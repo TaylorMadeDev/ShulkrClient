@@ -1,0 +1,788 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Shulkr - Built For The End</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollToPlugin.min.js"></script>
+</head>
+<body>
+    <div class="noise-overlay"></div>
+    <div class="grid-bg"></div>
+    
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="nav-container">
+            <a href="#" class="logo">
+                <svg class="logo-icon" viewBox="0 0 48 48" fill="none">
+                    <defs>
+                        <linearGradient id="logoGrad" x1="0" y1="0" x2="48" y2="48">
+                            <stop offset="0%" stop-color="#8b2dff"/>
+                            <stop offset="100%" stop-color="#ff2d95"/>
+                        </linearGradient>
+                    </defs>
+                    <rect width="48" height="48" rx="8" fill="url(#logoGrad)"/>
+                    <path d="M14 12h16c4.4 0 6 2.6 6 6s-1.6 6-6 6H18c-2.2 0-3 1.3-3 3s.8 3 3 3h16v6H16c-4.4 0-6-2.6-6-6s1.6-6 6-6h12c2.2 0 3-1.3 3-3s-.8-3-3-3H14V12z" fill="#07050a"/>
+                </svg>
+                <span>SHULKR</span>
+            </a>
+            <ul class="nav-links">
+                <li><a href="#features">FEATURES</a></li>
+                <li><a href="#performance">PERFORMANCE</a></li>
+                <li><a href="#security">SECURITY</a></li>
+                <li><a href="#community">COMMUNITY</a></li>
+            </ul>
+            <a href="#download" class="btn btn-primary nav-btn">
+                <span>DOWNLOAD SHULKR</span>
+                <i class="fa-solid fa-arrow-right"></i>
+            </a>
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <section class="hero">
+        <div class="hero-bg">
+            <div class="mountain-glow"></div>
+            <div class="shards-container">
+                <div class="shard shard-1"></div>
+                <div class="shard shard-2"></div>
+                <div class="shard shard-3"></div>
+                <div class="shard shard-4"></div>
+                <div class="shard shard-5"></div>
+            </div>
+        </div>
+        
+        <div class="hero-content">
+            <div class="hero-left">
+                <div class="hero-tag">
+                    <span class="tag-line"></span>
+                    <span>END. ELEVATED.</span>
+                </div>
+                <h1 class="hero-title">
+                    <span class="title-line">BUILT FOR</span>
+                    <span class="title-line title-accent">THE END.</span>
+                </h1>
+                <p class="hero-subtitle">
+                    <span class="slash">/</span> SHULKR IS A HIGH-PERFORMANCE GAMING CLIENT FOR PLAYERS WHO GO FURTHER.
+                </p>
+                
+                <div class="feature-badges">
+                    <div class="badge">
+                        <div class="badge-icon">
+                            <i class="fa-solid fa-bolt"></i>
+                        </div>
+                        <div class="badge-text">
+                            <strong>MAX</strong>
+                            <span>PERFORMANCE</span>
+                        </div>
+                    </div>
+                    <div class="badge">
+                        <div class="badge-icon">
+                            <i class="fa-solid fa-shield-halved"></i>
+                        </div>
+                        <div class="badge-text">
+                            <strong>ADVANCED</strong>
+                            <span>PROTECTION</span>
+                        </div>
+                    </div>
+                    <div class="badge">
+                        <div class="badge-icon">
+                            <i class="fa-solid fa-stopwatch"></i>
+                        </div>
+                        <div class="badge-text">
+                            <strong>COMPETITIVE</strong>
+                            <span>EDGE</span>
+                        </div>
+                    </div>
+                    <div class="badge">
+                        <div class="badge-icon">
+                            <i class="fa-solid fa-users"></i>
+                        </div>
+                        <div class="badge-text">
+                            <strong>PLAYER</strong>
+                            <span>COMMUNITY</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="hero-right">
+                <div class="release-card">
+                    <div class="release-header">
+                        <span class="release-label">LATEST RELEASE</span>
+                        <span class="release-close">×</span>
+                    </div>
+                    <div class="release-version">
+                        <h2>v2.0</h2>
+                        <span class="release-codename">/ OBSIDIAN</span>
+                    </div>
+                    <p class="release-tagline">FASTER. CLEANER. STRONGER.</p>
+                    <ul class="release-features">
+                        <li><span class="check"><i class="fa-solid fa-check"></i></span> BOOST FPS</li>
+                        <li><span class="check"><i class="fa-solid fa-check"></i></span> LOWER LATENCY</li>
+                        <li><span class="check"><i class="fa-solid fa-check"></i></span> SMART OPTIMIZATIONS</li>
+                        <li><span class="check"><i class="fa-solid fa-check"></i></span> BUILT-IN PROTECTIONS</li>
+                    </ul>
+                    <a href="#download" class="btn btn-download">
+                        <i class="fa-solid fa-download"></i>
+                        <span>DOWNLOAD NOW</span>
+                    </a>
+                    <p class="release-meta">Windows 10/11 · 64-bit</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="hero-footer">
+            <p class="footer-tag">
+                <span class="footer-line"></span>
+                <span>NOT JUST A CLIENT.</span>
+                <span class="footer-accent">IT'S YOUR ADVANTAGE</span>
+            </p>
+            <div class="social-icons">
+                <a href="#" class="social-icon" aria-label="Discord">
+                    <i class="fa-brands fa-discord"></i>
+                </a>
+                <a href="#" class="social-icon" aria-label="X / Twitter">
+                    <i class="fa-brands fa-x-twitter"></i>
+                </a>
+                <a href="#" class="social-icon" aria-label="YouTube">
+                    <i class="fa-brands fa-youtube"></i>
+                </a>
+                <a href="#" class="social-icon add-icon" aria-label="More">
+                    <i class="fa-solid fa-plus"></i>
+                </a>
+            </div>
+        </div>
+    </section>
+
+    <!-- More Than A Client Section -->
+    <section class="section about-section" id="features">
+        <div class="about-bg">
+            <div class="about-shard about-shard-1"></div>
+            <div class="about-shard about-shard-2"></div>
+        </div>
+        <div class="container about-grid">
+            <div class="about-text">
+                <h2 class="section-title">
+                    <span class="title-line">MORE THAN</span>
+                    <span class="title-line title-accent">JUST A CLIENT.</span>
+                </h2>
+                <p class="about-desc">
+                    Shulkr Client is a Minecraft scripting platform with an in-game dashboard, script editor, templates, modules, overlay tools, and backend support for managing local and published scripts.
+                </p>
+                <a href="#" class="btn btn-secondary">
+                    <span>EXPLORE FEATURES</span>
+                    <i class="fa-solid fa-arrow-right"></i>
+                </a>
+            </div>
+            <div class="about-visual">
+                <div class="app-window">
+                    <div class="window-header">
+                        <div class="window-dots">
+                            <span></span><span></span><span></span>
+                        </div>
+                        <div class="window-title">Shulkr Client</div>
+                    </div>
+                    <div class="window-body">
+                        <div class="window-sidebar">
+                            <div class="sidebar-item active">Dashboard</div>
+                            <div class="sidebar-item">Scripts</div>
+                            <div class="sidebar-item">Editor</div>
+                            <div class="sidebar-item">Modules</div>
+                            <div class="sidebar-item">Overlays</div>
+                            <div class="sidebar-item">Settings</div>
+                        </div>
+                        <div class="window-content">
+                            <div class="code-line"><span class="code-keyword">function</span> <span class="code-func">onTick</span>() {</div>
+                            <div class="code-line indent"><span class="code-var">player</span>.<span class="code-func">boost</span>(<span class="code-num">1.5</span>);</div>
+                            <div class="code-line indent"><span class="code-keyword">if</span> (<span class="code-var">fps</span> &lt; <span class="code-num">60</span>) {</div>
+                            <div class="code-line indent-2"><span class="code-var">optimizer</span>.<span class="code-func">run</span>();</div>
+                            <div class="code-line indent">}</div>
+                            <div class="code-line">}</div>
+                            <div class="code-line blank"></div>
+                            <div class="code-line"><span class="code-comment">// Shulkr v2.0 — Obsidian</span></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Features Section -->
+    <section class="section features-section" id="performance">
+        <div class="container">
+            <div class="section-header">
+                <div class="section-tag">
+                    <span class="tag-line"></span>
+                    <span>EVERYTHING YOU NEED</span>
+                </div>
+                <h2 class="section-title">
+                    <span class="title-line">POWERFUL FEATURES</span>
+                    <span class="title-line title-accent">BUILT FOR CREATORS</span>
+                </h2>
+                <p class="section-desc">
+                    From scripting to debugging, Shulkr gives you everything you need to create, test, and enhance your Minecraft experience.
+                </p>
+            </div>
+            
+            <div class="features-grid">
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <i class="fa-solid fa-code"></i>
+                    </div>
+                    <h3>SCRIPT EDITOR</h3>
+                    <p>A full-featured editor with syntax highlighting, auto-complete, and built-in debugging tools.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <i class="fa-solid fa-file-code"></i>
+                    </div>
+                    <h3>TEMPLATES</h3>
+                    <p>Jumpstart your ideas with pre-made script templates for all kinds of utilities and mods.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <i class="fa-solid fa-cubes"></i>
+                    </div>
+                    <h3>MODULES</h3>
+                    <p>Extend your scripts with powerful modules and APIs built for flexibility and performance.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <i class="fa-solid fa-desktop"></i>
+                    </div>
+                    <h3>WINDOWSPY</h3>
+                    <p>Inspect any Minecraft window or UI element with precision using WindowSpy.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <i class="fa-solid fa-eye"></i>
+                    </div>
+                    <h3>OVERLAY TOOLS</h3>
+                    <p>In-game overlay with info, notifications, and custom render components.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <i class="fa-solid fa-database"></i>
+                    </div>
+                    <h3>BACKEND SYSTEM</h3>
+                    <p>Manage your scripts, sync with the cloud, and stay connected across devices.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Showcase Section -->
+    <section class="section showcase-section" id="showcase">
+        <div class="showcase-bg">
+            <div class="showcase-shard showcase-shard-1"></div>
+            <div class="showcase-shard showcase-shard-2"></div>
+        </div>
+        <div class="container">
+            <div class="section-header showcase-header">
+                <div class="section-tag">
+                    <span class="tag-line"></span>
+                    <span>SEE IT IN ACTION</span>
+                </div>
+                <h2 class="section-title">
+                    <span class="title-line">POWERFUL.</span>
+                    <span class="title-line title-accent">INTUITIVE.</span>
+                </h2>
+                <p class="section-desc">
+                    A clean, modern interface designed for creators. Everything you need, right where you need it.
+                </p>
+            </div>
+            
+            <div class="showcase-stage">
+                <div class="showcase-frame">
+                    <img src="main.png" alt="Shulkr Client Interface" class="showcase-image">
+                    <div class="showcase-glow"></div>
+                </div>
+                <div class="floating-icons">
+                    <img src="shulkr-icons.png" alt="Shulkr Icons" class="icons-cluster icons-cluster-1">
+                    <img src="shulkr-icons.png" alt="Shulkr Icons" class="icons-cluster icons-cluster-2">
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Stats Section -->
+    <section class="stats-section" id="security">
+        <div class="stats-bg"></div>
+        <div class="container">
+            <div class="stats-tag">
+                <span class="tag-line"></span>
+                <span>TRUSTED BY THOUSANDS OF PLAYERS</span>
+            </div>
+            <div class="stats-grid">
+                <div class="stat-item">
+                    <span class="stat-number" data-target="100">0</span><span class="stat-suffix">K+</span>
+                    <span class="stat-label">USERS</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-number" data-target="2">0</span><span class="stat-suffix">M+</span>
+                    <span class="stat-label">SCRIPTS RUN</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-number" data-target="99.9">0</span><span class="stat-suffix">%</span>
+                    <span class="stat-label">UPTIME</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-number" data-target="24">0</span><span class="stat-suffix">/7</span>
+                    <span class="stat-label">SUPPORT</span>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Community Section -->
+    <section class="section community-section" id="community">
+        <div class="community-bg">
+            <div class="community-shard community-shard-1"></div>
+            <div class="community-shard community-shard-2"></div>
+        </div>
+        <div class="container community-grid">
+            <div class="community-text">
+                <div class="section-tag">
+                    <span class="tag-line"></span>
+                    <span>READY TO ELEVATE?</span>
+                </div>
+                <h2 class="section-title">
+                    <span class="title-line">JOIN THE</span>
+                    <span class="title-line title-accent">SHULKR COMMUNITY</span>
+                </h2>
+                <p class="community-desc">
+                    Stay updated, share scripts, get support, and connect with the best Minecraft scripters out there.
+                </p>
+                <a href="#" class="btn btn-primary">
+                    <span>JOIN OUR DISCORD</span>
+                    <i class="fa-solid fa-arrow-right"></i>
+                </a>
+            </div>
+            <div class="community-visual">
+                <div class="discord-card">
+                    <div class="discord-header">
+                        <span>Shulkr Community</span>
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 16l-6-6h12l-6 6z"/></svg>
+                    </div>
+                    <div class="discord-body">
+                        <div class="channel-list">
+                            <div class="channel-category">announcements</div>
+                            <div class="channel"># releases</div>
+                            <div class="channel"># updates</div>
+                            <div class="channel-category">scripts</div>
+                            <div class="channel"># scripts</div>
+                            <div class="channel"># showcase</div>
+                            <div class="channel-category">support</div>
+                            <div class="channel"># support</div>
+                            <div class="channel"># general</div>
+                        </div>
+                        <div class="chat-preview">
+                            <div class="message">
+                                <div class="message-avatar">S</div>
+                                <div class="message-content">
+                                    <div class="message-author">Shulkr <span class="bot-tag">BOT</span></div>
+                                    <div class="message-text">Shulkr v2.0 is now live! Check out the new performance improvements, modules, and more.</div>
+                                </div>
+                            </div>
+                            <div class="message">
+                                <div class="message-avatar" style="background: #5865F2;">P</div>
+                                <div class="message-content">
+                                    <div class="message-author">Player</div>
+                                    <div class="message-text">Just made this script! 🔥</div>
+                                    <div class="message-file">
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/>
+                                            <polyline points="13 2 13 9 20 9"/>
+                                        </svg>
+                                        <span>AutoFarm.lua</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container footer-content">
+            <div class="footer-brand">
+                <a href="#" class="logo">
+                    <svg class="logo-icon" viewBox="0 0 48 48" fill="none">
+                        <defs>
+                            <linearGradient id="logoGrad2" x1="0" y1="0" x2="48" y2="48">
+                                <stop offset="0%" stop-color="#8b2dff"/>
+                                <stop offset="100%" stop-color="#ff2d95"/>
+                            </linearGradient>
+                        </defs>
+                        <rect width="48" height="48" rx="8" fill="url(#logoGrad2)"/>
+                        <path d="M14 12h16c4.4 0 6 2.6 6 6s-1.6 6-6 6H18c-2.2 0-3 1.3-3 3s.8 3 3 3h16v6H16c-4.4 0-6-2.6-6-6s1.6-6 6-6h12c2.2 0 3-1.3 3-3s-.8-3-3-3H14V12z" fill="#07050a"/>
+                    </svg>
+                    <span>SHULKR</span>
+                </a>
+                <p>Built for the end. Elevated.</p>
+            </div>
+            <div class="footer-links">
+                <a href="#features">Features</a>
+                <a href="#performance">Performance</a>
+                <a href="#security">Security</a>
+                <a href="#community">Community</a>
+            </div>
+            <p class="footer-copy">© 2026 Shulkr. All rights reserved.</p>
+        </div>
+    </footer>
+
+    <script>
+        gsap.registerPlugin(ScrollTrigger, ScrollToPlugin);
+
+        // Navbar background on scroll
+        ScrollTrigger.create({
+            start: "top -80",
+            end: 99999,
+            toggleClass: { className: "scrolled", targets: ".navbar" }
+        });
+
+        // Hero entrance timeline
+        const heroTl = gsap.timeline({ defaults: { ease: "power3.out" } });
+        heroTl
+            .from(".hero-tag", { y: 30, opacity: 0, duration: 0.8 }, 0.2)
+            .from(".hero-title .title-line", { y: 100, opacity: 0, rotateX: 25, duration: 1.1, stagger: 0.15 }, 0.35)
+            .from(".hero-subtitle", { y: 30, opacity: 0, duration: 0.8 }, 0.75)
+            .from(".badge", { y: 50, opacity: 0, duration: 0.7, stagger: 0.1 }, 0.95)
+            .from(".release-card", { x: 80, opacity: 0, duration: 1.1, ease: "back.out(1.2)" }, 1.1)
+            .from(".hero-footer", { y: 30, opacity: 0, duration: 0.8 }, 1.35);
+
+        // Hero parallax shards
+        gsap.to(".shard", {
+            y: (i) => (i + 1) * 70,
+            rotation: (i) => (i % 2 === 0 ? 8 : -8),
+            ease: "none",
+            scrollTrigger: {
+                trigger: ".hero",
+                start: "top top",
+                end: "bottom top",
+                scrub: 1.2
+            }
+        });
+
+        // Mountain glow parallax / fade
+        gsap.to(".mountain-glow", {
+            y: 120,
+            opacity: 0.25,
+            scale: 1.1,
+            ease: "none",
+            scrollTrigger: {
+                trigger: ".hero",
+                start: "top top",
+                end: "bottom top",
+                scrub: 1
+            }
+        });
+
+        // About section
+        gsap.from(".about-text", {
+            x: -80,
+            opacity: 0,
+            duration: 1,
+            ease: "power3.out",
+            scrollTrigger: {
+                trigger: ".about-section",
+                start: "top 70%",
+                toggleActions: "play none none reverse"
+            }
+        });
+
+        gsap.from(".app-window", {
+            x: 80,
+            opacity: 0,
+            rotateY: 12,
+            duration: 1.2,
+            ease: "power3.out",
+            scrollTrigger: {
+                trigger: ".about-section",
+                start: "top 70%",
+                toggleActions: "play none none reverse"
+            }
+        });
+
+        // Features section
+        gsap.fromTo(".features-section .section-header",
+            { y: 60, opacity: 0 },
+            {
+                y: 0,
+                opacity: 1,
+                duration: 0.9,
+                ease: "power3.out",
+                scrollTrigger: {
+                    trigger: ".features-section",
+                    start: "top 75%",
+                    toggleActions: "play none none reverse"
+                }
+            }
+        );
+
+        gsap.fromTo(".feature-card",
+            { y: 80, opacity: 0 },
+            {
+                y: 0,
+                opacity: 1,
+                duration: 0.7,
+                stagger: 0.1,
+                ease: "power3.out",
+                scrollTrigger: {
+                    trigger: ".features-grid",
+                    start: "top 85%",
+                    toggleActions: "play none none reverse"
+                }
+            }
+        );
+
+        // Showcase section
+        gsap.fromTo(".showcase-header",
+            { y: 60, opacity: 0 },
+            {
+                y: 0,
+                opacity: 1,
+                duration: 0.9,
+                ease: "power3.out",
+                scrollTrigger: {
+                    trigger: ".showcase-section",
+                    start: "top 75%",
+                    toggleActions: "play none none reverse"
+                }
+            }
+        );
+
+        gsap.fromTo(".showcase-frame",
+            { y: 100, opacity: 0, rotateX: 20 },
+            {
+                y: 0,
+                opacity: 1,
+                rotateX: 0,
+                duration: 1.4,
+                ease: "power3.out",
+                scrollTrigger: {
+                    trigger: ".showcase-stage",
+                    start: "top 80%",
+                    toggleActions: "play none none reverse"
+                }
+            }
+        );
+
+        gsap.fromTo(".icons-cluster-1",
+            { x: -100, opacity: 0, rotateY: -45 },
+            {
+                x: 0,
+                opacity: 1,
+                rotateY: 0,
+                duration: 1.2,
+                ease: "power3.out",
+                scrollTrigger: {
+                    trigger: ".showcase-stage",
+                    start: "top 75%",
+                    toggleActions: "play none none reverse"
+                }
+            }
+        );
+
+        gsap.fromTo(".icons-cluster-2",
+            { x: 100, opacity: 0, rotateY: 45 },
+            {
+                x: 0,
+                opacity: 1,
+                rotateY: 0,
+                duration: 1.2,
+                delay: 0.2,
+                ease: "power3.out",
+                scrollTrigger: {
+                    trigger: ".showcase-stage",
+                    start: "top 75%",
+                    toggleActions: "play none none reverse"
+                }
+            }
+        );
+
+        // Showcase 3D scroll rotation
+        gsap.to(".showcase-frame", {
+            rotateY: 8,
+            rotateX: -4,
+            y: -40,
+            ease: "none",
+            scrollTrigger: {
+                trigger: ".showcase-section",
+                start: "top bottom",
+                end: "bottom top",
+                scrub: 1.5
+            }
+        });
+
+        gsap.to(".icons-cluster-1", {
+            y: -120,
+            rotateY: -25,
+            ease: "none",
+            scrollTrigger: {
+                trigger: ".showcase-section",
+                start: "top bottom",
+                end: "bottom top",
+                scrub: 1.2
+            }
+        });
+
+        gsap.to(".icons-cluster-2", {
+            y: -80,
+            rotateY: 25,
+            ease: "none",
+            scrollTrigger: {
+                trigger: ".showcase-section",
+                start: "top bottom",
+                end: "bottom top",
+                scrub: 1.2
+            }
+        });
+
+        // Mouse tilt for showcase frame
+        const showcaseFrame = document.querySelector(".showcase-frame");
+        const showcaseSection = document.querySelector(".showcase-section");
+
+        if (showcaseFrame && showcaseSection && window.matchMedia("(pointer: fine)").matches) {
+            showcaseSection.addEventListener("mousemove", (e) => {
+                const rect = showcaseSection.getBoundingClientRect();
+                const x = (e.clientX - rect.left) / rect.width - 0.5;
+                const y = (e.clientY - rect.top) / rect.height - 0.5;
+
+                gsap.to(showcaseFrame, {
+                    rotateY: x * 12,
+                    rotateX: -y * 12,
+                    duration: 0.6,
+                    ease: "power2.out",
+                    overwrite: "auto"
+                });
+            });
+
+            showcaseSection.addEventListener("mouseleave", () => {
+                gsap.to(showcaseFrame, {
+                    rotateY: 0,
+                    rotateX: 0,
+                    duration: 0.8,
+                    ease: "power2.out"
+                });
+            });
+        }
+
+        // Stats section
+        gsap.from(".stats-tag", {
+            y: 30,
+            opacity: 0,
+            duration: 0.8,
+            scrollTrigger: {
+                trigger: ".stats-section",
+                start: "top 75%",
+                toggleActions: "play none none reverse"
+            }
+        });
+
+        document.querySelectorAll(".stat-item").forEach((item, i) => {
+            const numberEl = item.querySelector(".stat-number");
+            const target = parseFloat(numberEl.dataset.target);
+            const isDecimal = target % 1 !== 0;
+
+            gsap.from(item, {
+                y: 50,
+                opacity: 0,
+                duration: 0.8,
+                delay: i * 0.1,
+                ease: "power3.out",
+                scrollTrigger: {
+                    trigger: ".stats-grid",
+                    start: "top 85%",
+                    toggleActions: "play none none reverse"
+                }
+            });
+
+            gsap.to(numberEl, {
+                innerText: target,
+                duration: 2,
+                ease: "power2.out",
+                delay: i * 0.1,
+                snap: { innerText: isDecimal ? 0.1 : 1 },
+                scrollTrigger: {
+                    trigger: ".stats-grid",
+                    start: "top 85%",
+                    toggleActions: "play none none reverse"
+                },
+                onUpdate: function() {
+                    const val = parseFloat(numberEl.innerText);
+                    numberEl.innerText = isDecimal ? val.toFixed(1) : Math.floor(val);
+                }
+            });
+        });
+
+        // Community section
+        gsap.from(".community-text", {
+            x: -80,
+            opacity: 0,
+            duration: 1,
+            ease: "power3.out",
+            scrollTrigger: {
+                trigger: ".community-section",
+                start: "top 70%",
+                toggleActions: "play none none reverse"
+            }
+        });
+
+        gsap.from(".discord-card", {
+            x: 80,
+            opacity: 0,
+            rotateY: -12,
+            duration: 1.2,
+            ease: "power3.out",
+            scrollTrigger: {
+                trigger: ".community-section",
+                start: "top 70%",
+                toggleActions: "play none none reverse"
+            }
+        });
+
+        // Footer reveal
+        gsap.from(".footer > .container > *", {
+            y: 30,
+            opacity: 0,
+            duration: 0.8,
+            stagger: 0.1,
+            ease: "power3.out",
+            scrollTrigger: {
+                trigger: ".footer",
+                start: "top 90%",
+                toggleActions: "play none none reverse"
+            }
+        });
+
+        // GSAP smooth scroll for anchor links
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function(e) {
+                const href = this.getAttribute('href');
+                if (href === '#') return;
+                e.preventDefault();
+                const target = document.querySelector(href);
+                if (target) {
+                    gsap.to(window, {
+                        duration: 1.2,
+                        scrollTo: { y: target, offsetY: 80 },
+                        ease: "power2.inOut"
+                    });
+                }
+            });
+        });
+    </script>
+</body>
+</html>

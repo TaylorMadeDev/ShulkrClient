@@ -1,0 +1,41 @@
+[
+  {
+    "id": "web-dashboard",
+    "name": "Web Dashboard",
+    "author": "Shulk",
+    "version": "1.0.0",
+    "description": "Open the live browser dashboard for scripts, libraries, and published entries.",
+    "category": "Dashboard",
+    "icon": "window-restore-regular.png",
+    "status": "Available",
+    "installed": true,
+    "favorite": true,
+    "openUrl": "http://127.0.0.1:50991/web/"
+  },
+  {
+    "id": "backend-admin",
+    "name": "Backend Admin",
+    "author": "Shulk",
+    "version": "1.0.0",
+    "description": "Open the local Express control surface for scripts, licenses, and modules.",
+    "category": "Admin",
+    "icon": "gear-solid.png",
+    "status": "Available",
+    "installed": true,
+    "favorite": false,
+    "openUrl": "http://127.0.0.1:50991/admin/"
+  },
+  {
+    "id": "script-hub",
+    "name": "Script Hub",
+    "author": "Shulk",
+    "version": "1.0.0",
+    "description": "Jump into the browser-based script workspace and published library tools.",
+    "category": "Workspace",
+    "icon": "house-solid.png",
+    "status": "Available",
+    "installed": true,
+    "favorite": false,
+    "openUrl": "http://127.0.0.1:50991/web/"
+  }
+]

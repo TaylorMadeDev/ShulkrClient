@@ -1,0 +1,98 @@
+[
+  {
+    "id": "nbtlib",
+    "name": "nbtlib",
+    "author": "jasonperlow",
+    "version": "v2.3.5",
+    "description": "Read, write and modify Minecraft NBT data.",
+    "category": "Data",
+    "icon": "box-solid.png",
+    "status": "Installed",
+    "installed": true,
+    "favorite": true
+  },
+  {
+    "id": "matplotlib",
+    "name": "matplotlib",
+    "author": "matplotlib",
+    "version": "v3.8.2",
+    "description": "Create static, animated and interactive visualizations.",
+    "category": "Visualization",
+    "icon": "circle-solid.png",
+    "status": "Installed",
+    "installed": true,
+    "favorite": false
+  },
+  {
+    "id": "requests",
+    "name": "requests",
+    "author": "psf",
+    "version": "v2.31.0",
+    "description": "HTTP for Humans.",
+    "category": "Web",
+    "icon": "arrows-rotate-solid.png",
+    "status": "Installed",
+    "installed": true,
+    "favorite": false
+  },
+  {
+    "id": "numpy",
+    "name": "numpy",
+    "author": "numpy",
+    "version": "v1.26.4",
+    "description": "Fundamental package for scientific computing.",
+    "category": "Data",
+    "icon": "box-open-solid.png",
+    "status": "Installed",
+    "installed": true,
+    "favorite": false
+  },
+  {
+    "id": "pillow",
+    "name": "pillow",
+    "author": "python-pillow",
+    "version": "v10.2.0",
+    "description": "Python Imaging Library for image processing.",
+    "category": "Utility",
+    "icon": "cloud-solid.png",
+    "status": "Installed",
+    "installed": true,
+    "favorite": false
+  },
+  {
+    "id": "pandas",
+    "name": "pandas",
+    "author": "pandas-dev",
+    "version": "v2.2.1",
+    "description": "Powerful data structures for data analysis.",
+    "category": "Data",
+    "icon": "border-all-solid.png",
+    "status": "Installed",
+    "installed": true,
+    "favorite": false
+  },
+  {
+    "id": "rich",
+    "name": "rich",
+    "author": "Textualize",
+    "version": "v13.7.1",
+    "description": "Rich text and beautiful formatting in the console.",
+    "category": "Utility",
+    "icon": "code-solid.png",
+    "status": "Installed",
+    "installed": true,
+    "favorite": false
+  },
+  {
+    "id": "aiohttp",
+    "name": "aiohttp",
+    "author": "aio-libs",
+    "version": "v3.9.3",
+    "description": "Asynchronous HTTP client/server framework.",
+    "category": "Web",
+    "icon": "circle-info-solid.png",
+    "status": "Not Installed",
+    "installed": false,
+    "favorite": false
+  }
+]

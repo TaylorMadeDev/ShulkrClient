@@ -1,0 +1,283 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Shulk Admin</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #080d16;
+      --panel: rgba(16, 23, 38, .78);
+      --card: rgba(19, 28, 45, .72);
+      --line: rgba(166, 178, 215, .18);
+      --text: #f7f4ff;
+      --muted: #aeb6ce;
+      --accent: #a358ff;
+      --green: #3ed863;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: Inter, Segoe UI, system-ui, sans-serif;
+      background: radial-gradient(circle at top, rgba(91, 49, 180, .25), transparent 35%), var(--bg);
+      color: var(--text);
+    }
+    main { width: min(1320px, calc(100vw - 48px)); margin: 0 auto; padding: 32px 0; }
+    header { display: flex; align-items: center; gap: 18px; margin-bottom: 24px; }
+    .logo { width: 58px; height: 58px; border-radius: 16px; background: rgba(163, 88, 255, .16); display: grid; place-items: center; }
+    .logo span { font-size: 34px; color: var(--accent); }
+    h1 { margin: 0; font-size: 30px; letter-spacing: .02em; }
+    p { color: var(--muted); margin: 6px 0 0; }
+    .grid { display: grid; grid-template-columns: 1.4fr .9fr; gap: 18px; }
+    .stats { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin-bottom: 18px; }
+    section, .stat {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      box-shadow: 0 20px 70px rgba(0, 0, 0, .22);
+    }
+    section { padding: 18px; }
+    .stat { padding: 16px; }
+    .stat small, th { color: var(--muted); font-size: 12px; font-weight: 500; }
+    .stat strong { display: block; font-size: 28px; margin-top: 6px; }
+    h2 { font-size: 17px; margin: 0 0 14px; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { text-align: left; padding: 11px 8px; border-bottom: 1px solid rgba(166,178,215,.1); }
+    td { color: #dce3f8; font-size: 13px; vertical-align: top; }
+    .pill { display: inline-flex; align-items: center; gap: 6px; padding: 4px 9px; border-radius: 999px; background: rgba(163,88,255,.18); color: #d6b8ff; font-size: 12px; text-decoration: none; }
+    .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); }
+    .cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+    .card { padding: 14px; border-radius: 12px; background: var(--card); border: 1px solid rgba(166,178,215,.14); display: grid; gap: 10px; }
+    .card b { display: block; }
+    .card small { color: var(--muted); }
+    button, a.button {
+      border: 1px solid rgba(163, 88, 255, .45);
+      background: rgba(89, 48, 168, .72);
+      color: var(--text);
+      border-radius: 10px;
+      padding: 10px 14px;
+      cursor: pointer;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+    button.secondary, a.secondary { background: rgba(17, 26, 43, .86); border-color: rgba(166,178,215,.2); }
+    button.danger { background: rgba(113, 35, 57, .72); border-color: rgba(255, 86, 128, .35); color: #ffb7c7; }
+    .form { display: grid; gap: 10px; }
+    .row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+    input, textarea {
+      width: 100%;
+      border: 1px solid rgba(166,178,215,.18);
+      background: rgba(8, 13, 24, .76);
+      color: var(--text);
+      border-radius: 10px;
+      padding: 11px 12px;
+      font: inherit;
+      outline: none;
+    }
+    textarea { min-height: 132px; resize: vertical; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; }
+    .actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+    .message { min-height: 18px; color: var(--muted); font-size: 12px; }
+    .link-row { display: flex; gap: 8px; flex-wrap: wrap; }
+    @media (max-width: 980px) {
+      .grid, .stats { grid-template-columns: 1fr; }
+      .cards { grid-template-columns: 1fr; }
+      .row { grid-template-columns: 1fr; }
+      .stats { grid-template-columns: 1fr 1fr; }
+    }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <div class="logo"><span>S</span></div>
+    <div>
+      <h1>Shulk Admin</h1>
+      <p>Backend control surface for clients, scripts, templates, libraries, and modules.</p>
+    </div>
+    <div style="margin-left:auto" class="link-row">
+      <a class="button secondary" href="/web/">Open Web Dashboard</a>
+      <a class="button secondary" href="/admin/">Open Admin</a>
+    </div>
+  </header>
+  <div class="stats" id="stats"></div>
+  <div class="grid">
+    <div>
+      <section>
+        <h2>Connected Clients</h2>
+        <table>
+          <thead><tr><th>User</th><th>Status</th><th>Minecraft</th><th>Last seen</th></tr></thead>
+          <tbody id="clients"></tbody>
+        </table>
+      </section>
+      <section style="margin-top:18px">
+        <h2>Access & Licenses</h2>
+        <div class="cards" id="licenses"></div>
+      </section>
+      <section style="margin-top:18px">
+        <h2>Published Scripts</h2>
+        <div class="cards" id="scripts"></div>
+      </section>
+      <section style="margin-top:18px">
+        <h2>Publish Script</h2>
+        <div class="form">
+          <div class="row">
+            <input id="publishName" placeholder="Script name">
+            <input id="publishFile" placeholder="File name, e.g. AutoFarm.py">
+          </div>
+          <div class="row">
+            <input id="publishAuthor" placeholder="Author" value="EnderUser">
+            <input id="publishTags" placeholder="Tags, comma separated">
+          </div>
+          <input id="publishIcon" placeholder="Icon file, e.g. code-solid.png">
+          <textarea id="publishAbout" placeholder="About this script"></textarea>
+          <textarea id="publishCode" placeholder="import minescript as ms&#10;&#10;ms.echo(&quot;Hello from Shulk&quot;)"></textarea>
+          <div class="actions">
+            <button id="publishButton">Publish to Library</button>
+            <button class="secondary" id="clearPublish">Clear</button>
+          </div>
+          <div class="message" id="publishMessage"></div>
+        </div>
+      </section>
+    </div>
+    <div>
+      <section>
+        <h2>Libraries</h2>
+        <div class="cards" id="libraries"></div>
+      </section>
+      <section style="margin-top:18px">
+        <h2>Modules</h2>
+        <div class="cards" id="modules"></div>
+      </section>
+      <section style="margin-top:18px">
+        <h2>Local Library Scripts</h2>
+        <div class="cards" id="libraryScripts"></div>
+      </section>
+      <section style="margin-top:18px">
+        <h2>Templates</h2>
+        <div class="cards" id="templates"></div>
+      </section>
+    </div>
+  </div>
+</main>
+<script>
+const $ = (id) => document.getElementById(id);
+async function get(path) {
+  const response = await fetch(path);
+  if (!response.ok) throw new Error(await response.text());
+  return response.json();
+}
+async function send(path, options) {
+  const response = await fetch(path, options);
+  if (!response.ok) throw new Error(await response.text());
+  return response.json();
+}
+function card(title, body, meta = "") {
+  return `<div class="card"><b>${escapeHtml(title)}</b><small>${escapeHtml(body || "")}</small>${meta ? `<div>${meta}</div>` : ""}</div>`;
+}
+function escapeHtml(value) {
+  return String(value ?? "").replace(/[&<>"']/g, (char) => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", "\"":"&quot;", "'":"&#39;" }[char]));
+}
+async function load() {
+  const [stats, clients, scripts, libraries, modules, libraryScripts, templates, licenses] = await Promise.all([
+    get("/api/stats"),
+    get("/api/clients"),
+    get("/api/library/scripts"),
+    get("/api/libraries"),
+    get("/api/client-modules"),
+    get("/api/libraries/scripts"),
+    get("/api/templates"),
+    get("/api/licenses")
+  ]);
+  $("stats").innerHTML = [
+    ["Scripts", stats.scripts],
+    ["Published", stats.publishedScripts],
+    ["Libraries", stats.installedLibraries ?? stats.installedModules],
+    ["Modules", stats.installedClientModules ?? modules.filter((module) => module.installed !== false).length],
+    ["Templates", stats.templates]
+  ].map(([label, value]) => `<div class="stat"><small>${label}</small><strong>${value}</strong></div>`).join("");
+  $("clients").innerHTML = clients.map((client) => `
+    <tr>
+      <td>${escapeHtml(client.displayName)} <span class="pill">${escapeHtml(client.tier || "User")}</span></td>
+      <td><span class="pill"><span class="dot"></span>${client.connected ? "Connected" : "Away"}</span></td>
+      <td>${escapeHtml(client.minecraft || "unknown")}</td>
+      <td>${escapeHtml(client.lastSeenAt || "")}</td>
+    </tr>`).join("");
+  $("scripts").innerHTML = scripts.length ? scripts.map((script) =>
+    card(script.name, script.about, `<span class="pill">${escapeHtml(script.category)}</span> <span class="pill">${script.downloads} installs</span><div class="actions"><button class="secondary" data-install="${escapeHtml(script.id)}">Install</button><button class="danger" data-delete="${escapeHtml(script.id)}">Delete</button></div>`)
+  ).join("") : card("No published scripts", "Use Shulk in-game to publish your first community script.");
+  $("licenses").innerHTML = licenses.map((license) =>
+    card(license.displayName, `${license.tier} / ${license.status}`, `<span class="pill">${escapeHtml((license.features || []).join(", "))}</span>`)
+  ).join("");
+  $("libraries").innerHTML = libraries.map((library) =>
+    card(library.name, library.description, `<span class="pill">${escapeHtml(library.category)}</span> <span class="pill">${library.installed ? "Installed" : "Available"}</span>`)
+  ).join("");
+  $("modules").innerHTML = modules.length ? modules.map((module) =>
+    card(module.name, module.description, `<span class="pill">${escapeHtml(module.category)}</span> <span class="pill">${module.installed ? "Installed" : "Available"}</span><div class="actions"><a class="button" href="${escapeHtml(module.openUrl || "/web/")}" target="_blank" rel="noreferrer">Open</a><button class="secondary" data-module-toggle="${escapeHtml(module.id)}">${module.installed ? "Disable" : "Install"}</button></div>`)
+  ).join("") : card("No modules", "Add client modules in the backend data file.");
+  $("libraryScripts").innerHTML = libraryScripts.length ? libraryScripts.map((script) =>
+    card(script, "Reusable local script helper.", `<span class="pill">Local</span> <span class="pill">${escapeHtml(script.split(".").pop().toUpperCase())}</span>`)
+  ).join("") : card("No local library scripts", "Mark scripts as reusable libraries from Shulk.");
+  $("templates").innerHTML = templates.map((template) =>
+    card(template.name, template.description, `<span class="pill">${escapeHtml(template.category)}</span> <span class="pill">${escapeHtml(template.difficulty)}</span>`)
+  ).join("");
+}
+$("clearPublish").addEventListener("click", () => {
+  ["publishName", "publishFile", "publishTags", "publishIcon", "publishAbout", "publishCode"].forEach((id) => $(id).value = "");
+  $("publishMessage").textContent = "";
+});
+$("publishButton").addEventListener("click", async () => {
+  $("publishMessage").textContent = "Publishing...";
+  try {
+    const payload = {
+      name: $("publishName").value,
+      fileName: $("publishFile").value,
+      author: $("publishAuthor").value,
+      tags: $("publishTags").value.split(",").map((tag) => tag.trim()).filter(Boolean),
+      icon: $("publishIcon").value,
+      about: $("publishAbout").value,
+      code: $("publishCode").value
+    };
+    await send("/api/library/scripts", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    $("publishMessage").textContent = "Published.";
+    await load();
+  } catch (error) {
+    $("publishMessage").textContent = error.message;
+  }
+});
+document.addEventListener("click", async (event) => {
+  const install = event.target.closest("[data-install]");
+  const del = event.target.closest("[data-delete]");
+  const moduleToggle = event.target.closest("[data-module-toggle]");
+  if (install) {
+    await send(`/api/library/scripts/${encodeURIComponent(install.dataset.install)}/install`, { method: "POST" });
+    await load();
+  }
+  if (del && confirm("Delete this published script?")) {
+    await send(`/api/library/scripts/${encodeURIComponent(del.dataset.delete)}`, { method: "DELETE" });
+    await load();
+  }
+  if (moduleToggle) {
+    const id = moduleToggle.dataset.moduleToggle;
+    const module = (await get("/api/client-modules")).find((item) => item.id === id);
+    if (module) {
+      await send(`/api/client-modules/${encodeURIComponent(id)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ installed: !module.installed })
+      });
+      await load();
+    }
+  }
+});
+load().catch((error) => { document.body.insertAdjacentHTML("afterbegin", `<pre>${escapeHtml(error.message)}</pre>`); });
+</script>
+</body>
+</html>

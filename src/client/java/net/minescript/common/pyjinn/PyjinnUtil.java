@@ -1,0 +1,40 @@
+// SPDX-FileCopyrightText: © 2022-2026 Greg Christiana <maxuser@minescript.net>
+// SPDX-License-Identifier: GPL-3.0-only
+
+package net.minescript.common.pyjinn;
+
+import java.util.Arrays;
+import org.pyjinn.interpreter.Script;
+import org.pyjinn.interpreter.Script.PyjList;
+import org.pyjinn.interpreter.Script.PyjTuple;
+
+public class PyjinnUtil {
+
+  public static final int[] toNullableIntArray(Object object) {
+    if (object == null) {
+      return null;
+    }
+    return toRequiredIntArray(object);
+  }
+
+  public static final int[] toRequiredIntArray(Object object) {
+    if (object instanceof PyjList pyList) {
+      return Script.getJavaList(pyList).stream()
+          .map(Number.class::cast)
+          .mapToInt(Number::intValue)
+          .toArray();
+    } else if (object instanceof PyjTuple pyTuple) {
+      return Arrays.stream(Script.getJavaArray(pyTuple))
+          .map(Number.class::cast)
+          .mapToInt(Number::intValue)
+          .toArray();
+    } else if (object instanceof Object[] array) {
+      return Arrays.stream(array).map(Number.class::cast).mapToInt(Number::intValue).toArray();
+    } else if (object instanceof int[] array) {
+      return array;
+    } else {
+      throw new IllegalArgumentException(
+          "Unexpected type not convertible to int array: " + object.getClass());
+    }
+  }
+}

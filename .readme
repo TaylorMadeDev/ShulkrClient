@@ -1,0 +1,10 @@
+Shulkr Client
+
+This project is a Fabric + ModernUI script workspace built around Minescript and a standalone Express backend.
+
+Notes:
+- The backend lives in `backend/` and is used by the client at runtime.
+- Generated runtime data lives under `run/` and should stay local.
+- Published library scripts are managed through the backend, not hardcoded in the UI.
+- If the backend is unreachable, the client should show `Server is offline`.
+- Use `U` in-game to open the client UI.

@@ -1,0 +1,22 @@
+{
+	"providers": [
+		{
+			"type": "reference",
+			"id": "minecraft:include/space"
+		},
+		{
+			"type": "ttf",
+			"file": "triton-ui:inter.ttf",
+			"size": 10.5,
+			"oversample": 4.0,
+			"shift": [
+				0.0,
+				0.4
+			]
+		},
+		{
+			"type": "reference",
+			"id": "minecraft:include/unifont"
+		}
+	]
+}

@@ -1,0 +1,65 @@
+# Gradle / Java
+.gradle/
+build/
+out/
+classes/
+bin/
+*.class
+*.jar
+*.war
+*.nar
+*.ear
+hs_err_*.log
+replay_*.log
+*.hprof
+*.jfr
+
+# Fabric / Minecraft runtime
+run/
+*.log.gz
+
+# Node
+node_modules/
+.npm-cache/
+backend/node_modules/
+web-client/node_modules/
+web-client/dist/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Local backend data and secrets
+.env
+.env.*
+backend/.env
+backend/.env.*
+backend/*.log
+backend/.cache/
+
+# IDEs
+.idea/
+.vscode/
+.settings/
+*.iml
+*.ipr
+*.iws
+*.launch
+.classpath
+.project
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Local smoke-test artifacts
+*-smoke.png
+playwright-report/
+test-results/
+
+# Python cache files from bundled script runtimes
+__pycache__/
+*.py[cod]
+tools/ffmpeg-release-essentials.zip
+tools/ffmpeg-release-essentials.zip

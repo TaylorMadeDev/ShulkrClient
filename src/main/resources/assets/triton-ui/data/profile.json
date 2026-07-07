@@ -1,0 +1,12 @@
+{
+  "id": "local-user",
+  "displayName": "EnderUser",
+  "tier": "Premium",
+  "avatar": "user-solid.png",
+  "activePage": "Dashboard",
+  "connected": true,
+  "uiScale": 100,
+  "status": "Ready",
+  "createdAt": "seed",
+  "lastSeenAt": "seed"
+}

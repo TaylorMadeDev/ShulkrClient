@@ -1,0 +1,174 @@
+# SPDX-FileCopyrightText: © 2026 Shulkr
+# SPDX-License-Identifier: GPL-3.0-only
+
+r"""pathfinder v1.0
+
+Usage:
+  \pathfinder
+  \pathfinder x y z
+  \pathfinder --range 48
+
+Finds a walking route from the player's current position to the targeted block
+under the crosshair, or to an explicit coordinate target. The computed path is
+printed to chat so you can follow it or feed it into another script.
+
+If no target is provided, the script tries the block you're looking at.
+"""
+
+from __future__ import annotations
+
+import heapq
+import math
+import sys
+
+from minescript import echo, get_block_region, player_get_targeted_block, player_position
+
+
+DEFAULT_RANGE = 48
+NEIGHBORS = (
+    (1, 0, 0),
+    (-1, 0, 0),
+    (0, 0, 1),
+    (0, 0, -1),
+)
+
+
+def floor_pos(values):
+    return tuple(int(math.floor(float(v))) for v in values)
+
+
+def normalize_block_name(name: str) -> str:
+    return (name or "").lower().strip()
+
+
+def is_air(block: str) -> bool:
+    name = normalize_block_name(block)
+    return (
+        not name
+        or name == "air"
+        or name.endswith(":air")
+        or "cave_air" in name
+        or "void_air" in name
+    )
+
+
+def is_solid(block: str) -> bool:
+    return not is_air(block)
+
+
+def walkable(region, x, y, z) -> bool:
+    try:
+        feet = region.get_block(x, y, z)
+        head = region.get_block(x, y + 1, z)
+        floor = region.get_block(x, y - 1, z)
+    except Exception:
+        return False
+    return is_air(feet) and is_air(head) and is_solid(floor)
+
+
+def heuristic(a, b):
+    return abs(a[0] - b[0]) + abs(a[1] - b[1]) + abs(a[2] - b[2])
+
+
+def reconstruct(came_from, current):
+    path = [current]
+    while current in came_from:
+      current = came_from[current]
+      path.append(current)
+    path.reverse()
+    return path
+
+
+def a_star(region, start, goal):
+    open_heap = [(0, start)]
+    came_from = {}
+    g_score = {start: 0}
+    closed = set()
+
+    while open_heap:
+        _, current = heapq.heappop(open_heap)
+        if current in closed:
+            continue
+        if current == goal:
+            return reconstruct(came_from, current)
+        closed.add(current)
+        for dx, dy, dz in NEIGHBORS:
+            nxt = (current[0] + dx, current[1] + dy, current[2] + dz)
+            if nxt in closed or not walkable(region, *nxt):
+                continue
+            tentative = g_score[current] + 1
+            if tentative < g_score.get(nxt, 1_000_000):
+                came_from[nxt] = current
+                g_score[nxt] = tentative
+                f_score = tentative + heuristic(nxt, goal)
+                heapq.heappush(open_heap, (f_score, nxt))
+    return None
+
+
+def parse_target(argv):
+  if len(argv) >= 4 and all(part.lstrip("-").isdigit() for part in argv[1:4]):
+    return tuple(int(part) for part in argv[1:4])
+  target = player_get_targeted_block(DEFAULT_RANGE)
+  if target is None:
+    return None
+  x, y, z = (int(v) for v in target.position)
+  return (x, y + 1, z)
+
+
+def parse_range(argv):
+    if "--range" in argv:
+        i = argv.index("--range")
+        if i + 1 < len(argv):
+            try:
+                return max(8, min(128, int(argv[i + 1])))
+            except Exception:
+                pass
+    return DEFAULT_RANGE
+
+
+def pad_bounds(start, goal, radius):
+    min_x = min(start[0], goal[0]) - radius
+    max_x = max(start[0], goal[0]) + radius
+    min_y = min(start[1], goal[1]) - 4
+    max_y = max(start[1], goal[1]) + 4
+    min_z = min(start[2], goal[2]) - radius
+    max_z = max(start[2], goal[2]) + radius
+    return (min_x, min_y, min_z), (max_x, max_y, max_z)
+
+
+def main(argv):
+    target = parse_target(argv)
+    if target is None:
+        echo("Pathfinder: look at a block or pass x y z.")
+        return 1
+
+    radius = parse_range(argv)
+    start = floor_pos(player_position())
+    goal = target
+    if start == goal:
+        echo("Pathfinder: you are already at the target.")
+        return 0
+
+    min_pos, max_pos = pad_bounds(start, goal, radius)
+    region = get_block_region(min_pos, max_pos, safety_limit=False)
+
+    if not walkable(region, *start):
+        echo("Pathfinder: start position is not walkable.")
+        return 1
+    if not walkable(region, goal[0], goal[1], goal[2]):
+        echo("Pathfinder: target position is not walkable.")
+        return 1
+
+    path = a_star(region, start, goal)
+    if not path:
+        echo(f"Pathfinder: no route found from {start} to {goal}.")
+        return 1
+
+    coords = " -> ".join(f"({x}, {y}, {z})" for x, y, z in path)
+    echo(f"Pathfinder route ({len(path)} nodes):")
+    echo(coords)
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv))

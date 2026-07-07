@@ -1,0 +1,90 @@
+[
+  {
+    "id": "autofarm-starter",
+    "name": "AutoFarm Starter",
+    "category": "Farming",
+    "description": "Scan mature crops, harvest, and replant safely.",
+    "difficulty": "Easy",
+    "blocks": 5,
+    "icon": "user-solid.png",
+    "badge": "Featured",
+    "script": "import minescript as ms\n\nsettings = {\n    \"range\": 5,\n    \"replant\": True,\n}\n\nms.echo(\"AutoFarm starter loaded\")\n"
+  },
+  {
+    "id": "combat-assist",
+    "name": "Combat Assist",
+    "category": "Combat",
+    "description": "Target checks, cooldown timing, and safe toggle states.",
+    "difficulty": "Medium",
+    "blocks": 8,
+    "icon": "broom-solid.png",
+    "badge": "Popular",
+    "script": "import minescript as ms\n\nms.echo(\"Combat Assist scaffold\")\n"
+  },
+  {
+    "id": "builder-macro",
+    "name": "Builder Macro",
+    "category": "World",
+    "description": "Place block patterns from a small coordinate plan.",
+    "difficulty": "Medium",
+    "blocks": 7,
+    "icon": "box-open-solid.png",
+    "badge": "",
+    "script": "import minescript as ms\n\nms.echo(\"Builder Macro scaffold\")\n"
+  },
+  {
+    "id": "chat-commands",
+    "name": "Chat Commands",
+    "category": "Utility",
+    "description": "Register commands and route arguments into handlers.",
+    "difficulty": "Easy",
+    "blocks": 4,
+    "icon": "code-solid.png",
+    "badge": "New",
+    "script": "import minescript as ms\n\nms.echo(\"Chat Commands scaffold\")\n"
+  },
+  {
+    "id": "hud-overlay",
+    "name": "HUD Overlay",
+    "category": "Render",
+    "description": "Draw status widgets, colors, and animated counters.",
+    "difficulty": "Medium",
+    "blocks": 6,
+    "icon": "border-all-solid.png",
+    "badge": "",
+    "script": "import minescript as ms\n\nms.echo(\"HUD Overlay scaffold\")\n"
+  },
+  {
+    "id": "route-walker",
+    "name": "Route Walker",
+    "category": "Movement",
+    "description": "Waypoint stepping, stuck checks, and movement stop conditions.",
+    "difficulty": "Advanced",
+    "blocks": 9,
+    "icon": "route-solid.png",
+    "badge": "",
+    "script": "import minescript as ms\n\nms.echo(\"Route Walker scaffold\")\n"
+  },
+  {
+    "id": "pathfinder-route",
+    "name": "Pathfinder Route",
+    "category": "Movement",
+    "description": "Build a route from your current position to the block under your crosshair.",
+    "difficulty": "Advanced",
+    "blocks": 11,
+    "icon": "person-walking-dashed-line-arrow-right-solid.png",
+    "badge": "New",
+    "script": "import minescript as ms\n\nms.echo(\"Pathfinder Route scaffold\")\n"
+  },
+  {
+    "id": "singleplayer-effect-toggle",
+    "name": "Effect Toggle",
+    "category": "Utility",
+    "description": "Loop a safe single-player effect and clean it up when the script stops.",
+    "difficulty": "Easy",
+    "blocks": 6,
+    "icon": "star-solid.png",
+    "badge": "Utility",
+    "script": "# Shulkr Effect Toggle - safe single-player effect loop.\nfrom system.lib import minescript as ms\n\nimport atexit\nimport time\n\nEFFECT = \"speed\"\nSECONDS = 3\nAMPLIFIER = 1\n\n\ndef command(text):\n    ms.execute(text)\n    ms.flush()\n\n\ndef cleanup():\n    command(f\"effect clear @s minecraft:{EFFECT}\")\n\n\natexit.register(cleanup)\nms.echo(f\"[Shulkr] {EFFECT} enabled. Stop this script to disable.\")\n\nwhile True:\n    command(f\"effect give @s minecraft:{EFFECT} {SECONDS} {AMPLIFIER} true\")\n    time.sleep(1.0)\n"
+  }
+]

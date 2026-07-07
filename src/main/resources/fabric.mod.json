@@ -1,0 +1,40 @@
+{
+	"schemaVersion": 1,
+	"id": "triton-ui",
+	"version": "${version}",
+	"name": "Shulkr Client",
+	"description": "A polished ModernUI script client and Minescript workspace.",
+	"authors": [
+		"Shulkr contributors"
+	],
+	"contact": {
+		"homepage": "https://github.com/TaylorMadeDev/Shulkr",
+		"sources": "https://github.com/TaylorMadeDev/Shulkr"
+	},
+	"license": "GPL-3.0-only",
+	"icon": "assets/triton-ui/icon.png",
+	"environment": "client",
+	"entrypoints": {
+		"main": [
+			"dev.triton.ui.TritonUI",
+			"net.minescript.fabric.MinescriptFabricMod"
+		],
+		"client": [
+			"dev.triton.ui.client.TritonUIClient",
+			"net.minescript.fabric.MinescriptFabricClientMod"
+		]
+	},
+	"mixins": [
+		"minescript.mixins.json",
+		"minescript.fabric.mixins.json"
+	],
+	"depends": {
+		"fabricloader": ">=0.19.3",
+		"minecraft": "~26.1.2",
+		"java": ">=25",
+		"fabric-api": "*",
+		"fabric-screen-api-v1": "*",
+		"modernui": "*",
+		"forgeconfigapiport": "*"
+	}
+}

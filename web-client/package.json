@@ -1,0 +1,14 @@
+{
+  "name": "shulkr-web-client",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1 --port 5177",
+    "build": "vite build",
+    "preview": "vite preview --host 127.0.0.1 --port 5178"
+  },
+  "devDependencies": {
+    "vite": "^8.1.3"
+  }
+}
