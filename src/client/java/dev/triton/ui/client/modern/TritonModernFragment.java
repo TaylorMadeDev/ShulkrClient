@@ -15,6 +15,7 @@ import icyllis.modernui.R;
 import icyllis.modernui.animation.Animator;
 import icyllis.modernui.animation.AnimatorSet;
 import icyllis.modernui.animation.ObjectAnimator;
+import icyllis.modernui.animation.ValueAnimator;
 import icyllis.modernui.fragment.Fragment;
 import icyllis.modernui.graphics.Color;
 import icyllis.modernui.graphics.drawable.GradientDrawable;
@@ -129,10 +130,13 @@ public final class TritonModernFragment extends Fragment {
 	private static final long PRESS_IN_MS = 70L;
 	private static final long PRESS_OUT_MS = 120L;
 	private static final long PAGE_IN_MS = 210L;
+	private static final long DOCK_INDICATOR_MS = 220L;
 	private static final int SIDE_WIDTH = 330;
 	private static final int TOP_BAR_HEIGHT = 56;
 	private static final int SEARCH_WIDTH = 520;
 	private static final int DOCK_WIDTH = 620;
+	private static final int DOCK_ITEM_SIZE = 50;
+	private static final int DOCK_ITEM_GAP = 8;
 	private static final String[] THEME_OPTIONS = {"Frontend Nova", "Dark glass", "Deep transparent", "High contrast", "Blue dusk"};
 	private static final String[] ACCENT_OPTIONS = {"Nova purple", "Shulkr purple", "Soft blue", "Electric cyan", "Emerald", "Rose"};
 	private static final String[] DENSITY_OPTIONS = {"Comfortable", "Compact", "Spacious"};
@@ -459,7 +463,7 @@ public final class TritonModernFragment extends Fragment {
 
 		LinearLayout profile = row(14);
 		profile.setPadding(compact ? 8 : 16, compact ? 10 : 14, compact ? 8 : 16, compact ? 10 : 14);
-		profile.setGravity(Gravity.CENTER_VERTICAL);
+		profile.setGravity(compact ? Gravity.CENTER : Gravity.CENTER_VERTICAL);
 		profile.setBackground(glass(Color.argb(112, 10, 15, 27), Color.argb(132, 7, 12, 22), 16, STROKE));
 		FrameLayout avatar = new FrameLayout(requireContext());
 		avatar.setBackground(round(Color.argb(150, 28, 76, 48), 12, Color.argb(100, 96, 255, 154)));
@@ -7668,7 +7672,7 @@ public final class TritonModernFragment extends Fragment {
 	}
 
 	private LinearLayout dock(boolean forceVisible) {
-		LinearLayout dock = row(8);
+		LinearLayout dock = row(0);
 		dock.setPadding(14, 0, 14, 0);
 		dock.setGravity(Gravity.CENTER);
 		dock.setBackground(glass(Color.argb(155, 10, 16, 27), Color.argb(180, 7, 12, 22), 18, Color.argb(95, 105, 116, 150)));
@@ -7682,6 +7686,23 @@ public final class TritonModernFragment extends Fragment {
 				{"window-restore-regular.png", "windowspy"}, {"circle-info-solid.png", "remote"},
 				{"border-none-solid.png", "overlays"}, {"gear-solid.png", "settings"}
 		};
+		int trackWidth = dockItems.length * DOCK_ITEM_SIZE + (dockItems.length - 1) * DOCK_ITEM_GAP;
+		FrameLayout track = new FrameLayout(requireContext());
+		View indicator = new View(requireContext());
+		indicator.setBackground(round(PURPLE, 16, 0));
+		indicator.setAlpha(0.0F);
+		indicator.setClickable(false);
+		indicator.setFocusable(false);
+		FrameLayout.LayoutParams indicatorParams = new FrameLayout.LayoutParams(DOCK_ITEM_SIZE, DOCK_ITEM_SIZE);
+		indicatorParams.gravity = Gravity.TOP | Gravity.START;
+		track.addView(indicator, indicatorParams);
+
+		LinearLayout itemRow = row(DOCK_ITEM_GAP);
+		View[] activeTab = new View[1];
+		View[] indicatorTarget = new View[1];
+		AnimatorSet[] positionAnimation = new AnimatorSet[1];
+		ValueAnimator[] widthAnimation = new ValueAnimator[1];
+		int itemIndex = 0;
 		for (String[] item : dockItems) {
 			boolean active = (page == Page.DASHBOARD && item[1].equals("dashboard"))
 					|| (page == Page.SCRIPTS && item[1].equals("scripts"))
@@ -7694,13 +7715,43 @@ public final class TritonModernFragment extends Fragment {
 					|| (page == Page.OVERLAYS && item[1].equals("overlays"))
 					|| (page == Page.SETTINGS && item[1].equals("settings"));
 			FrameLayout tab = new FrameLayout(requireContext());
-			View hoverLayer = new View(requireContext());
-			GradientDrawable normal = active ? round(PURPLE, 16, 0) : round(accentAlpha(42), 14, 0);
-			GradientDrawable hover = active ? round(accentAlpha(255), 16, 0) : round(accentAlpha(72), 14, 0);
-			hoverLayer.setBackground(normal);
-			tab.addView(hoverLayer, new FrameLayout.LayoutParams(match(), match()));
 			tab.addView(icon(item[0], active ? TEXT : MUTED), centered(24, 24));
-			makeSlidingHover(tab, hoverLayer, normal, hover, active);
+			tab.setClickable(true);
+			tab.setFocusable(true);
+			tab.setFocusableInTouchMode(true);
+			if (active) {
+				activeTab[0] = tab;
+				indicatorTarget[0] = tab;
+				indicator.setTranslationX(itemIndex * (DOCK_ITEM_SIZE + DOCK_ITEM_GAP));
+				indicator.setAlpha(1.0F);
+			}
+			tab.setOnHoverListener((target, event) -> {
+				if (event.getAction() == MotionEvent.ACTION_HOVER_ENTER) {
+					indicatorTarget[0] = target;
+					moveDockIndicator(indicator, target, positionAnimation, widthAnimation, true);
+					return true;
+				}
+				return false;
+			});
+			tab.setOnFocusChangeListener((target, hasFocus) -> {
+				if (hasFocus) {
+					indicatorTarget[0] = target;
+					moveDockIndicator(indicator, target, positionAnimation, widthAnimation, true);
+					return;
+				}
+				dock.post(() -> {
+					if (!dock.hasFocus() && activeTab[0] != null) {
+						indicatorTarget[0] = activeTab[0];
+						moveDockIndicator(indicator, activeTab[0], positionAnimation, widthAnimation, true);
+					}
+				});
+			});
+			tab.addOnLayoutChangeListener((target, left, top, right, bottom, oldLeft, oldTop, oldRight, oldBottom) -> {
+				if (indicatorTarget[0] == target && right - left > 0
+						&& (right - left != oldRight - oldLeft || left != oldLeft)) {
+					moveDockIndicator(indicator, target, positionAnimation, widthAnimation, false);
+				}
+			});
 			addPressAnimation(tab);
 			if (item[1].equals("dashboard")) {
 				tab.setOnClickListener(view -> openPage(Page.DASHBOARD));
@@ -7723,9 +7774,82 @@ public final class TritonModernFragment extends Fragment {
 			} else if (item[1].equals("settings")) {
 				tab.setOnClickListener(view -> openPage(Page.SETTINGS));
 			}
-			dock.addView(tab, new LinearLayout.LayoutParams(44, 50));
+			itemRow.addView(tab, new LinearLayout.LayoutParams(DOCK_ITEM_SIZE, DOCK_ITEM_SIZE));
+			itemIndex++;
 		}
+		track.addView(itemRow, new FrameLayout.LayoutParams(trackWidth, DOCK_ITEM_SIZE));
+		dock.addView(track, new LinearLayout.LayoutParams(trackWidth, DOCK_ITEM_SIZE));
+		dock.setOnHoverListener((target, event) -> {
+			if (event.getAction() == MotionEvent.ACTION_HOVER_EXIT && !dock.hasFocus() && activeTab[0] != null) {
+				indicatorTarget[0] = activeTab[0];
+				moveDockIndicator(indicator, activeTab[0], positionAnimation, widthAnimation, true);
+			}
+			return false;
+		});
+		track.addOnLayoutChangeListener((view, left, top, right, bottom, oldLeft, oldTop, oldRight, oldBottom) -> {
+			if (indicatorTarget[0] != null && (right - left != oldRight - oldLeft || bottom - top != oldBottom - oldTop)) {
+				moveDockIndicator(indicator, indicatorTarget[0], positionAnimation, widthAnimation, false);
+			}
+		});
+		track.post(() -> {
+			if (activeTab[0] != null) {
+				indicatorTarget[0] = activeTab[0];
+				moveDockIndicator(indicator, activeTab[0], positionAnimation, widthAnimation, false);
+			}
+		});
 		return dock;
+	}
+
+	private void moveDockIndicator(View indicator, View target, AnimatorSet[] positionAnimation,
+			ValueAnimator[] widthAnimation, boolean animate) {
+		if (target.getWidth() <= 0) {
+			return;
+		}
+		float targetX = target.getLeft();
+		int targetWidth = target.getWidth();
+		boolean motionEnabled = animate && animatedHoverHighlight && ValueAnimator.areAnimatorsEnabled();
+		if (!motionEnabled) {
+			cancelDockIndicatorAnimations(positionAnimation, widthAnimation);
+			indicator.setTranslationX(targetX);
+			setDockIndicatorWidth(indicator, targetWidth);
+			indicator.setAlpha(1.0F);
+			return;
+		}
+
+		cancelDockIndicatorAnimations(positionAnimation, widthAnimation);
+		ObjectAnimator translate = ObjectAnimator.ofFloat(indicator, View.TRANSLATION_X, indicator.getTranslationX(), targetX);
+		ObjectAnimator fade = ObjectAnimator.ofFloat(indicator, View.ALPHA, indicator.getAlpha(), 1.0F);
+		AnimatorSet position = new AnimatorSet();
+		position.playTogether(new Animator[]{translate, fade});
+		position.setDuration(DOCK_INDICATOR_MS);
+		positionAnimation[0] = position;
+
+		int currentWidth = indicator.getLayoutParams() == null ? targetWidth : indicator.getLayoutParams().width;
+		ValueAnimator width = ValueAnimator.ofInt(currentWidth, targetWidth);
+		width.addUpdateListener(animation -> setDockIndicatorWidth(indicator, (Integer) animation.getAnimatedValue()));
+		width.setDuration(DOCK_INDICATOR_MS);
+		widthAnimation[0] = width;
+		position.start();
+		width.start();
+	}
+
+	private void cancelDockIndicatorAnimations(AnimatorSet[] positionAnimation, ValueAnimator[] widthAnimation) {
+		if (positionAnimation[0] != null) {
+			positionAnimation[0].cancel();
+			positionAnimation[0] = null;
+		}
+		if (widthAnimation[0] != null) {
+			widthAnimation[0].cancel();
+			widthAnimation[0] = null;
+		}
+	}
+
+	private void setDockIndicatorWidth(View indicator, int width) {
+		ViewGroup.LayoutParams params = indicator.getLayoutParams();
+		if (params != null && params.width != width) {
+			params.width = width;
+			indicator.setLayoutParams(params);
+		}
 	}
 
 	private View primaryButton(String iconFile, String text, String trailingIcon) {
