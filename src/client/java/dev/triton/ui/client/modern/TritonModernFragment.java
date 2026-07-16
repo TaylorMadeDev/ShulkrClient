@@ -30,7 +30,6 @@ import icyllis.modernui.text.Layout;
 import icyllis.modernui.text.Spanned;
 import icyllis.modernui.text.TextPaint;
 import icyllis.modernui.text.TextWatcher;
-import icyllis.modernui.text.style.BackgroundColorSpan;
 import icyllis.modernui.text.style.CharacterStyle;
 import icyllis.modernui.util.ColorStateList;
 import icyllis.modernui.util.DataSet;
@@ -80,6 +79,7 @@ import java.nio.file.StandardCopyOption;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -181,6 +181,9 @@ public final class TritonModernFragment extends Fragment {
 	private LinearLayout consoleLogList;
 	private TextView completionHint;
 	private TextView completionGhost;
+	private TextView editorCursorOverlay;
+	private TextView editorMinimap;
+	private TextView editorSaveStatus;
 	private TextView editorLineNumbers;
 	private EditText codeEditor;
 	private View currentPageFrame;
@@ -213,6 +216,7 @@ public final class TritonModernFragment extends Fragment {
 	private Page restorePageSearchFocus;
 	private List<String> localCompletionCache = List.of();
 	private final Set<Path> dirtyScripts = new HashSet<>();
+	private final Set<Path> pendingCloseConfirmations = new HashSet<>();
 	private final Set<Path> selectedEditorItems = new LinkedHashSet<>();
 	private final Set<Path> collapsedEditorFolders = new HashSet<>();
 	private FluxusConfig settingsConfig;
@@ -227,7 +231,6 @@ public final class TritonModernFragment extends Fragment {
 	private boolean dropdownClosing;
 	private boolean rightPanelExpanded;
 	private boolean headerHidden;
-	private boolean createBackupsBeforeRun = true;
 	private boolean hidePlayerNamesInCaptures;
 	private String capturingShortcutAction = "";
 	private String windowSpyTab = "Live";
@@ -281,16 +284,19 @@ public final class TritonModernFragment extends Fragment {
 
 	private record ProcessResult(boolean started, boolean timedOut, int exitCode, String output, String error) {}
 	private boolean currentScriptRunning;
+	private long dangerousRunConfirmationExpiresAt;
+	private int runGeneration;
 	private boolean localCompletionDirty = true;
 	private long lastEditorClickAt;
 	private long lastEditorTextClickAt;
 	private final ScheduledExecutorService lintExecutor = Executors.newSingleThreadScheduledExecutor(runnable -> {
-		Thread thread = new Thread(runnable, "Shulkr Ruff Linter");
+		Thread thread = new Thread(runnable, "Shulkr Editor Worker");
 		thread.setDaemon(true);
 		return thread;
 	});
-	private ScheduledFuture<?> ruffLintTask;
 	private ScheduledFuture<?> editorAnalysisTask;
+	private ScheduledFuture<?> editorAutosaveTask;
+	private ScheduledFuture<?> editorRunTimeoutTask;
 	private int lintGeneration;
 	private int editorLineCount;
 	private final String initialPage;
@@ -381,14 +387,15 @@ public final class TritonModernFragment extends Fragment {
 
 	@Override
 	public void onDestroy() {
+		captureActiveDraft();
+		persistAllRecoveryDrafts();
 		super.onDestroy();
 		TritonUIClient.clearActiveModernFragment(this);
-		if (ruffLintTask != null) {
-			ruffLintTask.cancel(true);
-		}
 		if (editorAnalysisTask != null) {
 			editorAnalysisTask.cancel(true);
 		}
+		if (editorAutosaveTask != null) editorAutosaveTask.cancel(true);
+		if (editorRunTimeoutTask != null) editorRunTimeoutTask.cancel(true);
 		lintExecutor.shutdownNow();
 	}
 
@@ -1521,7 +1528,7 @@ public final class TritonModernFragment extends Fragment {
 		panel.addView(label("What You Get", 16, TEXT));
 		panel.addView(checkLine(selected.difficulty() + " starter scaffold"));
 		panel.addView(checkLine("Editable " + selected.category().toLowerCase(Locale.ROOT) + " logic"));
-		panel.addView(checkLine("Ruff-ready Python script"));
+		panel.addView(checkLine("Editor-ready Python script"));
 		panel.addView(checkLine("Created directly in your scripts folder"));
 		return panel;
 	}
@@ -2503,9 +2510,18 @@ public final class TritonModernFragment extends Fragment {
 			right.addView(settingsLiveStatusCard(), new LinearLayout.LayoutParams(match(), 0, 1.0F));
 		} else if (settingsTab == SettingsTab.EDITOR) {
 			body.addView(right, new LinearLayout.LayoutParams(0, match(), 1.0F));
-			left.addView(editorSettingsCard(), new LinearLayout.LayoutParams(match(), 260));
-			left.addView(editorLintSettingsCard(), new LinearLayout.LayoutParams(match(), 0, 1.0F));
-			right.addView(settingsLiveStatusCard(), new LinearLayout.LayoutParams(match(), 0, 1.0F));
+			ScrollView leftScroll = layoutScrollView();
+			LinearLayout leftCards = column(14);
+			leftCards.addView(editorEditingSettingsCard(), new LinearLayout.LayoutParams(match(), wrap()));
+			leftCards.addView(editorAppearanceSettingsCard(), new LinearLayout.LayoutParams(match(), wrap()));
+			leftScroll.addView(leftCards, new ScrollView.LayoutParams(match(), wrap()));
+			left.addView(leftScroll, new LinearLayout.LayoutParams(match(), 0, 1.0F));
+			ScrollView rightScroll = layoutScrollView();
+			LinearLayout rightCards = column(14);
+			rightCards.addView(editorSaveRecoverySettingsCard(), new LinearLayout.LayoutParams(match(), wrap()));
+			rightCards.addView(editorRunBehaviourSettingsCard(), new LinearLayout.LayoutParams(match(), wrap()));
+			rightScroll.addView(rightCards, new ScrollView.LayoutParams(match(), wrap()));
+			right.addView(rightScroll, new LinearLayout.LayoutParams(match(), 0, 1.0F));
 		} else if (settingsTab == SettingsTab.SHORTCUTS) {
 			body.addView(right, new LinearLayout.LayoutParams(0, match(), 1.0F));
 			left.addView(shortcutSettingsCard(), new LinearLayout.LayoutParams(match(), 300));
@@ -2541,9 +2557,10 @@ public final class TritonModernFragment extends Fragment {
 			content.addView(fileBackupSettingsCard(), new LinearLayout.LayoutParams(match(), 260));
 			content.addView(settingsLiveStatusCard(), new LinearLayout.LayoutParams(match(), 320));
 		} else if (settingsTab == SettingsTab.EDITOR) {
-			content.addView(editorSettingsCard(), new LinearLayout.LayoutParams(match(), 260));
-			content.addView(editorLintSettingsCard(), new LinearLayout.LayoutParams(match(), 260));
-			content.addView(settingsLiveStatusCard(), new LinearLayout.LayoutParams(match(), 320));
+			content.addView(editorEditingSettingsCard(), new LinearLayout.LayoutParams(match(), wrap()));
+			content.addView(editorAppearanceSettingsCard(), new LinearLayout.LayoutParams(match(), wrap()));
+			content.addView(editorSaveRecoverySettingsCard(), new LinearLayout.LayoutParams(match(), wrap()));
+			content.addView(editorRunBehaviourSettingsCard(), new LinearLayout.LayoutParams(match(), wrap()));
 		} else if (settingsTab == SettingsTab.SHORTCUTS) {
 			content.addView(shortcutSettingsCard(), new LinearLayout.LayoutParams(match(), 300));
 			content.addView(shortcutHelperCard(), new LinearLayout.LayoutParams(match(), 340));
@@ -2631,10 +2648,6 @@ public final class TritonModernFragment extends Fragment {
 		View templateFolder = settingsValueRow("Template folder", scriptDir.resolve("templates").toString());
 		templateFolder.setOnClickListener(view -> openFolder(scriptDir.resolve("templates"), "Template folder"));
 		card.addView(templateFolder, new LinearLayout.LayoutParams(match(), 38));
-		card.addView(settingsSwitchRow("Autosave scripts", settingsConfig.autosaveScripts(), checked -> {
-			settingsConfig.setAutosaveScripts(checked);
-			saveSettingsConfig("Autosave scripts updated.");
-		}), new LinearLayout.LayoutParams(match(), 38));
 		String selectedRelative = selectedScriptRelativePath();
 		boolean canFlagModule = selectedScript != null && Files.isRegularFile(selectedScript);
 		card.addView(settingsSwitchRow("Selected script is module", canFlagModule && FluxusAppState.get().isScriptModule(selectedRelative), checked -> {
@@ -2645,36 +2658,77 @@ public final class TritonModernFragment extends Fragment {
 			FluxusAppState.get().setScriptModule(selectedRelative, checked);
 			saveUiMessage((checked ? "Marked " : "Unmarked ") + selectedScript.getFileName() + " as a module.");
 		}), new LinearLayout.LayoutParams(match(), 38));
-		card.addView(settingsSwitchRow("Create backups before run", createBackupsBeforeRun, checked -> {
-			createBackupsBeforeRun = checked;
-			saveUiMessage("Backups before run set to " + checked + ".");
-		}), new LinearLayout.LayoutParams(match(), 38));
-		View backup = settingsSliderRow("Backup history", settingsConfig.backupHistory() + " files");
-		backup.setOnClickListener(view -> {
-			settingsConfig.setBackupHistory(settingsConfig.backupHistory() == 25 ? 50 : 25);
-			saveSettingsConfig("Backup history set to " + settingsConfig.backupHistory() + ".");
-		});
-		card.addView(backup, new LinearLayout.LayoutParams(match(), 46));
 		return card;
 	}
 
-	private View editorSettingsCard() {
-		LinearLayout card = settingsCard("Editor", "code-solid.png");
-		card.addView(settingsSwitchRow("Python autocomplete", settingsConfig.inlineAutocomplete(), checked -> {
-			settingsConfig.setInlineAutocomplete(checked);
-			saveSettingsConfig("Python autocomplete updated.");
-		}), new LinearLayout.LayoutParams(match(), 38));
-		card.addView(settingsSwitchRow("Ruff diagnostics", settingsConfig.ruffDiagnostics(), checked -> {
-			settingsConfig.setRuffDiagnostics(checked);
-			saveSettingsConfig("Ruff diagnostics updated.");
-		}), new LinearLayout.LayoutParams(match(), 38));
-		card.addView(settingsSwitchRow("Inline ghost text", settingsConfig.inlineAutocomplete(), checked -> {
-			settingsConfig.setInlineAutocomplete(checked);
-			saveSettingsConfig("Inline ghost text updated.");
-		}), new LinearLayout.LayoutParams(match(), 38));
-		card.addView(settingsDropdownRow("indentation", "Indentation", "Spaces: 4", new String[]{"Spaces: 4", "Spaces: 2", "Tabs"},
-				value -> saveUiMessage("Indentation set to " + value + ".")), new LinearLayout.LayoutParams(match(), 38));
+	private View editorEditingSettingsCard() {
+		LinearLayout card = settingsCard("Editing", "code-solid.png");
+		addEditorToggle(card, "Python autocomplete", settingsConfig.pythonAutocomplete(), settingsConfig::setPythonAutocomplete);
+		addEditorToggle(card, "Inline suggestions", settingsConfig.inlineSuggestions(), settingsConfig::setInlineSuggestions);
+		addEditorToggle(card, "Hover documentation", settingsConfig.hoverDocumentation(), settingsConfig::setHoverDocumentation);
+		addEditorToggle(card, "Signature help", settingsConfig.signatureHelp(), settingsConfig::setSignatureHelp);
+		addEditorToggle(card, "Auto-close brackets and quotes", settingsConfig.autoCloseBracketsAndQuotes(), settingsConfig::setAutoCloseBracketsAndQuotes);
+		addEditorToggle(card, "Bracket-pair highlighting", settingsConfig.bracketPairHighlighting(), settingsConfig::setBracketPairHighlighting);
+		addEditorToggle(card, "Word wrap", settingsConfig.wordWrap(), settingsConfig::setWordWrap);
+		card.addView(settingsDropdownRow("editor-tab-size", "Tab size", settingsConfig.editorTabSize() + " spaces", new String[]{"2 spaces", "4 spaces", "8 spaces"}, value -> {}), new LinearLayout.LayoutParams(match(), 38));
+		addEditorToggle(card, "Convert tabs to spaces", settingsConfig.convertTabsToSpaces(), settingsConfig::setConvertTabsToSpaces);
+		addEditorToggle(card, "Format pasted indentation", settingsConfig.formatPastedIndentation(), settingsConfig::setFormatPastedIndentation);
 		return card;
+	}
+
+	private View editorAppearanceSettingsCard() {
+		LinearLayout card = settingsCard("Editor Appearance", "eye-dropper-solid.png");
+		card.addView(settingsIntSliderRow("Font size", 10, 24, settingsConfig.editorFontSize(), " px", value -> updateEditorSetting("Editor font size", () -> settingsConfig.setEditorFontSize(value))), new LinearLayout.LayoutParams(match(), 46));
+		card.addView(settingsIntSliderRow("Line height", 14, 36, settingsConfig.editorLineHeight(), " px", value -> updateEditorSetting("Editor line height", () -> settingsConfig.setEditorLineHeight(value))), new LinearLayout.LayoutParams(match(), 46));
+		card.addView(settingsDropdownRow("editor-cursor-style", "Cursor style", settingsConfig.cursorStyle(), new String[]{"Line", "Block", "Underline"}, value -> {}), new LinearLayout.LayoutParams(match(), 38));
+		addEditorToggle(card, "Smooth cursor animation", settingsConfig.smoothCursorAnimation(), settingsConfig::setSmoothCursorAnimation);
+		addEditorToggle(card, "Show line numbers", settingsConfig.showLineNumbers(), settingsConfig::setShowLineNumbers);
+		addEditorToggle(card, "Highlight current line", settingsConfig.highlightCurrentLine(), settingsConfig::setHighlightCurrentLine);
+		addEditorToggle(card, "Render whitespace", settingsConfig.renderWhitespace(), settingsConfig::setRenderWhitespace);
+		addEditorToggle(card, "Show indentation guides", settingsConfig.showIndentationGuides(), settingsConfig::setShowIndentationGuides);
+		addEditorToggle(card, "Show minimap", settingsConfig.showMinimap(), settingsConfig::setShowMinimap);
+		return card;
+	}
+
+	private View editorSaveRecoverySettingsCard() {
+		LinearLayout card = settingsCard("Save & Recovery", "folder-open-solid.png");
+		card.addView(settingsDropdownRow("editor-autosave", "Autosave", settingsConfig.autosaveMode(), new String[]{"Off", "After Delay", "On Focus Change"}, value -> {}), new LinearLayout.LayoutParams(match(), 38));
+		card.addView(settingsIntSliderRow("Autosave delay", 250, 5000, settingsConfig.autosaveDelay(), " ms", value -> updateEditorSetting("Autosave delay", () -> settingsConfig.setAutosaveDelay(value))), new LinearLayout.LayoutParams(match(), 46));
+		addEditorToggle(card, "Trim trailing whitespace on save", settingsConfig.trimTrailingWhitespaceOnSave(), settingsConfig::setTrimTrailingWhitespaceOnSave);
+		addEditorToggle(card, "Insert final newline", settingsConfig.insertFinalNewline(), settingsConfig::setInsertFinalNewline);
+		addEditorToggle(card, "Create backup before saving", settingsConfig.createBackupBeforeSaving(), settingsConfig::setCreateBackupBeforeSaving);
+		card.addView(settingsIntSliderRow("Maximum backup count", 0, 100, settingsConfig.maximumBackupCount(), "", value -> updateEditorSetting("Maximum backup count", () -> settingsConfig.setMaximumBackupCount(value))), new LinearLayout.LayoutParams(match(), 46));
+		addEditorToggle(card, "Restore unsaved tabs after reopening", settingsConfig.restoreUnsavedTabs(), settingsConfig::setRestoreUnsavedTabs);
+		addEditorToggle(card, "Confirm before closing unsaved files", settingsConfig.confirmCloseUnsaved(), settingsConfig::setConfirmCloseUnsaved);
+		return card;
+	}
+
+	private View editorRunBehaviourSettingsCard() {
+		LinearLayout card = settingsCard("Run Behaviour", "play-solid.png");
+		addEditorToggle(card, "Save script before running", settingsConfig.saveBeforeRunning(), settingsConfig::setSaveBeforeRunning);
+		addEditorToggle(card, "Stop previous instance before running again", settingsConfig.stopPreviousBeforeRunning(), settingsConfig::setStopPreviousBeforeRunning);
+		addEditorToggle(card, "Clear output before running", settingsConfig.clearOutputBeforeRunning(), settingsConfig::setClearOutputBeforeRunning);
+		addEditorToggle(card, "Open output panel when execution starts", settingsConfig.openOutputOnRun(), settingsConfig::setOpenOutputOnRun);
+		addEditorToggle(card, "Focus output panel when an error occurs", settingsConfig.focusOutputOnError(), settingsConfig::setFocusOutputOnError);
+		card.addView(settingsIntSliderRow("Default execution timeout", 0, 300, settingsConfig.executionTimeoutSeconds(), " s", value -> updateEditorSetting("Execution timeout", () -> settingsConfig.setExecutionTimeoutSeconds(value))), new LinearLayout.LayoutParams(match(), 46));
+		card.addView(settingsDropdownRow("editor-working-directory", "Working directory", settingsConfig.workingDirectoryMode(), new String[]{"Script Folder", "Minescript Folder", "Custom"}, value -> {}), new LinearLayout.LayoutParams(match(), 38));
+		if (settingsConfig.workingDirectoryMode().equals("Custom")) card.addView(settingsTextInputRow("Custom directory", settingsConfig.customWorkingDirectory(), settingsConfig::setCustomWorkingDirectory), new LinearLayout.LayoutParams(match(), 42));
+		addEditorToggle(card, "Confirm before running dangerous scripts", settingsConfig.confirmDangerousScripts(), settingsConfig::setConfirmDangerousScripts);
+		addEditorToggle(card, "Automatically stop scripts when leaving the world", settingsConfig.stopScriptsOnWorldLeave(), settingsConfig::setStopScriptsOnWorldLeave);
+		return card;
+	}
+
+	private void addEditorToggle(LinearLayout card, String name, boolean value, Consumer<Boolean> setter) {
+		card.addView(settingsSwitchRow(name, value, checked -> updateEditorSetting(name, () -> setter.accept(checked))), new LinearLayout.LayoutParams(match(), 38));
+	}
+
+	private void updateEditorSetting(String name, Runnable update) {
+		update.run();
+		settingsConfig.save();
+		TritonUIClient.reloadConfig();
+		settingsConfig = TritonUIClient.config();
+		settingsMessage = name + " updated.";
+		renderShell();
 	}
 
 	private View privacySettingsCard() {
@@ -2682,10 +2736,6 @@ public final class TritonModernFragment extends Fragment {
 		card.addView(settingsSwitchRow("Hide player names in captures", hidePlayerNamesInCaptures, checked -> {
 			hidePlayerNamesInCaptures = checked;
 			saveUiMessage("Capture privacy set to " + checked + ".");
-		}), new LinearLayout.LayoutParams(match(), 38));
-		card.addView(settingsSwitchRow("Confirm destructive scripts", settingsConfig.confirmDestructiveScripts(), checked -> {
-			settingsConfig.setConfirmDestructiveScripts(checked);
-			saveSettingsConfig("Destructive script confirmation updated.");
 		}), new LinearLayout.LayoutParams(match(), 38));
 		card.addView(settingsSwitchRow("Block network by default", settingsConfig.blockNetworkByDefault(), checked -> {
 			settingsConfig.setBlockNetworkByDefault(checked);
@@ -3006,16 +3056,6 @@ public final class TritonModernFragment extends Fragment {
 		return card;
 	}
 
-	private View editorLintSettingsCard() {
-		LinearLayout card = settingsCard("Linting", "broom-solid.png");
-		card.addView(settingsValueRow("Ruff", settingsConfig.ruffDiagnostics() ? "Enabled" : "Disabled"), new LinearLayout.LayoutParams(match(), 38));
-		card.addView(settingsValueRow("Autocomplete", settingsConfig.inlineAutocomplete() ? "Enabled" : "Disabled"), new LinearLayout.LayoutParams(match(), 38));
-		View test = settingsActionRow("Test Ruff command", "play-solid.png");
-		test.setOnClickListener(view -> testRuffCommand());
-		card.addView(test, new LinearLayout.LayoutParams(match(), 42));
-		return card;
-	}
-
 	private View shortcutHelperCard() {
 		LinearLayout card = settingsCard("Installed Script Shortcuts", "keyboard");
 		card.addView(label("Click a row and press a combination. Escape cancels; Backspace or Delete clears. Script shortcuts are suppressed while typing.", 12, MUTED));
@@ -3261,6 +3301,32 @@ public final class TritonModernFragment extends Fragment {
 		return row;
 	}
 
+	private View settingsTextInputRow(String name, String value, Consumer<String> onChanged) {
+		LinearLayout row = row(10);
+		row.setGravity(Gravity.CENTER_VERTICAL);
+		row.addView(label(name, 12, MUTED), new LinearLayout.LayoutParams(128, wrap()));
+		EditText input = new EditText(requireContext());
+		input.setSingleLine(true);
+		input.setText(value == null ? "" : value);
+		input.setTextSize(12);
+		input.setTextColor(TEXT);
+		input.setHint("Choose an existing folder");
+		input.setHintTextColor(FAINT);
+		input.setPadding(10, 0, 10, 0);
+		input.setBackground(round(Color.argb(110, 18, 24, 39), 8, Color.argb(70, 105, 116, 150)));
+		input.setOnFocusChangeListener((view, focused) -> {
+			if (!focused) {
+				onChanged.accept(input.getText().toString().trim());
+				settingsConfig.save();
+				TritonUIClient.reloadConfig();
+				settingsConfig = TritonUIClient.config();
+				settingsMessage = name + " updated.";
+			}
+		});
+		row.addView(input, new LinearLayout.LayoutParams(0, 36, 1.0F));
+		return row;
+	}
+
 	private View settingsSliderRow(String name, String value) {
 		LinearLayout row = row(10);
 		row.setGravity(Gravity.CENTER_VERTICAL);
@@ -3382,6 +3448,8 @@ public final class TritonModernFragment extends Fragment {
 	private void saveSettingsConfig(String message) {
 		applyConfigPalette();
 		settingsConfig.save();
+		TritonUIClient.reloadConfig();
+		settingsConfig = TritonUIClient.config();
 		capturingShortcutAction = "";
 		settingsMessage = message;
 		renderShell();
@@ -3962,15 +4030,6 @@ public final class TritonModernFragment extends Fragment {
 		renderShell();
 	}
 
-	private void testRuffCommand() {
-		String version = runProcessForFirstLine(new String[]{"ruff", "--version"});
-		if (version.isBlank()) {
-			version = runProcessForFirstLine(new String[]{"py", "-m", "ruff", "--version"});
-		}
-		settingsMessage = version.isBlank() ? "Ruff was not found." : "Ruff OK: " + version;
-		renderShell();
-	}
-
 	private void openFolder(Path folder, String name) {
 		try {
 			Files.createDirectories(folder);
@@ -4040,7 +4099,7 @@ public final class TritonModernFragment extends Fragment {
 		LinearLayout card = aboutCard("What This Is", "circle-info-solid.png");
 		card.addView(label("Shulkr is the control layer for a script client: scripts, templates, editor tooling, module browsing, WindowSpy inspection, and settings live in one consistent interface.", 13, MUTED));
 		LinearLayout metrics = row(10);
-		metrics.addView(spyFact("Editor", "Ruff + autocomplete"), new LinearLayout.LayoutParams(0, 54, 1.0F));
+		metrics.addView(spyFact("Editor", "Autocomplete + recovery"), new LinearLayout.LayoutParams(0, 54, 1.0F));
 		metrics.addView(spyFact("Inspector", "World snapshots"), new LinearLayout.LayoutParams(0, 54, 1.0F));
 		metrics.addView(spyFact("UI", "Glass panels"), new LinearLayout.LayoutParams(0, 54, 1.0F));
 		card.addView(metrics, new LinearLayout.LayoutParams(match(), 58));
@@ -4140,7 +4199,7 @@ public final class TritonModernFragment extends Fragment {
 		panel.setBackground(panel(16));
 		panel.addView(label("Client Health", 16, TEXT));
 		panel.addView(flagRow("UI thread", "Ready", "green"), new LinearLayout.LayoutParams(match(), 30));
-		panel.addView(flagRow("Ruff", "Available", "green"), new LinearLayout.LayoutParams(match(), 30));
+		panel.addView(flagRow("Editor diagnostics", "Built in", "green"), new LinearLayout.LayoutParams(match(), 30));
 		panel.addView(flagRow("Assets", "Loaded", "green"), new LinearLayout.LayoutParams(match(), 30));
 		panel.addView(flagRow("Config", "Local", "blue"), new LinearLayout.LayoutParams(match(), 30));
 		panel.addView(flagRow("Network", "Blocked by default", "purple"), new LinearLayout.LayoutParams(match(), 30));
@@ -4564,6 +4623,7 @@ public final class TritonModernFragment extends Fragment {
 			appendEditorLog("Failed to prepare minescript folder: " + e.getMessage());
 		}
 		refreshEditorScripts();
+		restoreRecoveryDrafts();
 		if (editorLogs.isEmpty()) {
 			appendEditorLog("Editor connected to " + scriptDir);
 		}
@@ -4643,12 +4703,15 @@ public final class TritonModernFragment extends Fragment {
 			return false;
 		}
 		String root = relative.getName(0).toString().toLowerCase(Locale.ROOT);
-		return root.equals("system")
+		return root.startsWith(".")
+				|| root.equals("system")
 				|| root.equals("templates")
 				|| root.equals("plugins")
 				|| root.equals("plugins_disabled")
 				|| root.equals("exports")
-				|| root.equals("blockpacks");
+				|| root.equals("blockpacks")
+				|| root.equals("shulkr_config")
+				|| root.equals("shulkr_runtime");
 	}
 
 	private boolean isHiddenMinescriptFile(Path path) {
@@ -4725,6 +4788,65 @@ public final class TritonModernFragment extends Fragment {
 			dirtyScripts.add(selectedScript);
 		}
 		editorDirty = dirtyScripts.contains(selectedScript);
+		persistRecoveryDraft(selectedScript, text);
+	}
+
+	private Path editorRecoveryDirectory() {
+		return FluxusConfig.path().getParent().resolve("shulkr-editor-recovery");
+	}
+
+	private String recoveryKey(Path script) {
+		String path = script.startsWith(scriptDir) ? "L:" + scriptDir.relativize(script).toString().replace('\\', '/') : "A:" + script.toAbsolutePath().normalize();
+		return Base64.getUrlEncoder().withoutPadding().encodeToString(path.getBytes(StandardCharsets.UTF_8));
+	}
+
+	private void persistRecoveryDraft(Path script, String content) {
+		if (script == null) return;
+		Path recovery = editorRecoveryDirectory().resolve(recoveryKey(script) + ".draft");
+		try {
+			if (!settingsConfig.restoreUnsavedTabs() || !dirtyScripts.contains(script)) {
+				Files.deleteIfExists(recovery);
+				return;
+			}
+			Files.createDirectories(recovery.getParent());
+			Files.writeString(recovery, content, StandardCharsets.UTF_8);
+		} catch (IOException error) {
+			appendEditorLog("Recovery draft failed: " + error.getMessage());
+		}
+	}
+
+	private void deleteRecoveryDraft(Path script) {
+		if (script == null) return;
+		try { Files.deleteIfExists(editorRecoveryDirectory().resolve(recoveryKey(script) + ".draft")); }
+		catch (IOException error) { appendEditorLog("Could not remove recovery draft: " + error.getMessage()); }
+	}
+
+	private void persistAllRecoveryDrafts() {
+		if (settingsConfig == null) return;
+		for (Path script : dirtyScripts) persistRecoveryDraft(script, editorDrafts.getOrDefault(script, ""));
+	}
+
+	private void restoreRecoveryDrafts() {
+		if (!settingsConfig.restoreUnsavedTabs() || Files.notExists(editorRecoveryDirectory())) return;
+		try (var drafts = Files.list(editorRecoveryDirectory())) {
+			for (Path draft : drafts.filter(path -> path.getFileName().toString().endsWith(".draft")).toList()) {
+				String encoded = draft.getFileName().toString().replaceFirst("\\.draft$", "");
+				String key;
+				try { key = new String(Base64.getUrlDecoder().decode(encoded), StandardCharsets.UTF_8); }
+				catch (IllegalArgumentException ignored) { continue; }
+				Path script = key.startsWith("L:") ? scriptDir.resolve(key.substring(2)).normalize() : key.startsWith("A:") ? Path.of(key.substring(2)).normalize() : null;
+				if (script == null || Files.notExists(script)) { Files.deleteIfExists(draft); continue; }
+				String recovered = Files.readString(draft, StandardCharsets.UTF_8);
+				editorSavedContents.put(script, readFileQuietly(script));
+				editorDrafts.put(script, recovered);
+				dirtyScripts.add(script);
+				addOpenEditorTab(script);
+				if (selectedScript == null) selectedScript = script;
+			}
+			if (selectedScript != null) loadActiveDraftFromDisk();
+		} catch (IOException error) {
+			appendEditorLog("Could not restore editor recovery data: " + error.getMessage());
+		}
 	}
 
 	private void selectEditorScript(Path script) {
@@ -5094,14 +5216,27 @@ public final class TritonModernFragment extends Fragment {
 	}
 
 	private void saveCurrentScript() {
+		saveCurrentScript(true);
+	}
+
+	private boolean saveCurrentScript(boolean rerender) {
 		if (selectedScript == null || codeEditor == null) {
 			appendEditorLog("No script selected to save.");
 			refreshConsoleLogList();
-			return;
+			return false;
 		}
 		try {
-			editorDraft = codeEditor.getText().toString();
-			if (selectedScript.startsWith(scriptDir)) {
+			String rawDraft = codeEditor.getText().toString();
+			editorDraft = applySaveTransforms(rawDraft);
+			if (!editorDraft.equals(rawDraft)) {
+				int caret = Math.min(codeEditor.getSelectionStart(), editorDraft.length());
+				stylingEditorText = true;
+				codeEditor.setText(editorDraft);
+				codeEditor.setSelection(Math.max(0, caret));
+				stylingEditorText = false;
+			}
+			if (settingsConfig.createBackupBeforeSaving()) createEditorBackup(selectedScript);
+			if (selectedScript.startsWith(scriptDir) && Objects.equals(selectedScript.getParent(), scriptDir)) {
 				ScriptSummary summary = FluxusAppState.get().writeScript(scriptDir.relativize(selectedScript).toString().replace('\\', '/'), editorDraft, true);
 				selectedScript = scriptDir.resolve(summary.path()).normalize();
 			} else {
@@ -5111,14 +5246,48 @@ public final class TritonModernFragment extends Fragment {
 			editorSavedContents.put(selectedScript, editorDraft);
 			editorDrafts.put(selectedScript, editorDraft);
 			dirtyScripts.remove(selectedScript);
+			deleteRecoveryDraft(selectedScript);
 			editorDirty = false;
+			if (editorSaveStatus != null) {
+				editorSaveStatus.setText("Saved");
+				editorSaveStatus.setTextColor(GREEN);
+			}
 			appendEditorLog("Saved " + selectedScript.getFileName() + ".");
 			refreshEditorScripts();
-			renderShell();
+			if (rerender) renderShell(); else refreshConsoleLogList();
+			return true;
 		} catch (IOException e) {
 			appendEditorLog("Save failed: " + e.getMessage());
 			refreshConsoleLogList();
+			if (settingsConfig.focusOutputOnError()) consoleTab = "Errors";
+			return false;
 		}
+	}
+
+	private String applySaveTransforms(String source) {
+		String transformed = source;
+		if (settingsConfig.convertTabsToSpaces()) transformed = transformed.replace("\t", " ".repeat(settingsConfig.editorTabSize()));
+		if (settingsConfig.trimTrailingWhitespaceOnSave()) transformed = transformed.replaceAll("(?m)[ \\t]+$", "");
+		if (settingsConfig.insertFinalNewline() && !transformed.endsWith("\n")) transformed += "\n";
+		return transformed;
+	}
+
+	private void createEditorBackup(Path script) throws IOException {
+		if (script == null || Files.notExists(script) || settingsConfig.maximumBackupCount() <= 0) return;
+		Path relative = script.startsWith(scriptDir) ? scriptDir.relativize(script) : Path.of(script.getFileName().toString());
+		Path folder = scriptDir.resolve(".shulkr-backups").resolve(relative.getParent() == null ? Path.of("") : relative.getParent()).normalize();
+		Files.createDirectories(folder);
+		String prefix = script.getFileName() + ".";
+		Path backup = folder.resolve(prefix + System.currentTimeMillis() + ".bak");
+		Files.copy(script, backup, StandardCopyOption.REPLACE_EXISTING);
+		try (var backups = Files.list(folder)) {
+			List<Path> matching = backups.filter(path -> path.getFileName().toString().startsWith(prefix)).sorted(Comparator.comparingLong(this::backupModifiedMillis).reversed()).toList();
+			for (int i = settingsConfig.maximumBackupCount(); i < matching.size(); i++) Files.deleteIfExists(matching.get(i));
+		}
+	}
+
+	private long backupModifiedMillis(Path path) {
+		try { return Files.getLastModifiedTime(path).toMillis(); } catch (IOException ignored) { return 0L; }
 	}
 
 	private void runCurrentScript() {
@@ -5127,41 +5296,78 @@ public final class TritonModernFragment extends Fragment {
 			refreshConsoleLogList();
 			return;
 		}
-		if (codeEditor != null) {
-			saveCurrentScript();
-		}
+		if (settingsConfig.saveBeforeRunning() && codeEditor != null && !saveCurrentScript(false)) return;
 		String fileName = selectedScript.getFileName().toString();
 		if (".pyj".equalsIgnoreCase(extension(fileName))) {
 			appendEditorLog(fileName + " is a Pyjinn module. Import it from a Python runner instead of running it directly.");
 			refreshConsoleLogList();
 			return;
 		}
-		if (scriptRunSafetyLabel().equals("needs throttle")) {
-			appendEditorLog("Warning: this script has `while True` without sleep; add a throttle to avoid freezing.");
+		boolean dangerous = !scriptRunSafetyLabel().equals("ready") && !scriptRunSafetyLabel().equals("-");
+		if (dangerous && settingsConfig.confirmDangerousScripts() && System.currentTimeMillis() > dangerousRunConfirmationExpiresAt) {
+			dangerousRunConfirmationExpiresAt = System.currentTimeMillis() + 10_000L;
+			appendEditorLog("This script is marked " + scriptRunSafetyLabel() + ". Press Run again within 10 seconds to confirm.");
+			if (settingsConfig.focusOutputOnError()) consoleTab = "Errors";
+			refreshConsoleLogList();
+			return;
 		}
+		dangerousRunConfirmationExpiresAt = 0L;
 		Path scriptToRun = selectedScript;
+		Path workingDirectory;
+		try { workingDirectory = resolveEditorWorkingDirectory(scriptToRun); }
+		catch (IOException error) { handleRunError(fileName, error.getMessage()); return; }
+		if (settingsConfig.clearOutputBeforeRunning()) editorLogs.clear();
+		if (settingsConfig.openOutputOnRun()) consoleTab = "Output";
 		currentScriptRunning = true;
-		appendEditorLog("Validating variables for " + fileName + "...");
+		int generation = ++runGeneration;
+		appendEditorLog("Preparing " + fileName + "...");
 		renderShell();
+		Runnable start = () -> prepareAndStartScript(scriptToRun, workingDirectory, fileName, generation);
+		if (settingsConfig.stopPreviousBeforeRunning()) {
+			Minescript.runEditorCommandAsync("killjob -1", handled -> {
+				if (shell != null) shell.post(() -> {
+					appendEditorLog(handled ? "Stopped the previous script instance." : "No previous script instance was stopped.");
+					start.run();
+				});
+			});
+		} else {
+			start.run();
+		}
+	}
+
+	private Path resolveEditorWorkingDirectory(Path script) throws IOException {
+		Path directory = switch (settingsConfig.workingDirectoryMode()) {
+			case "Minescript Folder" -> scriptDir;
+			case "Custom" -> settingsConfig.customWorkingDirectory().isBlank() ? null : Path.of(settingsConfig.customWorkingDirectory()).toAbsolutePath().normalize();
+			default -> script.getParent();
+		};
+		if (directory == null || !Files.isDirectory(directory)) throw new IOException("Working directory does not exist: " + (directory == null ? "not configured" : directory));
+		return directory;
+	}
+
+	private void prepareAndStartScript(Path scriptToRun, Path workingDirectory, String fileName, int generation) {
 		CompletableFuture.supplyAsync(() -> {
-			try { return ScriptSettingsRuntime.prepare(scriptToRun); }
+			try { return ScriptSettingsRuntime.prepare(scriptToRun, workingDirectory); }
 			catch (IOException error) { throw new RuntimeException(error); }
 		}).whenComplete((prepared, error) -> {
 			if (shell == null) return;
 			shell.post(() -> {
+				if (generation != runGeneration) return;
 				if (error != null) {
 					currentScriptRunning = false;
 					Throwable cause = error.getCause() == null ? error : error.getCause();
-					appendEditorLog("Cannot run " + fileName + ": " + cause.getMessage());
-					renderShell();
+					handleRunError(fileName, cause.getMessage());
 					return;
 				}
 				appendEditorLog("Queued " + fileName + (prepared.configured() ? " with " + prepared.settingCount() + " configured variable(s)." : "."));
 				Minescript.runEditorCommandAsync(prepared.commandPath(), handled -> {
 					if (shell != null) shell.post(() -> {
+						if (generation != runGeneration) return;
 						currentScriptRunning = handled;
 						if (handled) TritonUIClient.rememberLastScript(prepared.commandPath() + ".py");
 						appendEditorLog((handled ? "Started " : "Failed to start ") + fileName + ".");
+						if (!handled && settingsConfig.focusOutputOnError()) consoleTab = "Errors";
+						if (handled) scheduleEditorRunTimeout(fileName, generation);
 						renderShell();
 					});
 				});
@@ -5169,7 +5375,34 @@ public final class TritonModernFragment extends Fragment {
 		});
 	}
 
+	private void handleRunError(String fileName, String message) {
+		currentScriptRunning = false;
+		appendEditorLog("Cannot run " + fileName + ": " + message);
+		if (settingsConfig.focusOutputOnError()) consoleTab = "Errors";
+		renderShell();
+	}
+
+	private void scheduleEditorRunTimeout(String fileName, int generation) {
+		if (editorRunTimeoutTask != null) editorRunTimeoutTask.cancel(false);
+		int seconds = settingsConfig.executionTimeoutSeconds();
+		if (seconds <= 0) return;
+		editorRunTimeoutTask = lintExecutor.schedule(() -> {
+			if (generation != runGeneration || !currentScriptRunning) return;
+			Minescript.runEditorCommandAsync("killjob -1", handled -> {
+				if (shell != null) shell.post(() -> {
+					if (generation != runGeneration) return;
+					currentScriptRunning = false;
+					appendEditorLog(handled ? "Stopped " + fileName + " after the " + seconds + " second timeout." : "Timeout elapsed, but the stop command was not handled.");
+					if (!handled && settingsConfig.focusOutputOnError()) consoleTab = "Errors";
+					renderShell();
+				});
+			});
+		}, seconds, TimeUnit.SECONDS);
+	}
+
 	private void stopScripts() {
+		runGeneration++;
+		if (editorRunTimeoutTask != null) editorRunTimeoutTask.cancel(false);
 		Minescript.runEditorCommandAsync("killjob -1", handled -> {
 			if (shell != null) {
 				shell.post(() -> {
@@ -5267,16 +5500,19 @@ public final class TritonModernFragment extends Fragment {
 
 	private void saveDraftWithoutRebuild() throws IOException {
 		if (selectedScript != null && codeEditor != null) {
-			editorDraft = codeEditor.getText().toString();
-			if (selectedScript.startsWith(scriptDir)) {
+			editorDraft = applySaveTransforms(codeEditor.getText().toString());
+			if (settingsConfig.createBackupBeforeSaving()) createEditorBackup(selectedScript);
+			if (selectedScript.startsWith(scriptDir) && Objects.equals(selectedScript.getParent(), scriptDir)) {
 				ScriptSummary summary = FluxusAppState.get().writeScript(scriptDir.relativize(selectedScript).toString().replace('\\', '/'), editorDraft, true);
 				selectedScript = scriptDir.resolve(summary.path()).normalize();
 			} else {
+				Files.createDirectories(selectedScript.getParent());
 				Files.writeString(selectedScript, editorDraft, StandardCharsets.UTF_8);
 			}
 			editorSavedContents.put(selectedScript, editorDraft);
 			editorDrafts.put(selectedScript, editorDraft);
 			dirtyScripts.remove(selectedScript);
+			deleteRecoveryDraft(selectedScript);
 			editorDirty = false;
 		}
 	}
@@ -5304,6 +5540,7 @@ public final class TritonModernFragment extends Fragment {
 			if (!deletedOk) {
 				throw new IOException("Script was not found");
 			}
+			deleteRecoveryDraft(deleted);
 			openEditorTabs.remove(deleted);
 			editorDrafts.remove(deleted);
 			editorSavedContents.remove(deleted);
@@ -5380,6 +5617,7 @@ public final class TritonModernFragment extends Fragment {
 		if (target == null) {
 			return;
 		}
+		if (!Files.isDirectory(target)) deleteRecoveryDraft(target);
 		openEditorTabs.removeIf(path -> path.equals(target) || path.startsWith(target));
 		editorDrafts.keySet().removeIf(path -> path.equals(target) || path.startsWith(target));
 		editorSavedContents.keySet().removeIf(path -> path.equals(target) || path.startsWith(target));
@@ -5608,8 +5846,15 @@ public final class TritonModernFragment extends Fragment {
 
 	private void closeEditorTab(Path script) {
 		captureActiveDraft();
+		if (dirtyScripts.contains(script) && settingsConfig.confirmCloseUnsaved() && !pendingCloseConfirmations.remove(script)) {
+			pendingCloseConfirmations.add(script);
+			appendEditorLog("Unsaved changes in " + script.getFileName() + ". Click close again to discard them.");
+			refreshConsoleLogList();
+			return;
+		}
 		int index = openEditorTabs.indexOf(script);
 		openEditorTabs.remove(script);
+		deleteRecoveryDraft(script);
 		if (Objects.equals(selectedScript, script)) {
 			if (openEditorTabs.isEmpty()) {
 				selectedScript = editorScripts.isEmpty() ? null : editorScripts.getFirst();
@@ -5629,9 +5874,9 @@ public final class TritonModernFragment extends Fragment {
 			return;
 		}
 		String formatted = codeEditor.getText().toString()
-				.replace("\t", "    ")
+				.replace("\t", " ".repeat(settingsConfig.editorTabSize()))
 				.replaceAll("[ \\t]+\\r?\\n", "\n");
-		if (!formatted.endsWith("\n")) {
+		if (settingsConfig.insertFinalNewline() && !formatted.endsWith("\n")) {
 			formatted += "\n";
 		}
 		codeEditor.setText(formatted);
@@ -6112,12 +6357,13 @@ public final class TritonModernFragment extends Fragment {
 		codeEditor = editor;
 		String initialEditorText = selectedScript == null ? "" : draftFor(selectedScript);
 		boolean deferInitialText = initialEditorText.length() > 20_000;
-		editor.setTextSize(12);
+		editor.setTextSize(settingsConfig.editorFontSize());
+		editor.setLineHeight(settingsConfig.editorLineHeight());
 		editor.setTextColor(Color.argb(242, 213, 220, 244));
 		editor.setHintTextColor(FAINT);
 		editor.setHint("# Start typing Python...");
 		editor.setSingleLine(false);
-		editor.setHorizontallyScrolling(true);
+		editor.setHorizontallyScrolling(!settingsConfig.wordWrap());
 		editor.setTextIsSelectable(true);
 		editor.setCursorVisible(true);
 		editor.setGravity(Gravity.TOP | Gravity.LEFT);
@@ -6142,14 +6388,19 @@ public final class TritonModernFragment extends Fragment {
 					return true;
 				}
 				if (keyCode == KeyEvent.KEY_TAB) {
-					if (!completionRemainder.isEmpty()) {
+					if (settingsConfig.pythonAutocomplete() && !completionRemainder.isEmpty()) {
 						acceptCompletion();
 					} else {
 						indentEditorSelection(editor);
 					}
 					return true;
 				}
+				editor.post(() -> updateEditorAssistance(editor));
 			}
+			return false;
+		});
+		editor.setOnHoverListener((view, event) -> {
+			if (settingsConfig.hoverDocumentation()) editor.post(() -> updateEditorAssistance(editor));
 			return false;
 		});
 		editor.setOnTouchListener((view, event) -> {
@@ -6159,6 +6410,7 @@ public final class TritonModernFragment extends Fragment {
 					editor.post(() -> selectWordAtCaret(editor));
 				}
 				lastEditorTextClickAt = now;
+				editor.post(() -> updateEditorAssistance(editor));
 			}
 			return false;
 		});
@@ -6170,20 +6422,8 @@ public final class TritonModernFragment extends Fragment {
 			@Override
 			public void onTextChanged(CharSequence text, int start, int before, int count) {
 				if (!stylingEditorText) {
-					editorDraft = text.toString();
-					if (selectedScript != null) {
-						editorDrafts.put(selectedScript, editorDraft);
-						String saved = editorSavedContents.computeIfAbsent(selectedScript, TritonModernFragment.this::readFileQuietly);
-						if (editorDraft.equals(saved)) {
-							dirtyScripts.remove(selectedScript);
-						} else {
-							dirtyScripts.add(selectedScript);
-						}
-					}
-					editorDirty = selectedScript == null || dirtyScripts.contains(selectedScript);
-					updateLineNumberGutter(text);
-					scheduleEditorAnalysis(text.toString());
-					updateCompletion(editor);
+					if (normalizeEditorInsertion(editor, start, before, count)) return;
+					processEditorContentChange(editor);
 				}
 			}
 
@@ -6191,8 +6431,13 @@ public final class TritonModernFragment extends Fragment {
 			public void afterTextChanged(Editable editable) {
 			}
 		});
+		editor.setOnFocusChangeListener((view, focused) -> {
+			if (!focused && settingsConfig.autosaveMode().equals("On Focus Change") && editorDirty) saveCurrentScript(false);
+			if (focused) editor.post(() -> updateEditorAssistance(editor));
+		});
 		LinearLayout editorBody = row(0);
-		editorLineNumbers = label("", 12, Color.argb(190, 94, 86, 112));
+		editorLineNumbers = label("", settingsConfig.editorFontSize(), Color.argb(190, 94, 86, 112));
+		editorLineNumbers.setLineHeight(settingsConfig.editorLineHeight());
 		editorLineCount = 0;
 		editorLineNumbers.setGravity(Gravity.TOP | Gravity.RIGHT);
 		editorLineNumbers.setPadding(8, 16, 10, 16);
@@ -6200,13 +6445,20 @@ public final class TritonModernFragment extends Fragment {
 		updateLineNumberGutter(editor.getText());
 		editor.setOnScrollChangeListener((view, scrollX, scrollY, oldScrollX, oldScrollY) ->
 				editorLineNumbers.scrollTo(0, scrollY));
-		editorBody.addView(editorLineNumbers, new LinearLayout.LayoutParams(58, match()));
+		if (settingsConfig.showLineNumbers()) editorBody.addView(editorLineNumbers, new LinearLayout.LayoutParams(58, match()));
 		FrameLayout editorStack = new FrameLayout(requireContext());
 		editorStack.addView(editor, new FrameLayout.LayoutParams(match(), match()));
-		completionGhost = label("", 12, Color.argb(150, 162, 173, 204));
+		completionGhost = label("", settingsConfig.editorFontSize(), Color.argb(150, 162, 173, 204));
 		completionGhost.setPadding(0, 0, 0, 0);
 		completionGhost.setGravity(Gravity.TOP | Gravity.LEFT);
 		editorStack.addView(completionGhost, new FrameLayout.LayoutParams(match(), match(), Gravity.TOP | Gravity.LEFT));
+		editorCursorOverlay = label("", settingsConfig.editorFontSize(), PURPLE);
+		editorCursorOverlay.setGravity(Gravity.TOP | Gravity.LEFT);
+		editorStack.addView(editorCursorOverlay, new FrameLayout.LayoutParams(match(), match(), Gravity.TOP | Gravity.LEFT));
+		editorMinimap = label("", 3, Color.argb(105, 165, 174, 204));
+		editorMinimap.setGravity(Gravity.TOP | Gravity.RIGHT);
+		editorMinimap.setPadding(0, 12, 8, 0);
+		if (settingsConfig.showMinimap()) editorStack.addView(editorMinimap, new FrameLayout.LayoutParams(76, match(), Gravity.TOP | Gravity.RIGHT));
 		editorBody.addView(editorStack, new LinearLayout.LayoutParams(0, match(), 1.0F));
 		panel.addView(editorBody, new LinearLayout.LayoutParams(match(), 0, 1.0F));
 
@@ -6227,8 +6479,9 @@ public final class TritonModernFragment extends Fragment {
 		LinearLayout status = row(16);
 		status.setPadding(18, 0, 18, 0);
 		status.setGravity(Gravity.CENTER_VERTICAL | Gravity.RIGHT);
-		status.addView(label(editorDirty ? "Unsaved" : "Saved", 12, editorDirty ? Color.argb(255, 255, 190, 88) : GREEN));
-		status.addView(label("Spaces: 4", 12, MUTED));
+		editorSaveStatus = label(editorDirty ? "Unsaved" : "Saved", 12, editorDirty ? Color.argb(255, 255, 190, 88) : GREEN);
+		status.addView(editorSaveStatus);
+		status.addView(label("Spaces: " + settingsConfig.editorTabSize(), 12, MUTED));
 		status.addView(label("UTF-8", 12, MUTED));
 		status.addView(label("LF", 12, MUTED));
 		status.addView(label(selectedScript == null ? "Python" : extension(selectedScript.getFileName().toString()).replace(".", "").toUpperCase(Locale.ROOT), 12, MUTED));
@@ -6245,7 +6498,9 @@ public final class TritonModernFragment extends Fragment {
 		} else {
 			scheduleEditorAnalysis(editor.getText().toString());
 		}
+		updateEditorMinimap(editor.getText());
 		updateCompletion(editor);
+		updateEditorAssistance(editor);
 		return panel;
 	}
 
@@ -6323,15 +6578,10 @@ public final class TritonModernFragment extends Fragment {
 		}
 		if (isPyjinnEditorScript()) {
 			clearSyntaxSpans(codeEditor == null ? null : codeEditor.getText());
-			clearErrorSpans();
-			if (ruffLintTask != null) {
-				ruffLintTask.cancel(false);
-				ruffLintTask = null;
-			}
-			renderLint("Pyjinn", List.of(), false);
+			renderLint(List.of());
 			if (lintList != null) {
 				lintList.removeAllViews();
-				lintList.addView(label("Pyjinn scripts skip Ruff and Python-only syntax checks.", 11, FAINT));
+				lintList.addView(label("Pyjinn modules skip Python-only syntax checks.", 11, FAINT));
 			}
 			return;
 		}
@@ -6345,10 +6595,8 @@ public final class TritonModernFragment extends Fragment {
 						return;
 					}
 					applySyntaxRanges(codeEditor.getText(), ranges);
-					renderLint("Built-in Python lint", issues, true);
-					if (settingsConfig == null || settingsConfig.ruffDiagnostics()) {
-						scheduleRuffLint(source, generation, List.copyOf(issues));
-					}
+					renderLint(issues);
+					applyEditorVisualSpans(codeEditor);
 				});
 			}
 		}, delay, TimeUnit.MILLISECONDS);
@@ -6378,7 +6626,7 @@ public final class TritonModernFragment extends Fragment {
 		return selectedScript != null && ".pyj".equalsIgnoreCase(extension(selectedScript.getFileName().toString()));
 	}
 
-	private void renderLint(String title, List<String> issues, boolean showRuffHint) {
+	private void renderLint(List<String> issues) {
 		lintList.removeAllViews();
 		if (issues.isEmpty()) {
 			lintSummary.setText("No issues found");
@@ -6389,114 +6637,6 @@ public final class TritonModernFragment extends Fragment {
 		lintSummary.setTextColor(Color.argb(255, 255, 190, 88));
 		for (String issue : issues) {
 			lintList.addView(label(issue, 11, Color.argb(235, 255, 198, 112)));
-		}
-	}
-
-	private void scheduleRuffLint(String source, int generation, List<String> builtInIssues) {
-		if (ruffLintTask != null) {
-			ruffLintTask.cancel(false);
-		}
-		ruffLintTask = lintExecutor.schedule(() -> {
-			RuffResult result = runRuff(source);
-			if (lintSummary != null) {
-				lintSummary.post(() -> {
-					if (generation == lintGeneration && lintSummary != null && lintList != null && result.available) {
-						LinkedHashSet<String> combinedIssues = new LinkedHashSet<>(builtInIssues);
-						combinedIssues.addAll(result.messages());
-						renderLint("Python lint", new ArrayList<>(combinedIssues), false);
-						applyRuffDiagnostics(result.issues());
-					}
-				});
-			}
-		}, 650, TimeUnit.MILLISECONDS);
-	}
-
-	private RuffResult runRuff(String source) {
-		String[][] commands = {
-				{"ruff", "check", "--output-format", "json", "--stdin-filename", "AutoFarm.py", "-"},
-				{"py", "-m", "ruff", "check", "--output-format", "json", "--stdin-filename", "AutoFarm.py", "-"},
-				{"python", "-m", "ruff", "check", "--output-format", "json", "--stdin-filename", "AutoFarm.py", "-"}
-		};
-		for (String[] command : commands) {
-			try {
-				Process process = new ProcessBuilder(command).redirectErrorStream(true).start();
-				process.getOutputStream().write(source.getBytes(java.nio.charset.StandardCharsets.UTF_8));
-				process.getOutputStream().close();
-				String output = new String(process.getInputStream().readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
-				boolean finished = process.waitFor(2, TimeUnit.SECONDS);
-				if (!finished) {
-					process.destroyForcibly();
-					continue;
-				}
-				String trimmedOutput = output.trim();
-				int exitCode = process.exitValue();
-				if ((exitCode != 0 && exitCode != 1) || !trimmedOutput.startsWith("[")) {
-					continue;
-				}
-				List<RuffIssue> issues = parseRuffIssues(output).stream()
-						.filter(issue -> !issue.code().equals("E401"))
-						.toList();
-				return new RuffResult(true, issues);
-			} catch (Exception ignored) {
-			}
-		}
-		return new RuffResult(false, List.of());
-	}
-
-	private List<RuffIssue> parseRuffIssues(String output) {
-		List<RuffIssue> issues = new ArrayList<>();
-		Pattern pattern = Pattern.compile("\"code\"\\s*:\\s*\"([^\"]+)\".*?\"end_location\"\\s*:\\s*\\{\\s*\"column\"\\s*:\\s*(\\d+)\\s*,\\s*\"row\"\\s*:\\s*(\\d+)\\s*}.*?\"location\"\\s*:\\s*\\{\\s*\"column\"\\s*:\\s*(\\d+)\\s*,\\s*\"row\"\\s*:\\s*(\\d+)\\s*}.*?\"message\"\\s*:\\s*\"((?:\\\\.|[^\"])*)\"", Pattern.DOTALL);
-		Matcher matcher = pattern.matcher(output);
-		while (matcher.find() && issues.size() < 8) {
-			String code = matcher.group(1);
-			int endColumn = Integer.parseInt(matcher.group(2));
-			int endRow = Integer.parseInt(matcher.group(3));
-			int column = Integer.parseInt(matcher.group(4));
-			int row = Integer.parseInt(matcher.group(5));
-			String message = unescapeJsonString(matcher.group(6));
-			issues.add(new RuffIssue(row, column, endRow, endColumn, code, message));
-		}
-		return issues;
-	}
-
-	private String unescapeJsonString(String text) {
-		return text.replace("\\\"", "\"").replace("\\\\", "\\").replace("\\n", "\n").replace("\\t", "\t");
-	}
-
-	private record RuffIssue(int row, int column, int endRow, int endColumn, String code, String message) {
-		String display() {
-			return "Line " + row + " [" + code + "]: " + message;
-		}
-	}
-
-	private record RuffResult(boolean available, List<RuffIssue> issues) {
-		List<String> messages() {
-			List<String> messages = new ArrayList<>();
-			for (RuffIssue issue : issues) {
-				messages.add(issue.display());
-			}
-			return messages;
-		}
-	}
-
-	private void applyRuffDiagnostics(List<RuffIssue> issues) {
-		if (codeEditor == null) {
-			return;
-		}
-		Editable editable = codeEditor.getText();
-		clearErrorSpans(editable);
-		String source = editable.toString();
-		for (RuffIssue issue : issues) {
-			int start = offsetForLineColumn(source, issue.row(), issue.column());
-			int end = offsetForLineColumn(source, issue.endRow(), issue.endColumn());
-			if (start < 0 || end <= start || start >= editable.length()) {
-				continue;
-			}
-			end = Math.min(end, editable.length());
-			stylingEditorText = true;
-			editable.setSpan(new ErrorUnderlineSpan(), start, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-			editable.setSpan(new BackgroundColorSpan(Color.argb(58, 255, 72, 96)), start, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-			stylingEditorText = false;
 		}
 	}
 
@@ -6570,40 +6710,14 @@ public final class TritonModernFragment extends Fragment {
 		}
 	}
 
-	private void clearErrorSpans() {
-		if (codeEditor != null) {
-			clearErrorSpans(codeEditor.getText());
-		}
-	}
-
-	private void clearErrorSpans(Editable editable) {
-		stylingEditorText = true;
-		for (ErrorUnderlineSpan span : editable.getSpans(0, editable.length(), ErrorUnderlineSpan.class)) {
-			editable.removeSpan(span);
-		}
-		for (BackgroundColorSpan span : editable.getSpans(0, editable.length(), BackgroundColorSpan.class)) {
-			editable.removeSpan(span);
-		}
-		stylingEditorText = false;
-	}
-
-	private int offsetForLineColumn(String source, int row, int column) {
-		if (row < 1 || column < 1) {
-			return -1;
-		}
-		int currentRow = 1;
-		int offset = 0;
-		while (currentRow < row && offset < source.length()) {
-			if (source.charAt(offset) == '\n') {
-				currentRow++;
-			}
-			offset++;
-		}
-		return Math.min(offset + column - 1, source.length());
-	}
-
 	private void updateCompletion(EditText editor) {
 		if (completionHint == null) {
+			return;
+		}
+		if (!settingsConfig.pythonAutocomplete()) {
+			completionRemainder = "";
+			completionHint.setText("");
+			if (completionGhost != null) completionGhost.setText("");
 			return;
 		}
 		String token = currentToken(editor);
@@ -6622,8 +6736,10 @@ public final class TritonModernFragment extends Fragment {
 		completionRemainder = suggestion.substring(token.length());
 		completionHint.setText("Tab to complete: " + suggestion);
 		completionHint.setTextColor(Color.argb(220, 185, 160, 255));
-		if (completionGhost != null) {
+		if (completionGhost != null && settingsConfig.inlineSuggestions()) {
 			positionCompletionGhost(editor, completionRemainder);
+		} else if (completionGhost != null) {
+			completionGhost.setText("");
 		}
 	}
 
@@ -6664,6 +6780,235 @@ public final class TritonModernFragment extends Fragment {
 		updateCompletion(codeEditor);
 	}
 
+	private void processEditorContentChange(EditText editor) {
+		editorDraft = editor.getText().toString();
+		if (selectedScript != null) {
+			editorDrafts.put(selectedScript, editorDraft);
+			String saved = editorSavedContents.computeIfAbsent(selectedScript, this::readFileQuietly);
+			if (editorDraft.equals(saved)) dirtyScripts.remove(selectedScript); else dirtyScripts.add(selectedScript);
+		}
+		editorDirty = selectedScript == null || dirtyScripts.contains(selectedScript);
+		if (editorSaveStatus != null) {
+			editorSaveStatus.setText(editorDirty ? "Unsaved" : "Saved");
+			editorSaveStatus.setTextColor(editorDirty ? Color.argb(255, 255, 190, 88) : GREEN);
+		}
+		updateLineNumberGutter(editor.getText());
+		updateEditorMinimap(editor.getText());
+		scheduleEditorAnalysis(editorDraft);
+		updateCompletion(editor);
+		updateEditorAssistance(editor);
+		scheduleEditorAutosave();
+		persistRecoveryDraft(selectedScript, editorDraft);
+	}
+
+	private boolean normalizeEditorInsertion(EditText editor, int start, int before, int count) {
+		if (count <= 0 || start < 0 || start + count > editor.getText().length()) return false;
+		String inserted = editor.getText().subSequence(start, start + count).toString();
+		String replacement = inserted;
+		if (settingsConfig.convertTabsToSpaces()) replacement = replacement.replace("\t", " ".repeat(settingsConfig.editorTabSize()));
+		if (count > 1 && settingsConfig.formatPastedIndentation()) {
+			replacement = replacement.replace("\r\n", "\n").replace('\r', '\n');
+			StringBuilder normalized = new StringBuilder(replacement.length());
+			for (String line : replacement.split("\n", -1)) {
+				int leading = 0;
+				while (leading < line.length() && line.charAt(leading) == ' ') leading++;
+				int aligned = leading == 0 ? 0 : ((leading + settingsConfig.editorTabSize() - 1) / settingsConfig.editorTabSize()) * settingsConfig.editorTabSize();
+				if (!normalized.isEmpty()) normalized.append('\n');
+				normalized.append(" ".repeat(aligned)).append(line.substring(leading));
+			}
+			replacement = normalized.toString();
+		}
+		if (!replacement.equals(inserted)) {
+			stylingEditorText = true;
+			editor.getText().replace(start, start + count, replacement);
+			editor.setSelection(Math.min(start + replacement.length(), editor.getText().length()));
+			stylingEditorText = false;
+			processEditorContentChange(editor);
+			return true;
+		}
+		if (count == 1 && before == 0 && settingsConfig.autoCloseBracketsAndQuotes()) {
+			char typed = inserted.charAt(0);
+			char closing = switch (typed) { case '(' -> ')'; case '[' -> ']'; case '{' -> '}'; case '\'' -> '\''; case '"' -> '"'; default -> 0; };
+			if (closing != 0) {
+				stylingEditorText = true;
+				editor.getText().insert(start + 1, String.valueOf(closing));
+				editor.setSelection(start + 1);
+				stylingEditorText = false;
+				processEditorContentChange(editor);
+				return true;
+			}
+		}
+		return false;
+	}
+
+	private void scheduleEditorAutosave() {
+		if (editorAutosaveTask != null) editorAutosaveTask.cancel(false);
+		if (!editorDirty || !settingsConfig.autosaveMode().equals("After Delay")) return;
+		editorAutosaveTask = lintExecutor.schedule(() -> {
+			if (codeEditor != null) codeEditor.post(() -> {
+				if (editorDirty && settingsConfig.autosaveMode().equals("After Delay")) saveCurrentScript(false);
+			});
+		}, settingsConfig.autosaveDelay(), TimeUnit.MILLISECONDS);
+	}
+
+	private void updateEditorMinimap(CharSequence source) {
+		if (editorMinimap == null || !settingsConfig.showMinimap()) return;
+		StringBuilder map = new StringBuilder();
+		String[] lines = source.toString().split("\n", -1);
+		for (int i = 0; i < Math.min(lines.length, 120); i++) {
+			if (i > 0) map.append('\n');
+			String line = lines[i].stripTrailing();
+			map.append(line, 0, Math.min(line.length(), 32));
+		}
+		editorMinimap.setText(map);
+	}
+
+	private void updateEditorAssistance(EditText editor) {
+		if (editor == null || stylingEditorText) return;
+		applyEditorVisualSpans(editor);
+		updateCustomCursor(editor);
+		if (completionHint == null) return;
+		String source = editor.getText().toString();
+		int caret = Math.max(0, Math.min(editor.getSelectionStart(), source.length()));
+		if (settingsConfig.signatureHelp()) {
+			int open = source.lastIndexOf('(', Math.max(0, caret - 1));
+			int close = source.lastIndexOf(')', Math.max(0, caret - 1));
+			if (open > close) {
+				String before = source.substring(0, open).stripTrailing();
+				Matcher function = Pattern.compile("([A-Za-z_][A-Za-z0-9_\\.]*)$").matcher(before);
+				if (function.find()) {
+					completionHint.setText(signatureFor(function.group(1)));
+					completionHint.setTextColor(Color.argb(225, 122, 203, 255));
+					return;
+				}
+			}
+		}
+		if (settingsConfig.hoverDocumentation()) {
+			String token = selectedEditorToken(editor);
+			String documentation = documentationFor(token);
+			if (!documentation.isBlank()) {
+				completionHint.setText(documentation);
+				completionHint.setTextColor(Color.argb(220, 185, 160, 255));
+			}
+		}
+	}
+
+	private String selectedEditorToken(EditText editor) {
+		String source = editor.getText().toString();
+		int start = Math.max(0, Math.min(editor.getSelectionStart(), source.length()));
+		int end = Math.max(start, Math.min(editor.getSelectionEnd(), source.length()));
+		if (end > start) return source.substring(start, end).trim();
+		while (start > 0 && isEditorWordChar(source.charAt(start - 1))) start--;
+		while (end < source.length() && isEditorWordChar(source.charAt(end))) end++;
+		return source.substring(start, end);
+	}
+
+	private String signatureFor(String function) {
+		return switch (function) {
+			case "print", "ms.echo", "minescript.echo" -> function + "(value, ...)";
+			case "range" -> "range(start, stop[, step])";
+			case "sleep", "time.sleep" -> function + "(seconds)";
+			case "ms.execute", "minescript.execute" -> function + "(command)";
+			case "ms.player_get_targeted_block", "minescript.player_get_targeted_block" -> function + "(max_distance)";
+			default -> function + "(…)";
+		};
+	}
+
+	private String documentationFor(String token) {
+		return switch (token) {
+			case "print" -> "print: write values to standard output";
+			case "range" -> "range: produce an integer sequence";
+			case "sleep" -> "sleep: pause the current script for a duration";
+			case "echo" -> "Minescript echo: display a message in Minecraft";
+			case "execute" -> "Minescript execute: run a Minecraft command";
+			case "player_position" -> "Minescript player_position: return the current player coordinates";
+			case "player_get_targeted_block" -> "Minescript targeted block: raycast from the player view";
+			default -> "";
+		};
+	}
+
+	private void updateCustomCursor(EditText editor) {
+		if (editorCursorOverlay == null) return;
+		String style = settingsConfig.cursorStyle();
+		if (style.equals("Line")) {
+			editor.setCursorVisible(true);
+			editorCursorOverlay.setText("");
+			return;
+		}
+		editor.setCursorVisible(false);
+		editorCursorOverlay.setText(style.equals("Block") ? "▉" : "▁");
+		Layout layout = editor.getLayout();
+		if (layout == null) return;
+		int caret = Math.max(0, Math.min(editor.getSelectionStart(), editor.getText().length()));
+		int line = layout.getLineForOffset(caret);
+		float x = editor.getCompoundPaddingLeft() + layout.getPrimaryHorizontal(caret) - editor.getScrollX();
+		float y = editor.getExtendedPaddingTop() + layout.getLineTop(line) - editor.getScrollY();
+		if (settingsConfig.smoothCursorAnimation() && !settingsConfig.reduceMotion()) {
+			ObjectAnimator moveX = ObjectAnimator.ofFloat(editorCursorOverlay, View.TRANSLATION_X, editorCursorOverlay.getTranslationX(), x);
+			ObjectAnimator moveY = ObjectAnimator.ofFloat(editorCursorOverlay, View.TRANSLATION_Y, editorCursorOverlay.getTranslationY(), y);
+			AnimatorSet set = new AnimatorSet();
+			set.playTogether(moveX, moveY);
+			set.setDuration(90);
+			set.start();
+		} else {
+			editorCursorOverlay.setTranslationX(x);
+			editorCursorOverlay.setTranslationY(y);
+		}
+	}
+
+	private void applyEditorVisualSpans(EditText editor) {
+		Editable text = editor.getText();
+		stylingEditorText = true;
+		for (EditorVisualSpan span : text.getSpans(0, text.length(), EditorVisualSpan.class)) text.removeSpan(span);
+		String source = text.toString();
+		int caret = Math.max(0, Math.min(editor.getSelectionStart(), source.length()));
+		if (settingsConfig.highlightCurrentLine() && !source.isEmpty()) {
+			int start = source.lastIndexOf('\n', Math.max(0, caret - 1)) + 1;
+			int end = source.indexOf('\n', caret);
+			if (end < 0) end = source.length();
+			if (end > start) text.setSpan(EditorVisualSpan.background(Color.argb(28, red(PURPLE), green(PURPLE), blue(PURPLE))), start, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+		}
+		if (settingsConfig.renderWhitespace() || settingsConfig.showIndentationGuides()) {
+			int markers = 0;
+			boolean leading = true;
+			for (int i = 0; i < source.length() && markers < 4000; i++) {
+				char ch = source.charAt(i);
+				if (ch == '\n') { leading = true; continue; }
+				if (ch != ' ' && ch != '\t') { leading = false; continue; }
+				boolean guide = leading && settingsConfig.showIndentationGuides() && ((i + 1) % settingsConfig.editorTabSize() == 0);
+				if (settingsConfig.renderWhitespace() || guide) {
+					text.setSpan(EditorVisualSpan.underline(guide ? Color.argb(115, 133, 107, 176) : Color.argb(65, 143, 151, 180)), i, i + 1, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+					markers++;
+				}
+			}
+		}
+		if (settingsConfig.bracketPairHighlighting()) highlightBracketPair(text, source, caret);
+		stylingEditorText = false;
+	}
+
+	private void highlightBracketPair(Editable text, String source, int caret) {
+		int anchor = caret > 0 && isBracket(source.charAt(caret - 1)) ? caret - 1 : caret < source.length() && isBracket(source.charAt(caret)) ? caret : -1;
+		if (anchor < 0) return;
+		char bracket = source.charAt(anchor);
+		String pairs = "()[]{}";
+		int pairIndex = pairs.indexOf(bracket);
+		boolean forward = pairIndex % 2 == 0;
+		char mate = pairs.charAt(forward ? pairIndex + 1 : pairIndex - 1);
+		int depth = 0;
+		for (int i = anchor; i >= 0 && i < source.length(); i += forward ? 1 : -1) {
+			char ch = source.charAt(i);
+			if (ch == bracket) depth++;
+			if (ch == mate && --depth == 0) {
+				int color = Color.argb(100, red(PURPLE), green(PURPLE), blue(PURPLE));
+				text.setSpan(EditorVisualSpan.background(color), anchor, anchor + 1, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+				text.setSpan(EditorVisualSpan.background(color), i, i + 1, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+				return;
+			}
+		}
+	}
+
+	private boolean isBracket(char ch) { return ch == '(' || ch == ')' || ch == '[' || ch == ']' || ch == '{' || ch == '}'; }
+
 	private void indentEditorSelection(EditText editor) {
 		Editable editable = editor.getText();
 		String text = editable.toString();
@@ -6673,21 +7018,23 @@ public final class TritonModernFragment extends Fragment {
 			int lineStart = text.lastIndexOf('\n', Math.max(0, start - 1)) + 1;
 			int position = lineStart;
 			int adjustedEnd = end;
+			String indentation = settingsConfig.convertTabsToSpaces() ? " ".repeat(settingsConfig.editorTabSize()) : "\t";
 			while (position <= adjustedEnd) {
-				editable.insert(position, "    ");
-				adjustedEnd += 4;
+				editable.insert(position, indentation);
+				adjustedEnd += indentation.length();
 				String updated = editable.toString();
-				int nextLine = updated.indexOf('\n', position + 4);
+				int nextLine = updated.indexOf('\n', position + indentation.length());
 				if (nextLine < 0 || nextLine >= adjustedEnd) {
 					break;
 				}
 				position = nextLine + 1;
 			}
-			editor.setSelection(Math.min(start + 4, editable.length()), Math.min(adjustedEnd, editable.length()));
+			editor.setSelection(Math.min(start + indentation.length(), editable.length()), Math.min(adjustedEnd, editable.length()));
 			return;
 		}
-		editable.replace(start, end, "    ");
-		editor.setSelection(Math.min(start + 4, editable.length()));
+		String indentation = settingsConfig.convertTabsToSpaces() ? " ".repeat(settingsConfig.editorTabSize()) : "\t";
+		editable.replace(start, end, indentation);
+		editor.setSelection(Math.min(start + indentation.length(), editable.length()));
 	}
 
 	private void selectWordAtCaret(EditText editor) {
@@ -6826,14 +7173,6 @@ public final class TritonModernFragment extends Fragment {
 		}
 	}
 
-	private static final class ErrorUnderlineSpan extends CharacterStyle {
-		@Override
-		public void updateDrawState(TextPaint paint) {
-			paint.setUnderline(true);
-			paint.underlineColor = Color.argb(255, 255, 72, 96);
-		}
-	}
-
 	private static final class SyntaxColorSpan extends CharacterStyle {
 		private final int color;
 
@@ -6844,6 +7183,28 @@ public final class TritonModernFragment extends Fragment {
 		@Override
 		public void updateDrawState(TextPaint paint) {
 			paint.setColor(color);
+		}
+	}
+
+	private static final class EditorVisualSpan extends CharacterStyle {
+		private final int background;
+		private final int underline;
+
+		private EditorVisualSpan(int background, int underline) {
+			this.background = background;
+			this.underline = underline;
+		}
+
+		static EditorVisualSpan background(int color) { return new EditorVisualSpan(color, 0); }
+		static EditorVisualSpan underline(int color) { return new EditorVisualSpan(0, color); }
+
+		@Override
+		public void updateDrawState(TextPaint paint) {
+			if (background != 0) paint.bgColor = background;
+			if (underline != 0) {
+				paint.underlineColor = underline;
+				paint.setUnderline(true);
+			}
 		}
 	}
 
@@ -7867,7 +8228,8 @@ public final class TritonModernFragment extends Fragment {
 				|| key.equals("sidebar-width") || key.equals("navigation-mode") || key.equals("content-width")
 				|| key.equals("right-panel") || key.equals("page-spacing") || key.equals("header-behaviour")
 				|| key.equals("corner-radius") || key.equals("border-strength") || key.equals("animation-speed")
-				|| key.equals("indentation") || key.equals("telemetry");
+				|| key.equals("editor-tab-size") || key.equals("editor-cursor-style")
+				|| key.equals("editor-autosave") || key.equals("editor-working-directory") || key.equals("telemetry");
 	}
 
 	private View settingsFloatingDropdown() {
@@ -7917,9 +8279,10 @@ public final class TritonModernFragment extends Fragment {
 		if (key.equals("animation-speed")) {
 			return settingsConfig.animationSpeed();
 		}
-		if (key.equals("indentation")) {
-			return "Spaces: 4";
-		}
+		if (key.equals("editor-tab-size")) return settingsConfig.editorTabSize() + " spaces";
+		if (key.equals("editor-cursor-style")) return settingsConfig.cursorStyle();
+		if (key.equals("editor-autosave")) return settingsConfig.autosaveMode();
+		if (key.equals("editor-working-directory")) return settingsConfig.workingDirectoryMode();
 		if (key.equals("telemetry")) {
 			return "Local only";
 		}
@@ -7963,9 +8326,10 @@ public final class TritonModernFragment extends Fragment {
 		if (key.equals("animation-speed")) {
 			return ANIMATION_SPEED_OPTIONS;
 		}
-		if (key.equals("indentation")) {
-			return new String[]{"Spaces: 4", "Spaces: 2", "Tabs"};
-		}
+		if (key.equals("editor-tab-size")) return new String[]{"2 spaces", "4 spaces", "8 spaces"};
+		if (key.equals("editor-cursor-style")) return new String[]{"Line", "Block", "Underline"};
+		if (key.equals("editor-autosave")) return new String[]{"Off", "After Delay", "On Focus Change"};
+		if (key.equals("editor-working-directory")) return new String[]{"Script Folder", "Minescript Folder", "Custom"};
 		if (key.equals("telemetry")) {
 			return new String[]{"Local only", "Off", "Diagnostics only"};
 		}
@@ -8045,8 +8409,24 @@ public final class TritonModernFragment extends Fragment {
 			saveSettingsConfig("Animation speed set to " + option + ".");
 			return;
 		}
-		if (key.equals("indentation")) {
-			saveUiMessage("Indentation set to " + option + ".");
+		if (key.equals("editor-tab-size")) {
+			settingsConfig.setEditorTabSize(Integer.parseInt(option.substring(0, 1)));
+			saveSettingsConfig("Tab size set to " + option + ".");
+			return;
+		}
+		if (key.equals("editor-cursor-style")) {
+			settingsConfig.setCursorStyle(option);
+			saveSettingsConfig("Cursor style set to " + option + ".");
+			return;
+		}
+		if (key.equals("editor-autosave")) {
+			settingsConfig.setAutosaveMode(option);
+			saveSettingsConfig("Autosave set to " + option + ".");
+			return;
+		}
+		if (key.equals("editor-working-directory")) {
+			settingsConfig.setWorkingDirectoryMode(option);
+			saveSettingsConfig("Working directory set to " + option + ".");
 			return;
 		}
 		if (key.equals("telemetry")) {
@@ -8751,7 +9131,7 @@ public final class TritonModernFragment extends Fragment {
 		if (containsAny(query, "python", "pip", "minescript", "environment", "diagnostic")) return SettingsTab.PYTHON;
 		if (containsAny(query, "shortcut", "key", "binding", "hotkey")) return SettingsTab.SHORTCUTS;
 		if (containsAny(query, "file", "folder", "backup", "autosave")) return SettingsTab.FILES;
-		if (containsAny(query, "editor", "ruff", "autocomplete", "indent")) return SettingsTab.EDITOR;
+		if (containsAny(query, "editor", "autocomplete", "indent", "autosave", "cursor", "minimap")) return SettingsTab.EDITOR;
 		if (containsAny(query, "privacy", "name", "capture")) return SettingsTab.PRIVACY;
 		if (containsAny(query, "advanced", "cache", "repair", "reset")) return SettingsTab.ADVANCED;
 		return SettingsTab.CUSTOMIZATION;

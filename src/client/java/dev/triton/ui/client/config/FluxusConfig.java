@@ -42,12 +42,44 @@ public final class FluxusConfig {
 	private String layoutPreset = "Balanced";
 	private String defaultPage = "Dashboard";
 	private boolean rememberLastPage = true;
-	private boolean autosaveScripts = true;
-	private boolean ruffDiagnostics = true;
-	private boolean inlineAutocomplete = true;
-	private boolean confirmDestructiveScripts = true;
+	private boolean pythonAutocomplete = true;
+	private boolean inlineSuggestions = true;
+	private boolean hoverDocumentation = true;
+	private boolean signatureHelp = true;
+	private boolean autoCloseBracketsAndQuotes = true;
+	private boolean bracketPairHighlighting = true;
+	private boolean wordWrap;
+	private int editorTabSize = 4;
+	private boolean convertTabsToSpaces = true;
+	private boolean formatPastedIndentation = true;
+	private int editorFontSize = 12;
+	private int editorLineHeight = 18;
+	private String cursorStyle = "Line";
+	private boolean smoothCursorAnimation = true;
+	private boolean showLineNumbers = true;
+	private boolean highlightCurrentLine = true;
+	private boolean renderWhitespace;
+	private boolean showIndentationGuides = true;
+	private boolean showMinimap = true;
+	private String autosaveMode = "After Delay";
+	private int autosaveDelay = 1000;
+	private boolean trimTrailingWhitespaceOnSave = true;
+	private boolean insertFinalNewline = true;
+	private boolean createBackupBeforeSaving = true;
+	private int maximumBackupCount = 25;
+	private boolean restoreUnsavedTabs = true;
+	private boolean confirmCloseUnsaved = true;
+	private boolean saveBeforeRunning = true;
+	private boolean stopPreviousBeforeRunning = true;
+	private boolean clearOutputBeforeRunning;
+	private boolean openOutputOnRun = true;
+	private boolean focusOutputOnError = true;
+	private int executionTimeoutSeconds;
+	private String workingDirectoryMode = "Script Folder";
+	private String customWorkingDirectory = "";
+	private boolean confirmDangerousScripts = true;
+	private boolean stopScriptsOnWorldLeave = true;
 	private boolean blockNetworkByDefault = true;
-	private int backupHistory = 25;
 	private int openMenuKey = 85;
 	private int overlayEditKey = -1;
 	private int runLastScriptKey = 117;
@@ -100,12 +132,46 @@ public final class FluxusConfig {
 			}
 			config.defaultPage = readString(json, "defaultPage", config.defaultPage);
 			config.rememberLastPage = readBoolean(json, "rememberLastPage", config.rememberLastPage);
-			config.autosaveScripts = readBoolean(json, "autosaveScripts", config.autosaveScripts);
-			config.ruffDiagnostics = readBoolean(json, "ruffDiagnostics", config.ruffDiagnostics);
-			config.inlineAutocomplete = readBoolean(json, "inlineAutocomplete", config.inlineAutocomplete);
-			config.confirmDestructiveScripts = readBoolean(json, "confirmDestructiveScripts", config.confirmDestructiveScripts);
+			boolean legacyAutocomplete = readBoolean(json, "inlineAutocomplete", config.pythonAutocomplete);
+			config.pythonAutocomplete = readBoolean(json, "pythonAutocomplete", legacyAutocomplete);
+			config.inlineSuggestions = readBoolean(json, "inlineSuggestions", legacyAutocomplete);
+			config.hoverDocumentation = readBoolean(json, "hoverDocumentation", config.hoverDocumentation);
+			config.signatureHelp = readBoolean(json, "signatureHelp", config.signatureHelp);
+			config.autoCloseBracketsAndQuotes = readBoolean(json, "autoCloseBracketsAndQuotes", config.autoCloseBracketsAndQuotes);
+			config.bracketPairHighlighting = readBoolean(json, "bracketPairHighlighting", config.bracketPairHighlighting);
+			config.wordWrap = readBoolean(json, "wordWrap", config.wordWrap);
+			config.editorTabSize = clamp(readInt(json, "editorTabSize", config.editorTabSize), 2, 8);
+			config.convertTabsToSpaces = readBoolean(json, "convertTabsToSpaces", config.convertTabsToSpaces);
+			config.formatPastedIndentation = readBoolean(json, "formatPastedIndentation", config.formatPastedIndentation);
+			config.editorFontSize = clamp(readInt(json, "editorFontSize", config.editorFontSize), 10, 24);
+			config.editorLineHeight = clamp(readInt(json, "editorLineHeight", config.editorLineHeight), 14, 36);
+			config.cursorStyle = readString(json, "cursorStyle", config.cursorStyle);
+			config.smoothCursorAnimation = readBoolean(json, "smoothCursorAnimation", config.smoothCursorAnimation);
+			config.showLineNumbers = readBoolean(json, "showLineNumbers", config.showLineNumbers);
+			config.highlightCurrentLine = readBoolean(json, "highlightCurrentLine", config.highlightCurrentLine);
+			config.renderWhitespace = readBoolean(json, "renderWhitespace", config.renderWhitespace);
+			config.showIndentationGuides = readBoolean(json, "showIndentationGuides", config.showIndentationGuides);
+			config.showMinimap = readBoolean(json, "showMinimap", config.showMinimap);
+			String legacyAutosave = readBoolean(json, "autosaveScripts", true) ? "After Delay" : "Off";
+			config.autosaveMode = readString(json, "autosaveMode", legacyAutosave);
+			config.autosaveDelay = clamp(readInt(json, "autosaveDelay", config.autosaveDelay), 250, 5000);
+			config.trimTrailingWhitespaceOnSave = readBoolean(json, "trimTrailingWhitespaceOnSave", config.trimTrailingWhitespaceOnSave);
+			config.insertFinalNewline = readBoolean(json, "insertFinalNewline", config.insertFinalNewline);
+			config.createBackupBeforeSaving = readBoolean(json, "createBackupBeforeSaving", config.createBackupBeforeSaving);
+			config.maximumBackupCount = clamp(readInt(json, "maximumBackupCount", readInt(json, "backupHistory", config.maximumBackupCount)), 0, 100);
+			config.restoreUnsavedTabs = readBoolean(json, "restoreUnsavedTabs", config.restoreUnsavedTabs);
+			config.confirmCloseUnsaved = readBoolean(json, "confirmCloseUnsaved", config.confirmCloseUnsaved);
+			config.saveBeforeRunning = readBoolean(json, "saveBeforeRunning", config.saveBeforeRunning);
+			config.stopPreviousBeforeRunning = readBoolean(json, "stopPreviousBeforeRunning", config.stopPreviousBeforeRunning);
+			config.clearOutputBeforeRunning = readBoolean(json, "clearOutputBeforeRunning", config.clearOutputBeforeRunning);
+			config.openOutputOnRun = readBoolean(json, "openOutputOnRun", config.openOutputOnRun);
+			config.focusOutputOnError = readBoolean(json, "focusOutputOnError", config.focusOutputOnError);
+			config.executionTimeoutSeconds = clamp(readInt(json, "executionTimeoutSeconds", config.executionTimeoutSeconds), 0, 300);
+			config.workingDirectoryMode = readString(json, "workingDirectoryMode", config.workingDirectoryMode);
+			config.customWorkingDirectory = readString(json, "customWorkingDirectory", config.customWorkingDirectory);
+			config.confirmDangerousScripts = readBoolean(json, "confirmDangerousScripts", readBoolean(json, "confirmDestructiveScripts", config.confirmDangerousScripts));
+			config.stopScriptsOnWorldLeave = readBoolean(json, "stopScriptsOnWorldLeave", config.stopScriptsOnWorldLeave);
 			config.blockNetworkByDefault = readBoolean(json, "blockNetworkByDefault", config.blockNetworkByDefault);
-			config.backupHistory = readInt(json, "backupHistory", config.backupHistory);
 			config.openMenuKey = readInt(json, "openMenuKey", config.openMenuKey);
 			config.overlayEditKey = readInt(json, "overlayEditKey", config.overlayEditKey);
 			config.runLastScriptKey = readInt(json, "runLastScriptKey", config.runLastScriptKey);
@@ -220,28 +286,46 @@ public final class FluxusConfig {
 		return rememberLastPage;
 	}
 
-	public boolean autosaveScripts() {
-		return autosaveScripts;
-	}
-
-	public boolean ruffDiagnostics() {
-		return ruffDiagnostics;
-	}
-
-	public boolean inlineAutocomplete() {
-		return inlineAutocomplete;
-	}
-
-	public boolean confirmDestructiveScripts() {
-		return confirmDestructiveScripts;
-	}
+	public boolean pythonAutocomplete() { return pythonAutocomplete; }
+	public boolean inlineSuggestions() { return inlineSuggestions; }
+	public boolean hoverDocumentation() { return hoverDocumentation; }
+	public boolean signatureHelp() { return signatureHelp; }
+	public boolean autoCloseBracketsAndQuotes() { return autoCloseBracketsAndQuotes; }
+	public boolean bracketPairHighlighting() { return bracketPairHighlighting; }
+	public boolean wordWrap() { return wordWrap; }
+	public int editorTabSize() { return editorTabSize; }
+	public boolean convertTabsToSpaces() { return convertTabsToSpaces; }
+	public boolean formatPastedIndentation() { return formatPastedIndentation; }
+	public int editorFontSize() { return editorFontSize; }
+	public int editorLineHeight() { return editorLineHeight; }
+	public String cursorStyle() { return cursorStyle; }
+	public boolean smoothCursorAnimation() { return smoothCursorAnimation; }
+	public boolean showLineNumbers() { return showLineNumbers; }
+	public boolean highlightCurrentLine() { return highlightCurrentLine; }
+	public boolean renderWhitespace() { return renderWhitespace; }
+	public boolean showIndentationGuides() { return showIndentationGuides; }
+	public boolean showMinimap() { return showMinimap; }
+	public String autosaveMode() { return autosaveMode; }
+	public int autosaveDelay() { return autosaveDelay; }
+	public boolean trimTrailingWhitespaceOnSave() { return trimTrailingWhitespaceOnSave; }
+	public boolean insertFinalNewline() { return insertFinalNewline; }
+	public boolean createBackupBeforeSaving() { return createBackupBeforeSaving; }
+	public int maximumBackupCount() { return maximumBackupCount; }
+	public boolean restoreUnsavedTabs() { return restoreUnsavedTabs; }
+	public boolean confirmCloseUnsaved() { return confirmCloseUnsaved; }
+	public boolean saveBeforeRunning() { return saveBeforeRunning; }
+	public boolean stopPreviousBeforeRunning() { return stopPreviousBeforeRunning; }
+	public boolean clearOutputBeforeRunning() { return clearOutputBeforeRunning; }
+	public boolean openOutputOnRun() { return openOutputOnRun; }
+	public boolean focusOutputOnError() { return focusOutputOnError; }
+	public int executionTimeoutSeconds() { return executionTimeoutSeconds; }
+	public String workingDirectoryMode() { return workingDirectoryMode; }
+	public String customWorkingDirectory() { return customWorkingDirectory; }
+	public boolean confirmDangerousScripts() { return confirmDangerousScripts; }
+	public boolean stopScriptsOnWorldLeave() { return stopScriptsOnWorldLeave; }
 
 	public boolean blockNetworkByDefault() {
 		return blockNetworkByDefault;
-	}
-
-	public int backupHistory() {
-		return backupHistory;
 	}
 
 	public int openMenuKey() {
@@ -378,28 +462,46 @@ public final class FluxusConfig {
 		this.rememberLastPage = rememberLastPage;
 	}
 
-	public void setAutosaveScripts(boolean autosaveScripts) {
-		this.autosaveScripts = autosaveScripts;
-	}
-
-	public void setRuffDiagnostics(boolean ruffDiagnostics) {
-		this.ruffDiagnostics = ruffDiagnostics;
-	}
-
-	public void setInlineAutocomplete(boolean inlineAutocomplete) {
-		this.inlineAutocomplete = inlineAutocomplete;
-	}
-
-	public void setConfirmDestructiveScripts(boolean confirmDestructiveScripts) {
-		this.confirmDestructiveScripts = confirmDestructiveScripts;
-	}
+	public void setPythonAutocomplete(boolean value) { pythonAutocomplete = value; }
+	public void setInlineSuggestions(boolean value) { inlineSuggestions = value; }
+	public void setHoverDocumentation(boolean value) { hoverDocumentation = value; }
+	public void setSignatureHelp(boolean value) { signatureHelp = value; }
+	public void setAutoCloseBracketsAndQuotes(boolean value) { autoCloseBracketsAndQuotes = value; }
+	public void setBracketPairHighlighting(boolean value) { bracketPairHighlighting = value; }
+	public void setWordWrap(boolean value) { wordWrap = value; }
+	public void setEditorTabSize(int value) { editorTabSize = value == 2 || value == 8 ? value : 4; }
+	public void setConvertTabsToSpaces(boolean value) { convertTabsToSpaces = value; }
+	public void setFormatPastedIndentation(boolean value) { formatPastedIndentation = value; }
+	public void setEditorFontSize(int value) { editorFontSize = clamp(value, 10, 24); }
+	public void setEditorLineHeight(int value) { editorLineHeight = clamp(value, 14, 36); }
+	public void setCursorStyle(String value) { cursorStyle = value; }
+	public void setSmoothCursorAnimation(boolean value) { smoothCursorAnimation = value; }
+	public void setShowLineNumbers(boolean value) { showLineNumbers = value; }
+	public void setHighlightCurrentLine(boolean value) { highlightCurrentLine = value; }
+	public void setRenderWhitespace(boolean value) { renderWhitespace = value; }
+	public void setShowIndentationGuides(boolean value) { showIndentationGuides = value; }
+	public void setShowMinimap(boolean value) { showMinimap = value; }
+	public void setAutosaveMode(String value) { autosaveMode = value; }
+	public void setAutosaveDelay(int value) { autosaveDelay = clamp(value, 250, 5000); }
+	public void setTrimTrailingWhitespaceOnSave(boolean value) { trimTrailingWhitespaceOnSave = value; }
+	public void setInsertFinalNewline(boolean value) { insertFinalNewline = value; }
+	public void setCreateBackupBeforeSaving(boolean value) { createBackupBeforeSaving = value; }
+	public void setMaximumBackupCount(int value) { maximumBackupCount = clamp(value, 0, 100); }
+	public void setRestoreUnsavedTabs(boolean value) { restoreUnsavedTabs = value; }
+	public void setConfirmCloseUnsaved(boolean value) { confirmCloseUnsaved = value; }
+	public void setSaveBeforeRunning(boolean value) { saveBeforeRunning = value; }
+	public void setStopPreviousBeforeRunning(boolean value) { stopPreviousBeforeRunning = value; }
+	public void setClearOutputBeforeRunning(boolean value) { clearOutputBeforeRunning = value; }
+	public void setOpenOutputOnRun(boolean value) { openOutputOnRun = value; }
+	public void setFocusOutputOnError(boolean value) { focusOutputOnError = value; }
+	public void setExecutionTimeoutSeconds(int value) { executionTimeoutSeconds = clamp(value, 0, 300); }
+	public void setWorkingDirectoryMode(String value) { workingDirectoryMode = value; }
+	public void setCustomWorkingDirectory(String value) { customWorkingDirectory = value == null ? "" : value; }
+	public void setConfirmDangerousScripts(boolean value) { confirmDangerousScripts = value; }
+	public void setStopScriptsOnWorldLeave(boolean value) { stopScriptsOnWorldLeave = value; }
 
 	public void setBlockNetworkByDefault(boolean blockNetworkByDefault) {
 		this.blockNetworkByDefault = blockNetworkByDefault;
-	}
-
-	public void setBackupHistory(int backupHistory) {
-		this.backupHistory = backupHistory;
 	}
 
 	public void setOpenMenuKey(int openMenuKey) {
@@ -470,12 +572,44 @@ public final class FluxusConfig {
 				+ "  \"layoutPreset\": \"" + escape(layoutPreset) + "\",\n"
 				+ "  \"defaultPage\": \"" + escape(defaultPage) + "\",\n"
 				+ "  \"rememberLastPage\": " + rememberLastPage + ",\n"
-				+ "  \"autosaveScripts\": " + autosaveScripts + ",\n"
-				+ "  \"ruffDiagnostics\": " + ruffDiagnostics + ",\n"
-				+ "  \"inlineAutocomplete\": " + inlineAutocomplete + ",\n"
-				+ "  \"confirmDestructiveScripts\": " + confirmDestructiveScripts + ",\n"
+				+ "  \"pythonAutocomplete\": " + pythonAutocomplete + ",\n"
+				+ "  \"inlineSuggestions\": " + inlineSuggestions + ",\n"
+				+ "  \"hoverDocumentation\": " + hoverDocumentation + ",\n"
+				+ "  \"signatureHelp\": " + signatureHelp + ",\n"
+				+ "  \"autoCloseBracketsAndQuotes\": " + autoCloseBracketsAndQuotes + ",\n"
+				+ "  \"bracketPairHighlighting\": " + bracketPairHighlighting + ",\n"
+				+ "  \"wordWrap\": " + wordWrap + ",\n"
+				+ "  \"editorTabSize\": " + editorTabSize + ",\n"
+				+ "  \"convertTabsToSpaces\": " + convertTabsToSpaces + ",\n"
+				+ "  \"formatPastedIndentation\": " + formatPastedIndentation + ",\n"
+				+ "  \"editorFontSize\": " + editorFontSize + ",\n"
+				+ "  \"editorLineHeight\": " + editorLineHeight + ",\n"
+				+ "  \"cursorStyle\": \"" + escape(cursorStyle) + "\",\n"
+				+ "  \"smoothCursorAnimation\": " + smoothCursorAnimation + ",\n"
+				+ "  \"showLineNumbers\": " + showLineNumbers + ",\n"
+				+ "  \"highlightCurrentLine\": " + highlightCurrentLine + ",\n"
+				+ "  \"renderWhitespace\": " + renderWhitespace + ",\n"
+				+ "  \"showIndentationGuides\": " + showIndentationGuides + ",\n"
+				+ "  \"showMinimap\": " + showMinimap + ",\n"
+				+ "  \"autosaveMode\": \"" + escape(autosaveMode) + "\",\n"
+				+ "  \"autosaveDelay\": " + autosaveDelay + ",\n"
+				+ "  \"trimTrailingWhitespaceOnSave\": " + trimTrailingWhitespaceOnSave + ",\n"
+				+ "  \"insertFinalNewline\": " + insertFinalNewline + ",\n"
+				+ "  \"createBackupBeforeSaving\": " + createBackupBeforeSaving + ",\n"
+				+ "  \"maximumBackupCount\": " + maximumBackupCount + ",\n"
+				+ "  \"restoreUnsavedTabs\": " + restoreUnsavedTabs + ",\n"
+				+ "  \"confirmCloseUnsaved\": " + confirmCloseUnsaved + ",\n"
+				+ "  \"saveBeforeRunning\": " + saveBeforeRunning + ",\n"
+				+ "  \"stopPreviousBeforeRunning\": " + stopPreviousBeforeRunning + ",\n"
+				+ "  \"clearOutputBeforeRunning\": " + clearOutputBeforeRunning + ",\n"
+				+ "  \"openOutputOnRun\": " + openOutputOnRun + ",\n"
+				+ "  \"focusOutputOnError\": " + focusOutputOnError + ",\n"
+				+ "  \"executionTimeoutSeconds\": " + executionTimeoutSeconds + ",\n"
+				+ "  \"workingDirectoryMode\": \"" + escape(workingDirectoryMode) + "\",\n"
+				+ "  \"customWorkingDirectory\": \"" + escape(customWorkingDirectory) + "\",\n"
+				+ "  \"confirmDangerousScripts\": " + confirmDangerousScripts + ",\n"
+				+ "  \"stopScriptsOnWorldLeave\": " + stopScriptsOnWorldLeave + ",\n"
 				+ "  \"blockNetworkByDefault\": " + blockNetworkByDefault + ",\n"
-				+ "  \"backupHistory\": " + backupHistory + ",\n"
 				+ "  \"openMenuKey\": " + openMenuKey + ",\n"
 				+ "  \"overlayEditKey\": " + overlayEditKey + ",\n"
 				+ "  \"runLastScriptKey\": " + runLastScriptKey + ",\n"

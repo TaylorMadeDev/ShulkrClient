@@ -40,6 +40,7 @@ public final class TritonUIClient implements ClientModInitializer {
 	private static boolean modernUiSearchConflictDisabled;
 	private static String remoteActiveScript = "";
 	private static ModuleManager moduleManager;
+	private static boolean wasInWorld;
 	private static final Set<String> runningShortcutScripts = new HashSet<>();
 
 	@Override
@@ -71,6 +72,14 @@ public final class TritonUIClient implements ClientModInitializer {
 
 		ClientTickEvents.END_CLIENT_TICK.register(client -> {
 			disableModernUiSearchConflict();
+			boolean inWorld = client.level != null && client.player != null;
+			if (wasInWorld && !inWorld && config.stopScriptsOnWorldLeave()) {
+				Minescript.runEditorCommandAsync("killjob -1", handled -> {
+					if (handled) LOGGER.info("Stopped Minescript jobs after leaving the world.");
+					else LOGGER.warn("Minescript did not handle the automatic stop command after leaving the world.");
+				});
+			}
+			wasInWorld = inWorld;
 			moduleManager.onClientTick(client);
 			if (++telemetryTicks >= 20) {
 				telemetryTicks = 0;
