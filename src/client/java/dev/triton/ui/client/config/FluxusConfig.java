@@ -25,6 +25,17 @@ public final class FluxusConfig {
 	private String rightPanelBehaviour = "Always visible";
 	private String pageSpacing = "Comfortable";
 	private String headerBehaviour = "Static";
+	private String cornerRadius = "Soft";
+	private int panelTransparency = 100;
+	private int backgroundBlur = 12;
+	private String borderStrength = "Subtle";
+	private int glowIntensity = 100;
+	private String animationSpeed = "Normal";
+	private int uiScale = 100;
+	private int fontSize = 100;
+	private int iconSize = 100;
+	private boolean reduceMotion;
+	private String layoutPreset = "Balanced";
 	private String defaultPage = "Dashboard";
 	private boolean rememberLastPage = true;
 	private boolean autosaveScripts = true;
@@ -62,6 +73,20 @@ public final class FluxusConfig {
 			config.rightPanelBehaviour = readString(json, "rightPanelBehaviour", config.rightPanelBehaviour);
 			config.pageSpacing = readString(json, "pageSpacing", config.pageSpacing);
 			config.headerBehaviour = readString(json, "headerBehaviour", config.headerBehaviour);
+			config.cornerRadius = readString(json, "cornerRadius", config.cornerRadius);
+			config.panelTransparency = clamp(readInt(json, "panelTransparency", config.panelTransparency), 55, 100);
+			config.backgroundBlur = clamp(readInt(json, "backgroundBlur", config.backgroundBlur), 0, 32);
+			config.borderStrength = readString(json, "borderStrength", config.borderStrength);
+			config.glowIntensity = clamp(readInt(json, "glowIntensity", config.glowIntensity), 0, 100);
+			config.animationSpeed = readString(json, "animationSpeed", config.animationSpeed);
+			config.uiScale = clamp(readInt(json, "uiScale", config.uiScale), 85, 115);
+			config.fontSize = clamp(readInt(json, "fontSize", config.fontSize), 85, 120);
+			config.iconSize = clamp(readInt(json, "iconSize", config.iconSize), 80, 125);
+			config.reduceMotion = readBoolean(json, "reduceMotion", config.reduceMotion);
+			config.layoutPreset = readString(json, "layoutPreset", config.layoutPreset);
+			if (!json.contains("\"layoutPreset\"")) {
+				config.layoutPreset = "Custom";
+			}
 			if (config.accent.equals("Shulk purple")) {
 				config.accent = "Shulkr purple";
 			}
@@ -129,6 +154,50 @@ public final class FluxusConfig {
 
 	public String headerBehaviour() {
 		return headerBehaviour;
+	}
+
+	public String cornerRadius() {
+		return cornerRadius;
+	}
+
+	public int panelTransparency() {
+		return panelTransparency;
+	}
+
+	public int backgroundBlur() {
+		return backgroundBlur;
+	}
+
+	public String borderStrength() {
+		return borderStrength;
+	}
+
+	public int glowIntensity() {
+		return glowIntensity;
+	}
+
+	public String animationSpeed() {
+		return animationSpeed;
+	}
+
+	public int uiScale() {
+		return uiScale;
+	}
+
+	public int fontSize() {
+		return fontSize;
+	}
+
+	public int iconSize() {
+		return iconSize;
+	}
+
+	public boolean reduceMotion() {
+		return reduceMotion;
+	}
+
+	public String layoutPreset() {
+		return layoutPreset;
 	}
 
 	public String defaultPage() {
@@ -215,6 +284,50 @@ public final class FluxusConfig {
 		this.headerBehaviour = headerBehaviour;
 	}
 
+	public void setCornerRadius(String cornerRadius) {
+		this.cornerRadius = cornerRadius;
+	}
+
+	public void setPanelTransparency(int panelTransparency) {
+		this.panelTransparency = clamp(panelTransparency, 55, 100);
+	}
+
+	public void setBackgroundBlur(int backgroundBlur) {
+		this.backgroundBlur = clamp(backgroundBlur, 0, 32);
+	}
+
+	public void setBorderStrength(String borderStrength) {
+		this.borderStrength = borderStrength;
+	}
+
+	public void setGlowIntensity(int glowIntensity) {
+		this.glowIntensity = clamp(glowIntensity, 0, 100);
+	}
+
+	public void setAnimationSpeed(String animationSpeed) {
+		this.animationSpeed = animationSpeed;
+	}
+
+	public void setUiScale(int uiScale) {
+		this.uiScale = clamp(uiScale, 85, 115);
+	}
+
+	public void setFontSize(int fontSize) {
+		this.fontSize = clamp(fontSize, 85, 120);
+	}
+
+	public void setIconSize(int iconSize) {
+		this.iconSize = clamp(iconSize, 80, 125);
+	}
+
+	public void setReduceMotion(boolean reduceMotion) {
+		this.reduceMotion = reduceMotion;
+	}
+
+	public void setLayoutPreset(String layoutPreset) {
+		this.layoutPreset = layoutPreset;
+	}
+
 	public void setDefaultPage(String defaultPage) {
 		this.defaultPage = defaultPage;
 	}
@@ -274,6 +387,17 @@ public final class FluxusConfig {
 				+ "  \"rightPanelBehaviour\": \"" + escape(rightPanelBehaviour) + "\",\n"
 				+ "  \"pageSpacing\": \"" + escape(pageSpacing) + "\",\n"
 				+ "  \"headerBehaviour\": \"" + escape(headerBehaviour) + "\",\n"
+				+ "  \"cornerRadius\": \"" + escape(cornerRadius) + "\",\n"
+				+ "  \"panelTransparency\": " + panelTransparency + ",\n"
+				+ "  \"backgroundBlur\": " + backgroundBlur + ",\n"
+				+ "  \"borderStrength\": \"" + escape(borderStrength) + "\",\n"
+				+ "  \"glowIntensity\": " + glowIntensity + ",\n"
+				+ "  \"animationSpeed\": \"" + escape(animationSpeed) + "\",\n"
+				+ "  \"uiScale\": " + uiScale + ",\n"
+				+ "  \"fontSize\": " + fontSize + ",\n"
+				+ "  \"iconSize\": " + iconSize + ",\n"
+				+ "  \"reduceMotion\": " + reduceMotion + ",\n"
+				+ "  \"layoutPreset\": \"" + escape(layoutPreset) + "\",\n"
 				+ "  \"defaultPage\": \"" + escape(defaultPage) + "\",\n"
 				+ "  \"rememberLastPage\": " + rememberLastPage + ",\n"
 				+ "  \"autosaveScripts\": " + autosaveScripts + ",\n"
@@ -302,6 +426,10 @@ public final class FluxusConfig {
 	private static int readInt(String json, String field, int fallback) {
 		Matcher matcher = Pattern.compile(INT_FIELD.pattern().formatted(Pattern.quote(field))).matcher(json);
 		return matcher.find() ? Integer.parseInt(matcher.group(1)) : fallback;
+	}
+
+	private static int clamp(int value, int min, int max) {
+		return Math.max(min, Math.min(max, value));
 	}
 
 	private static String escape(String value) {

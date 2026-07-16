@@ -20,6 +20,7 @@ import icyllis.modernui.fragment.Fragment;
 import icyllis.modernui.graphics.Color;
 import icyllis.modernui.graphics.drawable.GradientDrawable;
 import icyllis.modernui.graphics.drawable.ShapeDrawable;
+import icyllis.modernui.mc.BlurHandler;
 import icyllis.modernui.mc.ImageStore;
 import icyllis.modernui.text.Editable;
 import icyllis.modernui.text.Layout;
@@ -42,6 +43,7 @@ import icyllis.modernui.widget.EditText;
 import icyllis.modernui.widget.ImageView;
 import icyllis.modernui.widget.LinearLayout;
 import icyllis.modernui.widget.ScrollView;
+import icyllis.modernui.widget.SeekBar;
 import icyllis.modernui.widget.Switch;
 import icyllis.modernui.widget.TextView;
 import net.minescript.common.EntityExporter;
@@ -145,6 +147,10 @@ public final class TritonModernFragment extends Fragment {
 	private static final String[] RIGHT_PANEL_OPTIONS = {"Always visible", "Contextual", "Collapsed by default", "Hidden"};
 	private static final String[] PAGE_SPACING_OPTIONS = {"Compact", "Comfortable", "Spacious"};
 	private static final String[] HEADER_BEHAVIOUR_OPTIONS = {"Static", "Sticky", "Hide while scrolling"};
+	private static final String[] CORNER_RADIUS_OPTIONS = {"Sharp", "Soft", "Rounded"};
+	private static final String[] BORDER_STRENGTH_OPTIONS = {"None", "Subtle", "Strong"};
+	private static final String[] ANIMATION_SPEED_OPTIONS = {"Off", "Fast", "Normal", "Slow"};
+	private static final String[] LAYOUT_PRESET_OPTIONS = {"Balanced", "Focus", "Compact", "Workspace", "Floating", "Minimal"};
 	private static final String SHORTCUT_OPEN_UI = "open-ui";
 	private static final String SHORTCUT_OVERLAY_EDIT = "overlay-edit";
 	private static final String SHORTCUT_RUN_LAST = "run-last-script";
@@ -205,8 +211,6 @@ public final class TritonModernFragment extends Fragment {
 	private String completionRemainder = "";
 	private String openDropdownKey = "";
 	private boolean dropdownClosing;
-	private boolean strongerPanelTransparency = true;
-	private boolean animatedHoverHighlight = true;
 	private boolean rightPanelExpanded;
 	private boolean headerHidden;
 	private boolean createBackupsBeforeRun = true;
@@ -370,6 +374,7 @@ public final class TritonModernFragment extends Fragment {
 		currentDropdownArrow = null;
 		currentHeader = null;
 		shell.removeAllViews();
+		shell.setBackground(round(BACKDROP, 0, 0));
 		FrameLayout host = new FrameLayout(requireContext());
 		shell.addView(host, new FrameLayout.LayoutParams(match(), match()));
 		LinearLayout root = new LinearLayout(requireContext());
@@ -2322,32 +2327,41 @@ public final class TritonModernFragment extends Fragment {
 		LinearLayout left = column(14);
 		LinearLayout right = column(14);
 		body.addView(left, new LinearLayout.LayoutParams(0, match(), 1.0F));
-		body.addView(right, new LinearLayout.LayoutParams(0, match(), 1.0F));
 		if (settingsTab == SettingsTab.CUSTOMIZATION) {
-			left.addView(appearanceSettingsCard(), new LinearLayout.LayoutParams(match(), 270));
+			left.addView(appearanceSettingsCard(), new LinearLayout.LayoutParams(match(), 164));
 			left.addView(layoutSettingsCard(), new LinearLayout.LayoutParams(match(), 0, 1.0F));
-			right.addView(settingsPreviewCard(), new LinearLayout.LayoutParams(match(), 230));
-			right.addView(settingsLiveStatusCard(), new LinearLayout.LayoutParams(match(), 0, 1.0F));
+			right.addView(interfaceStyleSettingsCard(), new LinearLayout.LayoutParams(match(), wrap()));
+			right.addView(layoutPresetsCard(), new LinearLayout.LayoutParams(match(), wrap()));
+			ScrollView scroll = new ScrollView(requireContext());
+			scroll.setFillViewport(true);
+			scroll.addView(right, new FrameLayout.LayoutParams(match(), wrap()));
+			body.addView(scroll, new LinearLayout.LayoutParams(0, match(), 1.0F));
 		} else if (settingsTab == SettingsTab.PYTHON) {
+			body.addView(right, new LinearLayout.LayoutParams(0, match(), 1.0F));
 			left.addView(pythonInstallSettingsCard(), new LinearLayout.LayoutParams(match(), 416));
 			left.addView(pythonMinescriptCard(), new LinearLayout.LayoutParams(match(), 0, 1.0F));
 			right.addView(pythonHelpCard(), new LinearLayout.LayoutParams(match(), 300));
 			right.addView(settingsLiveStatusCard(), new LinearLayout.LayoutParams(match(), 0, 1.0F));
 		} else if (settingsTab == SettingsTab.FILES) {
+			body.addView(right, new LinearLayout.LayoutParams(0, match(), 1.0F));
 			left.addView(fileSettingsCard(), new LinearLayout.LayoutParams(match(), 300));
 			left.addView(fileBackupSettingsCard(), new LinearLayout.LayoutParams(match(), 0, 1.0F));
 			right.addView(settingsLiveStatusCard(), new LinearLayout.LayoutParams(match(), 0, 1.0F));
 		} else if (settingsTab == SettingsTab.EDITOR) {
+			body.addView(right, new LinearLayout.LayoutParams(0, match(), 1.0F));
 			left.addView(editorSettingsCard(), new LinearLayout.LayoutParams(match(), 260));
 			left.addView(editorLintSettingsCard(), new LinearLayout.LayoutParams(match(), 0, 1.0F));
 			right.addView(settingsLiveStatusCard(), new LinearLayout.LayoutParams(match(), 0, 1.0F));
 		} else if (settingsTab == SettingsTab.SHORTCUTS) {
+			body.addView(right, new LinearLayout.LayoutParams(0, match(), 1.0F));
 			left.addView(shortcutSettingsCard(), new LinearLayout.LayoutParams(match(), 300));
 			right.addView(shortcutHelperCard(), new LinearLayout.LayoutParams(match(), 0, 1.0F));
 		} else if (settingsTab == SettingsTab.PRIVACY) {
+			body.addView(right, new LinearLayout.LayoutParams(0, match(), 1.0F));
 			left.addView(privacySettingsCard(), new LinearLayout.LayoutParams(match(), 270));
 			right.addView(safetyRuntimeCard(), new LinearLayout.LayoutParams(match(), 0, 1.0F));
 		} else {
+			body.addView(right, new LinearLayout.LayoutParams(0, match(), 1.0F));
 			left.addView(advancedSettingsCard(), new LinearLayout.LayoutParams(match(), 340));
 			right.addView(settingsLiveStatusCard(), new LinearLayout.LayoutParams(match(), 0, 1.0F));
 		}
@@ -2363,15 +2377,6 @@ public final class TritonModernFragment extends Fragment {
 		card.addView(theme, new LinearLayout.LayoutParams(match(), 38));
 		View accent = accentDropdownRow();
 		card.addView(accent, new LinearLayout.LayoutParams(match(), 38));
-		card.addView(settingsSwitchRow("Stronger panel transparency", strongerPanelTransparency, checked -> {
-			strongerPanelTransparency = checked;
-			saveUiMessage("Panel transparency set to " + checked + ".");
-		}), new LinearLayout.LayoutParams(match(), 38));
-		card.addView(settingsSwitchRow("Animated hover highlight", animatedHoverHighlight, checked -> {
-			animatedHoverHighlight = checked;
-			saveUiMessage("Hover animation set to " + checked + ".");
-		}), new LinearLayout.LayoutParams(match(), 38));
-		card.addView(settingsSliderRow("Background visibility", "72%"), new LinearLayout.LayoutParams(match(), 46));
 		return card;
 	}
 
@@ -2538,12 +2543,173 @@ public final class TritonModernFragment extends Fragment {
 		return card;
 	}
 
-	private View settingsPreviewCard() {
-		LinearLayout card = settingsCard("Live Preview", "eye-dropper-solid.png");
-		card.addView(label("Theme, accent, and layout controls save instantly. Visual-only controls are logged until the renderer exposes runtime restyle hooks.", 12, MUTED));
-		card.addView(settingsValueRow("Theme", settingsConfig.theme()), new LinearLayout.LayoutParams(match(), 38));
-		card.addView(settingsValueRow("Accent", settingsConfig.accent()), new LinearLayout.LayoutParams(match(), 38));
+	private View interfaceStyleSettingsCard() {
+		LinearLayout card = settingsCard("Interface Style", "eye-dropper-solid.png");
+		int rowHeight = 38;
+		card.addView(settingsDropdownRow("corner-radius", "Corner radius", settingsConfig.cornerRadius(), CORNER_RADIUS_OPTIONS,
+				value -> {}), new LinearLayout.LayoutParams(match(), rowHeight));
+		card.addView(settingsIntSliderRow("Panel transparency", 55, 100, settingsConfig.panelTransparency(), "%", value -> {
+			settingsConfig.setPanelTransparency(value);
+			settingsConfig.setLayoutPreset("Custom");
+			saveSettingsConfig("Panel transparency set to " + value + "%.");
+		}), new LinearLayout.LayoutParams(match(), 42));
+		card.addView(settingsIntSliderRow("Background blur", 0, 32, settingsConfig.backgroundBlur(), " px", value -> {
+			settingsConfig.setBackgroundBlur(value);
+			settingsConfig.setLayoutPreset("Custom");
+			saveSettingsConfig("Background blur set to " + value + " px.");
+		}), new LinearLayout.LayoutParams(match(), 42));
+		card.addView(settingsDropdownRow("border-strength", "Border strength", settingsConfig.borderStrength(), BORDER_STRENGTH_OPTIONS,
+				value -> {}), new LinearLayout.LayoutParams(match(), rowHeight));
+		card.addView(settingsIntSliderRow("Glow intensity", 0, 100, settingsConfig.glowIntensity(), "%", value -> {
+			settingsConfig.setGlowIntensity(value);
+			settingsConfig.setLayoutPreset("Custom");
+			saveSettingsConfig("Glow intensity set to " + value + "%.");
+		}), new LinearLayout.LayoutParams(match(), 42));
+		card.addView(settingsDropdownRow("animation-speed", "Animation speed", settingsConfig.animationSpeed(), ANIMATION_SPEED_OPTIONS,
+				value -> {}), new LinearLayout.LayoutParams(match(), rowHeight));
+		card.addView(settingsIntSliderRow("UI scale", 85, 115, settingsConfig.uiScale(), "%", value -> {
+			settingsConfig.setUiScale(value);
+			settingsConfig.setLayoutPreset("Custom");
+			saveSettingsConfig("UI scale set to " + value + "%.");
+		}), new LinearLayout.LayoutParams(match(), 42));
+		card.addView(settingsIntSliderRow("Font size", 85, 120, settingsConfig.fontSize(), "%", value -> {
+			settingsConfig.setFontSize(value);
+			settingsConfig.setLayoutPreset("Custom");
+			saveSettingsConfig("Font size set to " + value + "%.");
+		}), new LinearLayout.LayoutParams(match(), 42));
+		card.addView(settingsIntSliderRow("Icon size", 80, 125, settingsConfig.iconSize(), "%", value -> {
+			settingsConfig.setIconSize(value);
+			settingsConfig.setLayoutPreset("Custom");
+			saveSettingsConfig("Icon size set to " + value + "%.");
+		}), new LinearLayout.LayoutParams(match(), 42));
+		card.addView(settingsSwitchRow("Reduce motion", settingsConfig.reduceMotion(), checked -> {
+			settingsConfig.setReduceMotion(checked);
+			settingsConfig.setLayoutPreset("Custom");
+			saveSettingsConfig("Reduce motion set to " + checked + ".");
+		}), new LinearLayout.LayoutParams(match(), rowHeight));
 		return card;
+	}
+
+	private View layoutPresetsCard() {
+		LinearLayout card = settingsCard("Layout Presets", "border-all-solid.png");
+		card.addView(label("Current: " + settingsConfig.layoutPreset() + ". Apply a starting point, then fine-tune any setting.", 11, MUTED),
+				new LinearLayout.LayoutParams(match(), wrap()));
+		for (int index = 0; index < LAYOUT_PRESET_OPTIONS.length; index += 2) {
+			LinearLayout presetRow = row(10);
+			presetRow.addView(layoutPresetCard(LAYOUT_PRESET_OPTIONS[index]), new LinearLayout.LayoutParams(0, 82, 1.0F));
+			presetRow.addView(layoutPresetCard(LAYOUT_PRESET_OPTIONS[index + 1]), new LinearLayout.LayoutParams(0, 82, 1.0F));
+			card.addView(presetRow, new LinearLayout.LayoutParams(match(), 82));
+		}
+		return card;
+	}
+
+	private View layoutPresetCard(String preset) {
+		boolean active = preset.equals(settingsConfig.layoutPreset());
+		LinearLayout card = column(5);
+		card.setPadding(9, 8, 9, 8);
+		card.setBackground(active
+				? glass(accentAlpha(155), accentDarkAlpha(125), 10, STROKE_HOVER)
+				: round(Color.argb(88, 18, 24, 39), 10, STROKE));
+
+		FrameLayout preview = layoutPresetPreview(preset, active);
+		card.addView(preview, new LinearLayout.LayoutParams(match(), 40));
+		LinearLayout footer = row(6);
+		footer.setGravity(Gravity.CENTER_VERTICAL);
+		footer.addView(label(preset, 12, active ? TEXT : MUTED), new LinearLayout.LayoutParams(0, wrap(), 1.0F));
+		if (active) {
+			footer.addView(icon("check-solid.png", TEXT), new LinearLayout.LayoutParams(13, 13));
+		}
+		card.addView(footer, new LinearLayout.LayoutParams(match(), 20));
+		card.setClickable(true);
+		card.setOnClickListener(view -> applyLayoutPreset(preset));
+		addPressAnimation(card);
+		return card;
+	}
+
+	private FrameLayout layoutPresetPreview(String preset, boolean active) {
+		FrameLayout preview = new FrameLayout(requireContext());
+		preview.setBackground(round(Color.argb(105, 7, 12, 22), 7, active ? accentAlpha(120) : Color.argb(46, 105, 116, 150)));
+		int leftWidth = switch (preset) {
+			case "Compact", "Minimal" -> 8;
+			case "Floating" -> 0;
+			default -> 17;
+		};
+		int rightWidth = switch (preset) {
+			case "Focus", "Minimal" -> 0;
+			case "Compact" -> 7;
+			default -> 12;
+		};
+		if (leftWidth > 0) {
+			View navigation = new View(requireContext());
+			navigation.setBackground(round(accentAlpha(active ? 105 : 62), 4, 0));
+			FrameLayout.LayoutParams navigationParams = new FrameLayout.LayoutParams(leftWidth, match(), Gravity.LEFT);
+			navigationParams.setMargins(4, 4, 0, 4);
+			preview.addView(navigation, navigationParams);
+		}
+		if (rightWidth > 0) {
+			View rightPanel = new View(requireContext());
+			rightPanel.setBackground(round(Color.argb(96, 30, 36, 57), 4, 0));
+			FrameLayout.LayoutParams rightParams = new FrameLayout.LayoutParams(rightWidth, match(), Gravity.RIGHT);
+			rightParams.setMargins(0, 4, 4, 4);
+			preview.addView(rightPanel, rightParams);
+		}
+		View content = new View(requireContext());
+		content.setBackground(round(Color.argb(110, 24, 30, 49), 4, 0));
+		FrameLayout.LayoutParams contentParams = new FrameLayout.LayoutParams(match(), match());
+		contentParams.setMargins(leftWidth + 7, 4, rightWidth + 7, preset.equals("Floating") ? 10 : 4);
+		preview.addView(content, contentParams);
+		if (preset.equals("Floating")) {
+			View dock = new View(requireContext());
+			dock.setBackground(round(accentAlpha(active ? 150 : 90), 3, 0));
+			FrameLayout.LayoutParams dockParams = new FrameLayout.LayoutParams(34, 5, Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL);
+			dockParams.setMargins(0, 0, 0, 3);
+			preview.addView(dock, dockParams);
+		}
+		return preview;
+	}
+
+	private void applyLayoutPreset(String preset) {
+		switch (preset) {
+			case "Focus" -> applyPresetValues("Comfortable", "300 px", "Auto-collapse", "Centered", "Contextual",
+					"Spacious", "Sticky", "Rounded", 92, 18, "Subtle", 55, "Slow", 100, 105, 100, false);
+			case "Compact" -> applyPresetValues("Compact", "300 px", "Compact icon rail", "Full width", "Contextual",
+					"Compact", "Static", "Sharp", 100, 6, "Strong", 35, "Fast", 90, 90, 90, false);
+			case "Workspace" -> applyPresetValues("Compact", "360 px", "Expanded sidebar", "Full width", "Always visible",
+					"Compact", "Sticky", "Soft", 96, 10, "Strong", 70, "Fast", 95, 95, 100, false);
+			case "Floating" -> applyPresetValues("Comfortable", "300 px", "Floating dock only", "Wide", "Contextual",
+					"Comfortable", "Hide while scrolling", "Rounded", 82, 24, "Subtle", 100, "Slow", 100, 100, 110, false);
+			case "Minimal" -> applyPresetValues("Comfortable", "300 px", "Compact icon rail", "Centered", "Hidden",
+					"Spacious", "Static", "Sharp", 100, 0, "None", 0, "Off", 100, 100, 90, true);
+			default -> applyPresetValues("Comfortable", "300 px", "Expanded sidebar", "Wide", "Always visible",
+					"Comfortable", "Static", "Soft", 100, 12, "Subtle", 100, "Normal", 100, 100, 100, false);
+		}
+		settingsConfig.setLayoutPreset(preset);
+		rightPanelExpanded = false;
+		headerHidden = false;
+		saveSettingsConfig(preset + " layout preset applied.");
+	}
+
+	private void applyPresetValues(String density, String sidebarWidth, String navigationMode, String contentWidth,
+			String rightPanelBehaviour, String pageSpacing, String headerBehaviour, String cornerRadius,
+			int panelTransparency, int backgroundBlur, String borderStrength, int glowIntensity, String animationSpeed,
+			int uiScale, int fontSize, int iconSize, boolean reduceMotion) {
+		settingsConfig.setDensity(density);
+		settingsConfig.setSidebarWidth(sidebarWidth);
+		settingsConfig.setNavigationMode(navigationMode);
+		settingsConfig.setContentWidth(contentWidth);
+		settingsConfig.setRightPanelBehaviour(rightPanelBehaviour);
+		settingsConfig.setPageSpacing(pageSpacing);
+		settingsConfig.setHeaderBehaviour(headerBehaviour);
+		settingsConfig.setCornerRadius(cornerRadius);
+		settingsConfig.setPanelTransparency(panelTransparency);
+		settingsConfig.setBackgroundBlur(backgroundBlur);
+		settingsConfig.setBorderStrength(borderStrength);
+		settingsConfig.setGlowIntensity(glowIntensity);
+		settingsConfig.setAnimationSpeed(animationSpeed);
+		settingsConfig.setUiScale(uiScale);
+		settingsConfig.setFontSize(fontSize);
+		settingsConfig.setIconSize(iconSize);
+		settingsConfig.setReduceMotion(reduceMotion);
 	}
 
 	private View settingsLiveStatusCard() {
@@ -2832,6 +2998,35 @@ public final class TritonModernFragment extends Fragment {
 		return row;
 	}
 
+	private View settingsIntSliderRow(String name, int min, int max, int value, String suffix, Consumer<Integer> onChanged) {
+		LinearLayout row = row(10);
+		row.setGravity(Gravity.CENTER_VERTICAL);
+		row.addView(label(name, 12, MUTED), new LinearLayout.LayoutParams(128, wrap()));
+		SeekBar slider = new SeekBar(requireContext());
+		slider.setMin(min);
+		slider.setMax(max);
+		slider.setProgress(value);
+		slider.setProgressTintList(ColorStateList.valueOf(PURPLE));
+		slider.setProgressBackgroundTintList(ColorStateList.valueOf(Color.argb(90, 44, 48, 66)));
+		slider.setThumbTintList(ColorStateList.valueOf(Color.argb(255, 228, 207, 255)));
+		TextView valueLabel = label(value + suffix, 12, TEXT);
+		valueLabel.setGravity(Gravity.RIGHT | Gravity.CENTER_VERTICAL);
+		slider.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+			@Override
+			public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+				valueLabel.setText(progress + suffix);
+			}
+
+			@Override
+			public void onStopTrackingTouch(SeekBar seekBar) {
+				onChanged.accept(seekBar.getProgress());
+			}
+		});
+		row.addView(slider, new LinearLayout.LayoutParams(0, 30, 1.0F));
+		row.addView(valueLabel, new LinearLayout.LayoutParams(58, 30));
+		return row;
+	}
+
 	private View settingsKeyRow(String action, String shortcutAction, String helperText) {
 		LinearLayout row = row(10);
 		row.setGravity(Gravity.CENTER_VERTICAL);
@@ -3012,6 +3207,22 @@ public final class TritonModernFragment extends Fragment {
 			MUTED = Color.argb(232, 183, 168, 214);
 			FAINT = Color.argb(176, 143, 126, 178);
 		}
+		if (settingsConfig != null) {
+			float glow = settingsConfig.glowIntensity() / 100.0F;
+			PURPLE_SOFT = scaleAlpha(PURPLE_SOFT, glow);
+			STROKE_HOVER = scaleAlpha(STROKE_HOVER, glow);
+			BlurHandler.sBlurEffect = settingsConfig.backgroundBlur() > 0;
+			BlurHandler.sBlurRadius = settingsConfig.backgroundBlur();
+			refreshBackgroundBlur();
+		}
+	}
+
+	private void refreshBackgroundBlur() {
+		Minecraft client = Minecraft.getInstance();
+		client.execute(() -> {
+			BlurHandler.INSTANCE.blur(null);
+			BlurHandler.INSTANCE.blur(client.screen);
+		});
 	}
 
 	private FluxusAppState.Profile currentProfile() {
@@ -6961,6 +7172,7 @@ public final class TritonModernFragment extends Fragment {
 		return key.equals("theme") || key.equals("accent") || key.equals("density")
 				|| key.equals("sidebar-width") || key.equals("navigation-mode") || key.equals("content-width")
 				|| key.equals("right-panel") || key.equals("page-spacing") || key.equals("header-behaviour")
+				|| key.equals("corner-radius") || key.equals("border-strength") || key.equals("animation-speed")
 				|| key.equals("indentation") || key.equals("telemetry");
 	}
 
@@ -7002,6 +7214,15 @@ public final class TritonModernFragment extends Fragment {
 		if (key.equals("header-behaviour")) {
 			return settingsConfig.headerBehaviour();
 		}
+		if (key.equals("corner-radius")) {
+			return settingsConfig.cornerRadius();
+		}
+		if (key.equals("border-strength")) {
+			return settingsConfig.borderStrength();
+		}
+		if (key.equals("animation-speed")) {
+			return settingsConfig.animationSpeed();
+		}
 		if (key.equals("indentation")) {
 			return "Spaces: 4";
 		}
@@ -7039,6 +7260,15 @@ public final class TritonModernFragment extends Fragment {
 		if (key.equals("header-behaviour")) {
 			return HEADER_BEHAVIOUR_OPTIONS;
 		}
+		if (key.equals("corner-radius")) {
+			return CORNER_RADIUS_OPTIONS;
+		}
+		if (key.equals("border-strength")) {
+			return BORDER_STRENGTH_OPTIONS;
+		}
+		if (key.equals("animation-speed")) {
+			return ANIMATION_SPEED_OPTIONS;
+		}
 		if (key.equals("indentation")) {
 			return new String[]{"Spaces: 4", "Spaces: 2", "Tabs"};
 		}
@@ -7061,39 +7291,64 @@ public final class TritonModernFragment extends Fragment {
 		}
 		if (key.equals("density")) {
 			settingsConfig.setDensity(option);
+			settingsConfig.setLayoutPreset("Custom");
 			saveSettingsConfig("Density set to " + option + ".");
 			return;
 		}
 		if (key.equals("sidebar-width")) {
 			settingsConfig.setSidebarWidth(option);
+			settingsConfig.setLayoutPreset("Custom");
 			saveSettingsConfig("Sidebar width set to " + option + ".");
 			return;
 		}
 		if (key.equals("navigation-mode")) {
 			settingsConfig.setNavigationMode(option);
+			settingsConfig.setLayoutPreset("Custom");
 			saveSettingsConfig("Navigation mode set to " + option + ".");
 			return;
 		}
 		if (key.equals("content-width")) {
 			settingsConfig.setContentWidth(option);
+			settingsConfig.setLayoutPreset("Custom");
 			saveSettingsConfig("Content width set to " + option + ".");
 			return;
 		}
 		if (key.equals("right-panel")) {
 			settingsConfig.setRightPanelBehaviour(option);
+			settingsConfig.setLayoutPreset("Custom");
 			rightPanelExpanded = false;
 			saveSettingsConfig("Right panel behaviour set to " + option + ".");
 			return;
 		}
 		if (key.equals("page-spacing")) {
 			settingsConfig.setPageSpacing(option);
+			settingsConfig.setLayoutPreset("Custom");
 			saveSettingsConfig("Page spacing set to " + option + ".");
 			return;
 		}
 		if (key.equals("header-behaviour")) {
 			settingsConfig.setHeaderBehaviour(option);
+			settingsConfig.setLayoutPreset("Custom");
 			headerHidden = false;
 			saveSettingsConfig("Header behaviour set to " + option + ".");
+			return;
+		}
+		if (key.equals("corner-radius")) {
+			settingsConfig.setCornerRadius(option);
+			settingsConfig.setLayoutPreset("Custom");
+			saveSettingsConfig("Corner radius set to " + option + ".");
+			return;
+		}
+		if (key.equals("border-strength")) {
+			settingsConfig.setBorderStrength(option);
+			settingsConfig.setLayoutPreset("Custom");
+			saveSettingsConfig("Border strength set to " + option + ".");
+			return;
+		}
+		if (key.equals("animation-speed")) {
+			settingsConfig.setAnimationSpeed(option);
+			settingsConfig.setLayoutPreset("Custom");
+			saveSettingsConfig("Animation speed set to " + option + ".");
 			return;
 		}
 		if (key.equals("indentation")) {
@@ -8253,6 +8508,7 @@ public final class TritonModernFragment extends Fragment {
 		image.setImage(ImageStore.getInstance().getOrCreate(TritonUI.id("textures/icons/" + file)));
 		image.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
 		image.setImageTintList(ColorStateList.valueOf(tint));
+		applyConfiguredIconScale(image);
 		return image;
 	}
 
@@ -8260,7 +8516,15 @@ public final class TritonModernFragment extends Fragment {
 		ImageView image = new ImageView(requireContext());
 		image.setImage(ImageStore.getInstance().getOrCreate(TritonUI.id("textures/icons/" + file)));
 		image.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
+		applyConfiguredIconScale(image);
 		return image;
+	}
+
+	private void applyConfiguredIconScale(ImageView image) {
+		float scale = settingsConfig == null ? 1.0F
+				: (settingsConfig.uiScale() / 100.0F) * (settingsConfig.iconSize() / 100.0F);
+		image.setScaleX(scale);
+		image.setScaleY(scale);
 	}
 
 	private ColorStateList switchTrackColors() {
@@ -8297,18 +8561,41 @@ public final class TritonModernFragment extends Fragment {
 		});
 	}
 
+	private boolean animationsEnabled() {
+		return settingsConfig == null
+				|| (!settingsConfig.reduceMotion() && !settingsConfig.animationSpeed().equals("Off") && ValueAnimator.areAnimatorsEnabled());
+	}
+
+	private long animationDuration(long normalDuration) {
+		if (settingsConfig == null) {
+			return normalDuration;
+		}
+		if (!animationsEnabled()) {
+			return 0L;
+		}
+		float multiplier = switch (settingsConfig.animationSpeed()) {
+			case "Fast" -> 0.65F;
+			case "Slow" -> 1.5F;
+			default -> 1.0F;
+		};
+		return Math.max(1L, Math.round(normalDuration * multiplier));
+	}
+
 	private void addPressAnimation(View view) {
 		final AnimatorSet[] running = new AnimatorSet[1];
 		view.setOnTouchListener((target, event) -> {
+			if (!animationsEnabled()) {
+				return false;
+			}
 			int action = event.getActionMasked();
 			if (action == MotionEvent.ACTION_DOWN) {
 				target.setPivotX(target.getWidth() * 0.5F);
 				target.setPivotY(target.getHeight() * 0.5F);
-				startScaleAnimation(running, target, 0.975F, PRESS_IN_MS);
+				startScaleAnimation(running, target, 0.975F, animationDuration(PRESS_IN_MS));
 				return false;
 			}
 			if (action == MotionEvent.ACTION_UP || action == MotionEvent.ACTION_CANCEL) {
-				startScaleAnimation(running, target, 1.0F, PRESS_OUT_MS);
+				startScaleAnimation(running, target, 1.0F, animationDuration(PRESS_OUT_MS));
 				return false;
 			}
 			return false;
@@ -8316,6 +8603,13 @@ public final class TritonModernFragment extends Fragment {
 	}
 
 	private void animateFloatingSurface(View view, boolean modal) {
+		if (!animationsEnabled()) {
+			view.setAlpha(1.0F);
+			view.setScaleX(1.0F);
+			view.setScaleY(1.0F);
+			view.setTranslationY(0.0F);
+			return;
+		}
 		float startScale = modal ? 0.985F : 0.965F;
 		float startY = modal ? 10.0F : -5.0F;
 		view.setAlpha(0.0F);
@@ -8329,7 +8623,7 @@ public final class TritonModernFragment extends Fragment {
 			ObjectAnimator scaleY = ObjectAnimator.ofFloat(view, View.SCALE_Y, view.getScaleY(), 1.0F);
 			ObjectAnimator slide = ObjectAnimator.ofFloat(view, View.TRANSLATION_Y, view.getTranslationY(), 0.0F);
 			set.playTogether(new Animator[]{fade, scaleX, scaleY, slide});
-			set.setDuration(modal ? MODAL_IN_MS : MENU_IN_MS);
+			set.setDuration(animationDuration(modal ? MODAL_IN_MS : MENU_IN_MS));
 			set.start();
 		});
 	}
@@ -8358,7 +8652,7 @@ public final class TritonModernFragment extends Fragment {
 		ObjectAnimator scaleY = ObjectAnimator.ofFloat(dropdown, View.SCALE_Y, dropdown.getScaleY(), endScale);
 		ObjectAnimator slide = ObjectAnimator.ofFloat(dropdown, View.TRANSLATION_Y, dropdown.getTranslationY(), endY);
 		set.playTogether(new Animator[]{fade, scaleX, scaleY, slide});
-		long duration = modal ? MODAL_IN_MS : MENU_OUT_MS;
+		long duration = animationDuration(modal ? MODAL_IN_MS : MENU_OUT_MS);
 		set.setDuration(duration);
 		set.start();
 		dropdown.postDelayed(() -> {
@@ -8381,7 +8675,7 @@ public final class TritonModernFragment extends Fragment {
 		}
 		arrow.post(() -> {
 			ObjectAnimator rotation = ObjectAnimator.ofFloat(arrow, View.ROTATION, arrow.getRotation(), target);
-			rotation.setDuration(open ? MENU_IN_MS : MENU_OUT_MS);
+			rotation.setDuration(animationDuration(open ? MENU_IN_MS : MENU_OUT_MS));
 			rotation.start();
 		});
 	}
@@ -8396,7 +8690,7 @@ public final class TritonModernFragment extends Fragment {
 		toggle.setOnCheckedChangeListener((buttonView, nextChecked) -> {
 			if (onChanged != null) {
 				if (deferCallback) {
-					toggle.postDelayed(() -> onChanged.accept(nextChecked), TOGGLE_COMMIT_DELAY_MS);
+					toggle.postDelayed(() -> onChanged.accept(nextChecked), animationDuration(TOGGLE_COMMIT_DELAY_MS));
 				} else {
 					onChanged.accept(nextChecked);
 				}
@@ -8421,6 +8715,11 @@ public final class TritonModernFragment extends Fragment {
 	}
 
 	private void animatePageSwap(View view) {
+		if (!animationsEnabled()) {
+			view.setAlpha(1.0F);
+			view.setTranslationY(0.0F);
+			return;
+		}
 		view.setAlpha(0.0F);
 		view.setTranslationY(10.0F);
 		view.post(() -> {
@@ -8428,7 +8727,7 @@ public final class TritonModernFragment extends Fragment {
 			ObjectAnimator fade = ObjectAnimator.ofFloat(view, View.ALPHA, view.getAlpha(), 1.0F);
 			ObjectAnimator slide = ObjectAnimator.ofFloat(view, View.TRANSLATION_Y, view.getTranslationY(), 0.0F);
 			set.playTogether(new Animator[]{fade, slide});
-			set.setDuration(PAGE_IN_MS);
+			set.setDuration(animationDuration(PAGE_IN_MS));
 			set.start();
 		});
 	}
@@ -8444,12 +8743,12 @@ public final class TritonModernFragment extends Fragment {
 		container.setOnHoverListener((target, event) -> {
 			if (event.getAction() == MotionEvent.ACTION_HOVER_ENTER) {
 				layer.setBackground(hover);
-				startSlideAnimation(running, layer, 1.0F, 1.0F, HOVER_IN_MS);
+				startSlideAnimation(running, layer, 1.0F, 1.0F, animationDuration(HOVER_IN_MS));
 				return true;
 			}
 			if (event.getAction() == MotionEvent.ACTION_HOVER_EXIT) {
 				layer.setBackground(normal);
-				startSlideAnimation(running, layer, active ? 1.0F : 0.0F, active ? 1.0F : 0.0F, HOVER_OUT_MS);
+				startSlideAnimation(running, layer, active ? 1.0F : 0.0F, active ? 1.0F : 0.0F, animationDuration(HOVER_OUT_MS));
 				return true;
 			}
 			return false;
@@ -8486,7 +8785,7 @@ public final class TritonModernFragment extends Fragment {
 		LinearLayout layout = new LinearLayout(requireContext());
 		layout.setOrientation(LinearLayout.HORIZONTAL);
 		layout.setShowDividers(LinearLayout.SHOW_DIVIDER_MIDDLE);
-		layout.setDividerDrawable(spacer(gap, 1));
+		layout.setDividerDrawable(spacer(scaleUi(gap), 1));
 		return layout;
 	}
 
@@ -8494,14 +8793,16 @@ public final class TritonModernFragment extends Fragment {
 		LinearLayout layout = new LinearLayout(requireContext());
 		layout.setOrientation(LinearLayout.VERTICAL);
 		layout.setShowDividers(LinearLayout.SHOW_DIVIDER_MIDDLE);
-		layout.setDividerDrawable(spacer(1, gap));
+		layout.setDividerDrawable(spacer(1, scaleUi(gap)));
 		return layout;
 	}
 
 	private TextView label(String text, float size, int color) {
 		TextView label = new TextView(requireContext());
 		label.setText(text);
-		label.setTextSize(size);
+		float textScale = settingsConfig == null ? 1.0F
+				: (settingsConfig.uiScale() / 100.0F) * (settingsConfig.fontSize() / 100.0F);
+		label.setTextSize(size * textScale);
 		label.setTextColor(color);
 		label.setSingleLine(false);
 		label.setIncludeFontPadding(false);
@@ -8521,22 +8822,63 @@ public final class TritonModernFragment extends Fragment {
 	private GradientDrawable round(int color, float radius, int stroke) {
 		GradientDrawable drawable = new GradientDrawable();
 		drawable.setShape(ShapeDrawable.RECTANGLE);
-		drawable.setColor(color);
-		drawable.setCornerRadius(radius);
-		if (stroke != 0) {
-			drawable.setStroke(1, stroke);
+		drawable.setColor(styleSurfaceColor(color));
+		drawable.setCornerRadius(styleRadius(radius));
+		int styledStroke = styleStroke(stroke);
+		if (styledStroke != 0) {
+			drawable.setStroke(settingsConfig != null && settingsConfig.borderStrength().equals("Strong") ? 2 : 1, styledStroke);
 		}
 		return drawable;
 	}
 
 	private GradientDrawable glass(int top, int bottom, float radius, int stroke) {
-		GradientDrawable drawable = new GradientDrawable(GradientDrawable.Orientation.TL_BR, new int[]{top, bottom});
+		GradientDrawable drawable = new GradientDrawable(GradientDrawable.Orientation.TL_BR,
+				new int[]{styleSurfaceColor(top), styleSurfaceColor(bottom)});
 		drawable.setShape(ShapeDrawable.RECTANGLE);
-		drawable.setCornerRadius(radius);
-		if (stroke != 0) {
-			drawable.setStroke(1, stroke);
+		drawable.setCornerRadius(styleRadius(radius));
+		int styledStroke = styleStroke(stroke);
+		if (styledStroke != 0) {
+			drawable.setStroke(settingsConfig != null && settingsConfig.borderStrength().equals("Strong") ? 2 : 1, styledStroke);
 		}
 		return drawable;
+	}
+
+	private int scaleUi(int value) {
+		if (value == 0 || settingsConfig == null) {
+			return value;
+		}
+		return Math.max(1, Math.round(value * settingsConfig.uiScale() / 100.0F));
+	}
+
+	private float styleRadius(float radius) {
+		if (radius == 0.0F || settingsConfig == null) {
+			return radius;
+		}
+		return switch (settingsConfig.cornerRadius()) {
+			case "Sharp" -> Math.min(3.0F, radius);
+			case "Rounded" -> radius * 1.35F;
+			default -> radius;
+		};
+	}
+
+	private int styleStroke(int stroke) {
+		if (stroke == 0 || settingsConfig == null) {
+			return stroke;
+		}
+		if (settingsConfig.borderStrength().equals("None")) {
+			return 0;
+		}
+		if (settingsConfig.borderStrength().equals("Strong")) {
+			return Color.argb(Math.min(255, Math.round(alpha(stroke) * 1.55F)), red(stroke), green(stroke), blue(stroke));
+		}
+		return stroke;
+	}
+
+	private int styleSurfaceColor(int color) {
+		if (settingsConfig == null || Math.max(red(color), Math.max(green(color), blue(color))) >= 80) {
+			return color;
+		}
+		return scaleAlpha(color, settingsConfig.panelTransparency() / 100.0F);
 	}
 
 	private ShapeDrawable spacer(int width, int height) {
@@ -8589,6 +8931,14 @@ public final class TritonModernFragment extends Fragment {
 
 	private int blue(int color) {
 		return color & 0xFF;
+	}
+
+	private int alpha(int color) {
+		return (color >>> 24) & 0xFF;
+	}
+
+	private int scaleAlpha(int color, float multiplier) {
+		return Color.argb(Math.max(0, Math.min(255, Math.round(alpha(color) * multiplier))), red(color), green(color), blue(color));
 	}
 
 	private int accentAlpha(int alpha) {
