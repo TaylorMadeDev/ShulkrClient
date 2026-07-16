@@ -130,14 +130,18 @@ public final class TritonModernFragment extends Fragment {
 	private static final long PRESS_OUT_MS = 120L;
 	private static final long PAGE_IN_MS = 210L;
 	private static final int SIDE_WIDTH = 330;
-	private static final int CONTENT_GAP = 20;
 	private static final int TOP_BAR_HEIGHT = 56;
 	private static final int SEARCH_WIDTH = 520;
-	private static final int DOCK_WIDTH = 520;
+	private static final int DOCK_WIDTH = 620;
 	private static final String[] THEME_OPTIONS = {"Frontend Nova", "Dark glass", "Deep transparent", "High contrast", "Blue dusk"};
 	private static final String[] ACCENT_OPTIONS = {"Nova purple", "Shulkr purple", "Soft blue", "Electric cyan", "Emerald", "Rose"};
 	private static final String[] DENSITY_OPTIONS = {"Comfortable", "Compact", "Spacious"};
 	private static final String[] SIDEBAR_WIDTH_OPTIONS = {"300 px", "330 px", "360 px"};
+	private static final String[] NAVIGATION_MODE_OPTIONS = {"Expanded sidebar", "Compact icon rail", "Auto-collapse", "Floating dock only"};
+	private static final String[] CONTENT_WIDTH_OPTIONS = {"Centered", "Wide", "Full width"};
+	private static final String[] RIGHT_PANEL_OPTIONS = {"Always visible", "Contextual", "Collapsed by default", "Hidden"};
+	private static final String[] PAGE_SPACING_OPTIONS = {"Compact", "Comfortable", "Spacious"};
+	private static final String[] HEADER_BEHAVIOUR_OPTIONS = {"Static", "Sticky", "Hide while scrolling"};
 	private static final String SHORTCUT_OPEN_UI = "open-ui";
 	private static final String SHORTCUT_OVERLAY_EDIT = "overlay-edit";
 	private static final String SHORTCUT_RUN_LAST = "run-last-script";
@@ -167,6 +171,7 @@ public final class TritonModernFragment extends Fragment {
 	private View currentPageFrame;
 	private View currentFloatingDropdown;
 	private ImageView currentDropdownArrow;
+	private View currentHeader;
 	private Page lastAnimatedPage;
 	private String editorDraft;
 	private Path scriptDir;
@@ -199,7 +204,8 @@ public final class TritonModernFragment extends Fragment {
 	private boolean dropdownClosing;
 	private boolean strongerPanelTransparency = true;
 	private boolean animatedHoverHighlight = true;
-	private boolean keepBottomPillCentered = true;
+	private boolean rightPanelExpanded;
+	private boolean headerHidden;
 	private boolean createBackupsBeforeRun = true;
 	private boolean hidePlayerNamesInCaptures;
 	private String capturingShortcutAction = "";
@@ -342,7 +348,7 @@ public final class TritonModernFragment extends Fragment {
 		if (key == InputConstants.KEY_K && (modifiers & 2) != 0) {
 			openDropdownKey = "command-palette";
 			dropdownAnchorX = 30;
-			dropdownAnchorY = TOP_BAR_HEIGHT;
+			dropdownAnchorY = effectiveTopBarHeight();
 			dropdownAnchorWidth = 360;
 			renderShell();
 			return true;
@@ -359,14 +365,30 @@ public final class TritonModernFragment extends Fragment {
 	private void renderShell() {
 		currentFloatingDropdown = null;
 		currentDropdownArrow = null;
+		currentHeader = null;
 		shell.removeAllViews();
+		FrameLayout host = new FrameLayout(requireContext());
+		shell.addView(host, new FrameLayout.LayoutParams(match(), match()));
 		LinearLayout root = new LinearLayout(requireContext());
 		root.setOrientation(LinearLayout.HORIZONTAL);
-		root.setPadding(18, 18, 18, 18);
-		shell.addView(root, new FrameLayout.LayoutParams(match(), match()));
+		int outerPadding = densityOuterPadding();
+		root.setPadding(outerPadding, outerPadding, outerPadding, outerPadding);
+		host.addView(root, new FrameLayout.LayoutParams(match(), match()));
 
-		root.addView(sidebar(), new LinearLayout.LayoutParams(300, match()));
-		root.addView(activePage(), weighted(1.0F, 30, 16, 0, 0));
+		boolean floatingDockOnly = settingsConfig.navigationMode().equals("Floating dock only");
+		boolean compactNavigation = useCompactNavigation();
+		if (!floatingDockOnly) {
+			int sidebarWidth = compactNavigation ? 86 : configuredSidebarWidth();
+			root.addView(sidebar(compactNavigation), new LinearLayout.LayoutParams(sidebarWidth, match()));
+		}
+		int contentInset = contentWidthInset();
+		int leadingGap = floatingDockOnly ? contentInset : Math.max(pageGap(), contentInset);
+		root.addView(activePage(), weighted(1.0F, leadingGap, 0, contentInset, floatingDockOnly ? 82 : 0));
+		if (floatingDockOnly) {
+			FrameLayout.LayoutParams dockParams = new FrameLayout.LayoutParams(DOCK_WIDTH, 70, Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL);
+			dockParams.setMargins(0, 0, 0, 14);
+			host.addView(dock(true), dockParams);
+		}
 	}
 
 	private View activePage() {
@@ -403,15 +425,15 @@ public final class TritonModernFragment extends Fragment {
 		return dashboardPage();
 	}
 
-	private View sidebar() {
+	private View sidebar(boolean compact) {
 		FluxusAppState.Profile profileData = currentProfile();
 		boolean online = FluxusAppState.get().backendOnline();
-		LinearLayout side = column(18);
-		side.setPadding(18, 18, 16, 16);
+		LinearLayout side = column(compact ? 10 : 18);
+		side.setPadding(compact ? 10 : 18, 18, compact ? 10 : 16, 16);
 		side.setBackground(panel(18));
 
 		FrameLayout brand = new FrameLayout(requireContext());
-		brand.addView(rawIcon("shulkr-icons.png"), centered(220, 124));
+		brand.addView(rawIcon("shulkr-icons.png"), centered(compact ? 62 : 220, compact ? 50 : 124));
 		side.addView(brand, new LinearLayout.LayoutParams(match(), 72));
 
 		String[][] primaryNav = {
@@ -436,21 +458,23 @@ public final class TritonModernFragment extends Fragment {
 		side.addView(secondary, new LinearLayout.LayoutParams(match(), wrap()));
 
 		LinearLayout profile = row(14);
-		profile.setPadding(16, 14, 16, 14);
+		profile.setPadding(compact ? 8 : 16, compact ? 10 : 14, compact ? 8 : 16, compact ? 10 : 14);
 		profile.setGravity(Gravity.CENTER_VERTICAL);
 		profile.setBackground(glass(Color.argb(112, 10, 15, 27), Color.argb(132, 7, 12, 22), 16, STROKE));
 		FrameLayout avatar = new FrameLayout(requireContext());
 		avatar.setBackground(round(Color.argb(150, 28, 76, 48), 12, Color.argb(100, 96, 255, 154)));
 		avatar.addView(icon("user-solid.png", GREEN), centered(24, 24));
-		profile.addView(avatar, new LinearLayout.LayoutParams(50, 50));
+		profile.addView(avatar, new LinearLayout.LayoutParams(compact ? 42 : 50, compact ? 42 : 50));
 		LinearLayout copy = column(4);
 		copy.addView(label(profileData.displayName(), 15, TEXT));
 		copy.addView(label(profileData.tier(), 13, PURPLE));
 		copy.addView(label("*  Minecraft " + System.getProperty("minecraft.version", "26.1.2"), 12, MUTED));
 		copy.addView(label(online ? "Connected" : "Offline", 11, online ? GREEN : FAINT));
-		profile.addView(copy, new LinearLayout.LayoutParams(0, wrap(), 1.0F));
+		if (!compact) {
+			profile.addView(copy, new LinearLayout.LayoutParams(0, wrap(), 1.0F));
+		}
 		profile.setOnClickListener(view -> openPage(Page.SETTINGS));
-		LinearLayout.LayoutParams profileLp = new LinearLayout.LayoutParams(match(), 112);
+		LinearLayout.LayoutParams profileLp = new LinearLayout.LayoutParams(match(), compact ? 72 : 112);
 		profileLp.setMargins(0, 0, 0, 14);
 		side.addView(profile, profileLp);
 		return side;
@@ -474,6 +498,8 @@ public final class TritonModernFragment extends Fragment {
 		if (page != next) {
 			captureActiveDraft();
 			page = next;
+			rightPanelExpanded = false;
+			headerHidden = false;
 			openDropdownKey = "";
 			if (next == Page.EDITOR || next == Page.SCRIPTS) {
 				refreshEditorScripts();
@@ -610,7 +636,7 @@ public final class TritonModernFragment extends Fragment {
 		overview.addView(docs, new LinearLayout.LayoutParams(112, 34));
 		panel.addView(overview, new LinearLayout.LayoutParams(match(), 82));
 
-		ScrollView scroll = new ScrollView(requireContext());
+		ScrollView scroll = layoutScrollView();
 		LinearLayout grid = column(12);
 		for (int index = 0; index < SHULKR_ADDONS.length; index += 2) {
 			LinearLayout line = row(12);
@@ -820,7 +846,7 @@ public final class TritonModernFragment extends Fragment {
 		}
 		panel.addView(chips, new LinearLayout.LayoutParams(match(), 34));
 
-		ScrollView scroller = new ScrollView(requireContext());
+		ScrollView scroller = layoutScrollView();
 		LinearLayout grid = column(10);
 		if (scripts.isEmpty()) {
 			TextView empty = label("No published scripts yet. Upload a script to publish it to the Shulkr library.", 14, MUTED);
@@ -906,7 +932,7 @@ public final class TritonModernFragment extends Fragment {
 		}
 		panel.addView(chips, new LinearLayout.LayoutParams(match(), 38));
 
-		ScrollView scroller = new ScrollView(requireContext());
+		ScrollView scroller = layoutScrollView();
 		LinearLayout grid = column(10);
 		if (modules.isEmpty()) {
 			TextView empty = label("No libraries match this filter yet. Mark a script as a library from the Editor to reuse it here.", 14, MUTED);
@@ -2348,21 +2374,37 @@ public final class TritonModernFragment extends Fragment {
 
 	private View layoutSettingsCard() {
 		LinearLayout card = settingsCard("Layout", "border-all-solid.png");
-		card.addView(settingsDropdownRow("density", "Density", "Comfortable", DENSITY_OPTIONS,
-				value -> saveUiMessage("Density set to " + value + ".")), new LinearLayout.LayoutParams(match(), 38));
-		card.addView(settingsDropdownRow("sidebar-width", "Sidebar width", "300 px", SIDEBAR_WIDTH_OPTIONS,
-				value -> saveUiMessage("Sidebar width will apply on next restart: " + value + ".")), new LinearLayout.LayoutParams(match(), 38));
-		card.addView(settingsSwitchRow("Keep bottom pill centered", keepBottomPillCentered, checked -> {
-			keepBottomPillCentered = checked;
-			saveUiMessage("Bottom pill centering set to " + checked + ".");
-		}), new LinearLayout.LayoutParams(match(), 38));
-		card.addView(settingsSwitchRow("Remember last page", settingsConfig.rememberLastPage(), checked -> {
-			settingsConfig.setRememberLastPage(checked);
-			if (checked) {
-				settingsConfig.setDefaultPage(page.name());
-			}
-			saveSettingsConfig("Default page updated.");
-		}), new LinearLayout.LayoutParams(match(), 38));
+		int rowHeight = settingsRowHeight();
+		card.addView(settingsDropdownRow("density", "Density", settingsConfig.density(), DENSITY_OPTIONS, value -> {
+			settingsConfig.setDensity(value);
+			saveSettingsConfig("Density set to " + value + ".");
+		}), new LinearLayout.LayoutParams(match(), rowHeight));
+		card.addView(settingsDropdownRow("sidebar-width", "Sidebar width", settingsConfig.sidebarWidth(), SIDEBAR_WIDTH_OPTIONS, value -> {
+			settingsConfig.setSidebarWidth(value);
+			saveSettingsConfig("Sidebar width set to " + value + ".");
+		}), new LinearLayout.LayoutParams(match(), rowHeight));
+		card.addView(settingsDropdownRow("navigation-mode", "Navigation mode", settingsConfig.navigationMode(), NAVIGATION_MODE_OPTIONS, value -> {
+			settingsConfig.setNavigationMode(value);
+			saveSettingsConfig("Navigation mode set to " + value + ".");
+		}), new LinearLayout.LayoutParams(match(), rowHeight));
+		card.addView(settingsDropdownRow("content-width", "Content width", settingsConfig.contentWidth(), CONTENT_WIDTH_OPTIONS, value -> {
+			settingsConfig.setContentWidth(value);
+			saveSettingsConfig("Content width set to " + value + ".");
+		}), new LinearLayout.LayoutParams(match(), rowHeight));
+		card.addView(settingsDropdownRow("right-panel", "Right panel behaviour", settingsConfig.rightPanelBehaviour(), RIGHT_PANEL_OPTIONS, value -> {
+			settingsConfig.setRightPanelBehaviour(value);
+			rightPanelExpanded = false;
+			saveSettingsConfig("Right panel behaviour set to " + value + ".");
+		}), new LinearLayout.LayoutParams(match(), rowHeight));
+		card.addView(settingsDropdownRow("page-spacing", "Page spacing", settingsConfig.pageSpacing(), PAGE_SPACING_OPTIONS, value -> {
+			settingsConfig.setPageSpacing(value);
+			saveSettingsConfig("Page spacing set to " + value + ".");
+		}), new LinearLayout.LayoutParams(match(), rowHeight));
+		card.addView(settingsDropdownRow("header-behaviour", "Header behaviour", settingsConfig.headerBehaviour(), HEADER_BEHAVIOUR_OPTIONS, value -> {
+			settingsConfig.setHeaderBehaviour(value);
+			headerHidden = false;
+			saveSettingsConfig("Header behaviour set to " + value + ".");
+		}), new LinearLayout.LayoutParams(match(), rowHeight));
 		return card;
 	}
 
@@ -2765,9 +2807,9 @@ public final class TritonModernFragment extends Fragment {
 		LinearLayout row = row(10);
 		row.setGravity(Gravity.CENTER_VERTICAL);
 		row.addView(label(name, 12, MUTED), new LinearLayout.LayoutParams(0, wrap(), 1.0F));
-		Switch toggle = animatedSwitch(checked, 44, onChanged, true);
+		Switch toggle = animatedSwitch(checked, 50, onChanged, true);
 		row.setOnClickListener(view -> toggle.setChecked(!toggle.isChecked()));
-		row.addView(toggle, new LinearLayout.LayoutParams(54, 36));
+		row.addView(toggle, new LinearLayout.LayoutParams(62, 38));
 		return row;
 	}
 
@@ -3502,7 +3544,7 @@ public final class TritonModernFragment extends Fragment {
 	}
 
 	private View overlaysSidePanel() {
-		ScrollView scroll = new ScrollView(requireContext());
+		ScrollView scroll = layoutScrollView();
 		LinearLayout side = column(14);
 		side.addView(overlayInspectorPanel(), new LinearLayout.LayoutParams(match(), 270));
 		side.addView(overlayPresetsPanel(), new LinearLayout.LayoutParams(match(), 228));
@@ -3515,7 +3557,7 @@ public final class TritonModernFragment extends Fragment {
 		LinearLayout card = settingsCard("Widget Library", "box-open-solid.png");
 		card.addView(label("Each widget has its own visual language. Select one to show it, then use Edit on Screen to position it.", 12, MUTED),
 				new LinearLayout.LayoutParams(match(), 34));
-		ScrollView scroller = new ScrollView(requireContext());
+		ScrollView scroller = layoutScrollView();
 		LinearLayout list = column(8);
 		for (String[] widget : overlayWidgets()) {
 			if (widget[1].equals(overlayFilter) || overlayFilter.equals("HUD")) {
@@ -5233,7 +5275,7 @@ public final class TritonModernFragment extends Fragment {
 		searchRow.addView(refresh, new LinearLayout.LayoutParams(38, 38));
 		panel.addView(searchRow, new LinearLayout.LayoutParams(match(), 40));
 
-		ScrollView treeScroller = new ScrollView(requireContext());
+		ScrollView treeScroller = layoutScrollView();
 		LinearLayout tree = column(4);
 		for (Path script : rootScripts()) {
 			tree.addView(editorScriptRow(script, 0), new LinearLayout.LayoutParams(match(), 42));
@@ -5407,7 +5449,7 @@ public final class TritonModernFragment extends Fragment {
 		lintSummary = label("Python lint: checking...", 12, MUTED);
 		completionHint = label("", 11, FAINT);
 		lintList = column(2);
-		ScrollView lintScroll = new ScrollView(requireContext());
+		ScrollView lintScroll = layoutScrollView();
 		lintScroll.setFillViewport(false);
 		lintScroll.addView(lintList, new ScrollView.LayoutParams(match(), wrap()));
 		lint.addView(lintSummary, new LinearLayout.LayoutParams(match(), 16));
@@ -6267,7 +6309,7 @@ public final class TritonModernFragment extends Fragment {
 		top.addView(clear, new LinearLayout.LayoutParams(68, 34));
 		panel.addView(top, new LinearLayout.LayoutParams(match(), 36));
 
-		ScrollView scroll = new ScrollView(requireContext());
+		ScrollView scroll = layoutScrollView();
 		consoleLogList = column(3);
 		refreshConsoleLogList();
 		scroll.addView(consoleLogList, new ScrollView.LayoutParams(match(), wrap(), Gravity.LEFT));
@@ -6407,11 +6449,19 @@ public final class TritonModernFragment extends Fragment {
 	private View pageFrame(View main, View side) {
 		FrameLayout outer = new FrameLayout(requireContext());
 		currentPageFrame = outer;
-		LinearLayout frame = column(18);
-		frame.addView(topToolbar(), new LinearLayout.LayoutParams(match(), TOP_BAR_HEIGHT));
-		LinearLayout body = row(CONTENT_GAP);
+		LinearLayout frame = column(pageGap());
+		View header = topToolbar();
+		currentHeader = header;
+		if (settingsConfig.headerBehaviour().equals("Sticky")) {
+			header.setBackground(glass(Color.argb(176, 12, 17, 30), Color.argb(196, 7, 12, 22), 10, STROKE));
+		}
+		if (settingsConfig.headerBehaviour().equals("Hide while scrolling") && headerHidden) {
+			header.setVisibility(View.GONE);
+		}
+		frame.addView(header, new LinearLayout.LayoutParams(match(), effectiveTopBarHeight()));
+		LinearLayout body = row(pageGap());
 		body.addView(main, new LinearLayout.LayoutParams(0, match(), 1.0F));
-		body.addView(side, new LinearLayout.LayoutParams(SIDE_WIDTH, match()));
+		addConfiguredRightPanel(body, side);
 		if (lastAnimatedPage != page) {
 			animatePageSwap(body);
 			lastAnimatedPage = page;
@@ -6429,6 +6479,97 @@ public final class TritonModernFragment extends Fragment {
 			outer.addView(dropdown, floatingDropdownLayoutParams());
 		}
 		return outer;
+	}
+
+	private void addConfiguredRightPanel(LinearLayout body, View side) {
+		String behaviour = settingsConfig.rightPanelBehaviour();
+		if (behaviour.equals("Hidden") || (behaviour.equals("Contextual") && !pageHasContextualPanel())) {
+			return;
+		}
+		if (!behaviour.equals("Collapsed by default")) {
+			body.addView(side, new LinearLayout.LayoutParams(SIDE_WIDTH, match()));
+			return;
+		}
+		LinearLayout collapsible = row(8);
+		collapsible.setGravity(Gravity.TOP);
+		View toggle = iconButton(rightPanelExpanded ? "chevron-right-solid.png" : "chevron-left-solid.png", PURPLE);
+		toggle.setOnClickListener(view -> {
+			rightPanelExpanded = !rightPanelExpanded;
+			renderShell();
+		});
+		collapsible.addView(toggle, new LinearLayout.LayoutParams(42, 42));
+		if (rightPanelExpanded) {
+			collapsible.addView(side, new LinearLayout.LayoutParams(SIDE_WIDTH, match()));
+		}
+		body.addView(collapsible, new LinearLayout.LayoutParams(rightPanelExpanded ? SIDE_WIDTH + 50 : 42, match()));
+	}
+
+	private boolean pageHasContextualPanel() {
+		return page == Page.SCRIPTS || page == Page.EDITOR || page == Page.MODULES || page == Page.ADDONS
+				|| page == Page.TEMPLATES || page == Page.WINDOWSPY || page == Page.OVERLAYS;
+	}
+
+	private boolean useCompactNavigation() {
+		String mode = settingsConfig.navigationMode();
+		if (mode.equals("Compact icon rail")) {
+			return true;
+		}
+		if (!mode.equals("Auto-collapse")) {
+			return false;
+		}
+		int width = shell == null ? 0 : shell.getWidth();
+		if (width <= 0 && Minecraft.getInstance().getWindow() != null) {
+			width = Minecraft.getInstance().getWindow().getGuiScaledWidth();
+		}
+		return width > 0 && width < 1280;
+	}
+
+	private int configuredSidebarWidth() {
+		try {
+			return Integer.parseInt(settingsConfig.sidebarWidth().replace(" px", "").trim());
+		} catch (NumberFormatException ignored) {
+			return 300;
+		}
+	}
+
+	private int contentWidthInset() {
+		return switch (settingsConfig.contentWidth()) {
+			case "Centered" -> 72;
+			case "Full width" -> 0;
+			default -> 24;
+		};
+	}
+
+	private int densityOuterPadding() {
+		return switch (settingsConfig.density()) {
+			case "Compact" -> 12;
+			case "Spacious" -> 24;
+			default -> 18;
+		};
+	}
+
+	private int effectiveTopBarHeight() {
+		return switch (settingsConfig.density()) {
+			case "Compact" -> 48;
+			case "Spacious" -> 64;
+			default -> TOP_BAR_HEIGHT;
+		};
+	}
+
+	private int settingsRowHeight() {
+		return switch (settingsConfig.density()) {
+			case "Compact" -> 34;
+			case "Spacious" -> 42;
+			default -> 38;
+		};
+	}
+
+	private int pageGap() {
+		return switch (settingsConfig.pageSpacing()) {
+			case "Compact" -> 12;
+			case "Spacious" -> 28;
+			default -> 20;
+		};
 	}
 
 	private View floatingDropdownForPage() {
@@ -6815,7 +6956,9 @@ public final class TritonModernFragment extends Fragment {
 
 	private boolean isSettingsDropdown(String key) {
 		return key.equals("theme") || key.equals("accent") || key.equals("density")
-				|| key.equals("sidebar-width") || key.equals("indentation") || key.equals("telemetry");
+				|| key.equals("sidebar-width") || key.equals("navigation-mode") || key.equals("content-width")
+				|| key.equals("right-panel") || key.equals("page-spacing") || key.equals("header-behaviour")
+				|| key.equals("indentation") || key.equals("telemetry");
 	}
 
 	private View settingsFloatingDropdown() {
@@ -6836,10 +6979,25 @@ public final class TritonModernFragment extends Fragment {
 			return settingsConfig.accent();
 		}
 		if (key.equals("density")) {
-			return "Comfortable";
+			return settingsConfig.density();
 		}
 		if (key.equals("sidebar-width")) {
-			return "300 px";
+			return settingsConfig.sidebarWidth();
+		}
+		if (key.equals("navigation-mode")) {
+			return settingsConfig.navigationMode();
+		}
+		if (key.equals("content-width")) {
+			return settingsConfig.contentWidth();
+		}
+		if (key.equals("right-panel")) {
+			return settingsConfig.rightPanelBehaviour();
+		}
+		if (key.equals("page-spacing")) {
+			return settingsConfig.pageSpacing();
+		}
+		if (key.equals("header-behaviour")) {
+			return settingsConfig.headerBehaviour();
 		}
 		if (key.equals("indentation")) {
 			return "Spaces: 4";
@@ -6863,6 +7021,21 @@ public final class TritonModernFragment extends Fragment {
 		if (key.equals("sidebar-width")) {
 			return SIDEBAR_WIDTH_OPTIONS;
 		}
+		if (key.equals("navigation-mode")) {
+			return NAVIGATION_MODE_OPTIONS;
+		}
+		if (key.equals("content-width")) {
+			return CONTENT_WIDTH_OPTIONS;
+		}
+		if (key.equals("right-panel")) {
+			return RIGHT_PANEL_OPTIONS;
+		}
+		if (key.equals("page-spacing")) {
+			return PAGE_SPACING_OPTIONS;
+		}
+		if (key.equals("header-behaviour")) {
+			return HEADER_BEHAVIOUR_OPTIONS;
+		}
 		if (key.equals("indentation")) {
 			return new String[]{"Spaces: 4", "Spaces: 2", "Tabs"};
 		}
@@ -6884,11 +7057,40 @@ public final class TritonModernFragment extends Fragment {
 			return;
 		}
 		if (key.equals("density")) {
-			saveUiMessage("Density set to " + option + ".");
+			settingsConfig.setDensity(option);
+			saveSettingsConfig("Density set to " + option + ".");
 			return;
 		}
 		if (key.equals("sidebar-width")) {
-			saveUiMessage("Sidebar width will apply on next restart: " + option + ".");
+			settingsConfig.setSidebarWidth(option);
+			saveSettingsConfig("Sidebar width set to " + option + ".");
+			return;
+		}
+		if (key.equals("navigation-mode")) {
+			settingsConfig.setNavigationMode(option);
+			saveSettingsConfig("Navigation mode set to " + option + ".");
+			return;
+		}
+		if (key.equals("content-width")) {
+			settingsConfig.setContentWidth(option);
+			saveSettingsConfig("Content width set to " + option + ".");
+			return;
+		}
+		if (key.equals("right-panel")) {
+			settingsConfig.setRightPanelBehaviour(option);
+			rightPanelExpanded = false;
+			saveSettingsConfig("Right panel behaviour set to " + option + ".");
+			return;
+		}
+		if (key.equals("page-spacing")) {
+			settingsConfig.setPageSpacing(option);
+			saveSettingsConfig("Page spacing set to " + option + ".");
+			return;
+		}
+		if (key.equals("header-behaviour")) {
+			settingsConfig.setHeaderBehaviour(option);
+			headerHidden = false;
+			saveSettingsConfig("Header behaviour set to " + option + ".");
 			return;
 		}
 		if (key.equals("indentation")) {
@@ -7401,11 +7603,11 @@ public final class TritonModernFragment extends Fragment {
 				round(Color.argb(165, 24, 30, 48), 8, accentAlpha(95)));
 		row.addView(icon(data.icon(), PURPLE), new LinearLayout.LayoutParams(20, 20));
 		row.addView(label(data.name(), 13, TEXT), new LinearLayout.LayoutParams(0, wrap(), 1.0F));
-		Switch toggle = animatedSwitch(data.installed(), 48, checked -> {
+		Switch toggle = animatedSwitch(data.installed(), 54, checked -> {
 			FluxusAppState.get().setModuleInstalled(data.id(), checked);
 			settingsMessage = data.name() + (checked ? " installed." : " disabled.");
 		}, false);
-		row.addView(toggle, new LinearLayout.LayoutParams(58, 40));
+		row.addView(toggle, new LinearLayout.LayoutParams(66, 42));
 		row.setOnClickListener(view -> {
 			selectedModuleId = data.id();
 			openPage(Page.MODULES);
@@ -7462,19 +7664,34 @@ public final class TritonModernFragment extends Fragment {
 	}
 
 	private LinearLayout dock() {
-		LinearLayout dock = row(48);
-		dock.setPadding(28, 0, 28, 0);
+		return dock(false);
+	}
+
+	private LinearLayout dock(boolean forceVisible) {
+		LinearLayout dock = row(8);
+		dock.setPadding(14, 0, 14, 0);
 		dock.setGravity(Gravity.CENTER);
 		dock.setBackground(glass(Color.argb(155, 10, 16, 27), Color.argb(180, 7, 12, 22), 18, Color.argb(95, 105, 116, 150)));
+		if (!forceVisible && settingsConfig.navigationMode().equals("Floating dock only")) {
+			dock.setVisibility(View.GONE);
+			return dock;
+		}
 		String[][] dockItems = {
-				{"house-solid.png", "dashboard"}, {"code-solid.png", "scripts"}, {"box-solid.png", "libraries"},
-				{"layer-group-solid.png", "templates"}, {"gear-solid.png", "settings"}
+				{"house-solid.png", "dashboard"}, {"code-solid.png", "scripts"}, {"border-all-solid.png", "editor"},
+				{"puzzle-piece-solid.png", "libraries"}, {"box-open-solid.png", "modules"}, {"layer-group-solid.png", "templates"},
+				{"window-restore-regular.png", "windowspy"}, {"circle-info-solid.png", "remote"},
+				{"border-none-solid.png", "overlays"}, {"gear-solid.png", "settings"}
 		};
 		for (String[] item : dockItems) {
 			boolean active = (page == Page.DASHBOARD && item[1].equals("dashboard"))
-					|| ((page == Page.SCRIPTS || page == Page.EDITOR) && item[1].equals("scripts"))
+					|| (page == Page.SCRIPTS && item[1].equals("scripts"))
 					|| (page == Page.MODULES && item[1].equals("libraries"))
+					|| (page == Page.EDITOR && item[1].equals("editor"))
+					|| (page == Page.ADDONS && item[1].equals("modules"))
 					|| (page == Page.TEMPLATES && item[1].equals("templates"))
+					|| (page == Page.WINDOWSPY && item[1].equals("windowspy"))
+					|| (page == Page.REMOTE && item[1].equals("remote"))
+					|| (page == Page.OVERLAYS && item[1].equals("overlays"))
 					|| (page == Page.SETTINGS && item[1].equals("settings"));
 			FrameLayout tab = new FrameLayout(requireContext());
 			View hoverLayer = new View(requireContext());
@@ -7489,14 +7706,24 @@ public final class TritonModernFragment extends Fragment {
 				tab.setOnClickListener(view -> openPage(Page.DASHBOARD));
 			} else if (item[1].equals("scripts")) {
 				tab.setOnClickListener(view -> openPage(Page.SCRIPTS));
+			} else if (item[1].equals("editor")) {
+				tab.setOnClickListener(view -> openPage(Page.EDITOR));
 			} else if (item[1].equals("libraries")) {
 				tab.setOnClickListener(view -> openPage(Page.MODULES));
+			} else if (item[1].equals("modules")) {
+				tab.setOnClickListener(view -> openPage(Page.ADDONS));
 			} else if (item[1].equals("templates")) {
 				tab.setOnClickListener(view -> openPage(Page.TEMPLATES));
+			} else if (item[1].equals("windowspy")) {
+				tab.setOnClickListener(view -> openPage(Page.WINDOWSPY));
+			} else if (item[1].equals("remote")) {
+				tab.setOnClickListener(view -> openPage(Page.REMOTE));
+			} else if (item[1].equals("overlays")) {
+				tab.setOnClickListener(view -> openPage(Page.OVERLAYS));
 			} else if (item[1].equals("settings")) {
 				tab.setOnClickListener(view -> openPage(Page.SETTINGS));
 			}
-			dock.addView(tab, new LinearLayout.LayoutParams(54, 54));
+			dock.addView(tab, new LinearLayout.LayoutParams(44, 50));
 		}
 		return dock;
 	}
@@ -7916,13 +8143,14 @@ public final class TritonModernFragment extends Fragment {
 		row.setGravity(Gravity.CENTER_VERTICAL);
 		row.addView(label(text, 13, TEXT), new LinearLayout.LayoutParams(0, wrap(), 1.0F));
 		boolean current = filterSwitchStates.getOrDefault(text, checked);
-		Switch toggle = animatedSwitch(current, 44, nextChecked -> filterSwitchStates.put(text, nextChecked), false);
+		Switch toggle = animatedSwitch(current, 50, nextChecked -> filterSwitchStates.put(text, nextChecked), false);
 		row.setOnClickListener(view -> toggle.setChecked(!toggle.isChecked()));
-		row.addView(toggle, new LinearLayout.LayoutParams(54, 36));
+		row.addView(toggle, new LinearLayout.LayoutParams(62, 38));
 		return row;
 	}
 
 	private View nav(String text, String iconFile, boolean active) {
+		boolean compact = useCompactNavigation();
 		FrameLayout shell = new FrameLayout(requireContext());
 		View hoverLayer = new View(requireContext());
 		GradientDrawable normal = active
@@ -7934,11 +8162,13 @@ public final class TritonModernFragment extends Fragment {
 		hoverLayer.setBackground(normal);
 		shell.addView(hoverLayer, new FrameLayout.LayoutParams(match(), match()));
 
-		LinearLayout item = row(14);
-		item.setPadding(16, 0, 16, 0);
-		item.setGravity(Gravity.CENTER_VERTICAL);
+		LinearLayout item = row(compact ? 0 : 14);
+		item.setPadding(compact ? 0 : 16, 0, compact ? 0 : 16, 0);
+		item.setGravity(compact ? Gravity.CENTER : Gravity.CENTER_VERTICAL);
 		item.addView(icon(iconFile, TEXT), new LinearLayout.LayoutParams(20, 20));
-		item.addView(label(text, 15, TEXT));
+		if (!compact) {
+			item.addView(label(text, 15, TEXT));
+		}
 		shell.addView(item, new FrameLayout.LayoutParams(match(), match()));
 		makeSlidingHover(shell, hoverLayer, normal, hover, active);
 		addPressAnimation(shell);
@@ -8161,10 +8391,7 @@ public final class TritonModernFragment extends Fragment {
 		toggle.setSwitchMinWidth(minWidth);
 		toggle.setTrackTintList(switchTrackColors());
 		toggle.setThumbTintList(switchThumbColors());
-		final AnimatorSet[] feedback = new AnimatorSet[1];
 		toggle.setOnCheckedChangeListener((buttonView, nextChecked) -> {
-			startScaleAnimation(feedback, toggle, 0.96F, PRESS_IN_MS);
-			toggle.postDelayed(() -> startScaleAnimation(feedback, toggle, 1.0F, PRESS_OUT_MS), PRESS_IN_MS);
 			if (onChanged != null) {
 				if (deferCallback) {
 					toggle.postDelayed(() -> onChanged.accept(nextChecked), TOGGLE_COMMIT_DELAY_MS);
@@ -8174,6 +8401,21 @@ public final class TritonModernFragment extends Fragment {
 			}
 		});
 		return toggle;
+	}
+
+	private ScrollView layoutScrollView() {
+		ScrollView scroll = new ScrollView(requireContext());
+		scroll.setOnScrollChangeListener((view, scrollX, scrollY, oldScrollX, oldScrollY) -> {
+			if (!settingsConfig.headerBehaviour().equals("Hide while scrolling") || currentHeader == null || scrollY == oldScrollY) {
+				return;
+			}
+			boolean hide = scrollY > oldScrollY && scrollY > 12;
+			if (headerHidden != hide) {
+				headerHidden = hide;
+				currentHeader.setVisibility(hide ? View.GONE : View.VISIBLE);
+			}
+		});
+		return scroll;
 	}
 
 	private void animatePageSwap(View view) {

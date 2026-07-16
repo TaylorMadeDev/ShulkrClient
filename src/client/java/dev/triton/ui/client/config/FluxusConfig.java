@@ -18,6 +18,13 @@ public final class FluxusConfig {
 
 	private String theme = "Dark glass";
 	private String accent = "Shulkr purple";
+	private String density = "Comfortable";
+	private String sidebarWidth = "300 px";
+	private String navigationMode = "Expanded sidebar";
+	private String contentWidth = "Wide";
+	private String rightPanelBehaviour = "Always visible";
+	private String pageSpacing = "Comfortable";
+	private String headerBehaviour = "Static";
 	private String defaultPage = "Dashboard";
 	private boolean rememberLastPage = true;
 	private boolean autosaveScripts = true;
@@ -48,6 +55,13 @@ public final class FluxusConfig {
 			String json = Files.readString(CONFIG_PATH, StandardCharsets.UTF_8);
 			config.theme = readString(json, "theme", config.theme);
 			config.accent = readString(json, "accent", config.accent);
+			config.density = readString(json, "density", config.density);
+			config.sidebarWidth = readString(json, "sidebarWidth", config.sidebarWidth);
+			config.navigationMode = readString(json, "navigationMode", config.navigationMode);
+			config.contentWidth = readString(json, "contentWidth", config.contentWidth);
+			config.rightPanelBehaviour = readString(json, "rightPanelBehaviour", config.rightPanelBehaviour);
+			config.pageSpacing = readString(json, "pageSpacing", config.pageSpacing);
+			config.headerBehaviour = readString(json, "headerBehaviour", config.headerBehaviour);
 			if (config.accent.equals("Shulk purple")) {
 				config.accent = "Shulkr purple";
 			}
@@ -87,6 +101,34 @@ public final class FluxusConfig {
 
 	public String accent() {
 		return accent;
+	}
+
+	public String density() {
+		return density;
+	}
+
+	public String sidebarWidth() {
+		return sidebarWidth;
+	}
+
+	public String navigationMode() {
+		return navigationMode;
+	}
+
+	public String contentWidth() {
+		return contentWidth;
+	}
+
+	public String rightPanelBehaviour() {
+		return rightPanelBehaviour;
+	}
+
+	public String pageSpacing() {
+		return pageSpacing;
+	}
+
+	public String headerBehaviour() {
+		return headerBehaviour;
 	}
 
 	public String defaultPage() {
@@ -145,6 +187,34 @@ public final class FluxusConfig {
 		this.accent = accent;
 	}
 
+	public void setDensity(String density) {
+		this.density = density;
+	}
+
+	public void setSidebarWidth(String sidebarWidth) {
+		this.sidebarWidth = sidebarWidth;
+	}
+
+	public void setNavigationMode(String navigationMode) {
+		this.navigationMode = navigationMode;
+	}
+
+	public void setContentWidth(String contentWidth) {
+		this.contentWidth = contentWidth;
+	}
+
+	public void setRightPanelBehaviour(String rightPanelBehaviour) {
+		this.rightPanelBehaviour = rightPanelBehaviour;
+	}
+
+	public void setPageSpacing(String pageSpacing) {
+		this.pageSpacing = pageSpacing;
+	}
+
+	public void setHeaderBehaviour(String headerBehaviour) {
+		this.headerBehaviour = headerBehaviour;
+	}
+
 	public void setDefaultPage(String defaultPage) {
 		this.defaultPage = defaultPage;
 	}
@@ -197,6 +267,13 @@ public final class FluxusConfig {
 		return "{\n"
 				+ "  \"theme\": \"" + escape(theme) + "\",\n"
 				+ "  \"accent\": \"" + escape(accent) + "\",\n"
+				+ "  \"density\": \"" + escape(density) + "\",\n"
+				+ "  \"sidebarWidth\": \"" + escape(sidebarWidth) + "\",\n"
+				+ "  \"navigationMode\": \"" + escape(navigationMode) + "\",\n"
+				+ "  \"contentWidth\": \"" + escape(contentWidth) + "\",\n"
+				+ "  \"rightPanelBehaviour\": \"" + escape(rightPanelBehaviour) + "\",\n"
+				+ "  \"pageSpacing\": \"" + escape(pageSpacing) + "\",\n"
+				+ "  \"headerBehaviour\": \"" + escape(headerBehaviour) + "\",\n"
 				+ "  \"defaultPage\": \"" + escape(defaultPage) + "\",\n"
 				+ "  \"rememberLastPage\": " + rememberLastPage + ",\n"
 				+ "  \"autosaveScripts\": " + autosaveScripts + ",\n"
