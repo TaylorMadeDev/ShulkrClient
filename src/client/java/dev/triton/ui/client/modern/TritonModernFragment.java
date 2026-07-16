@@ -130,7 +130,6 @@ public final class TritonModernFragment extends Fragment {
 	private static final long PRESS_IN_MS = 70L;
 	private static final long PRESS_OUT_MS = 120L;
 	private static final long PAGE_IN_MS = 210L;
-	private static final long DOCK_INDICATOR_MS = 220L;
 	private static final int SIDE_WIDTH = 330;
 	private static final int TOP_BAR_HEIGHT = 56;
 	private static final int SEARCH_WIDTH = 520;
@@ -7672,7 +7671,7 @@ public final class TritonModernFragment extends Fragment {
 	}
 
 	private LinearLayout dock(boolean forceVisible) {
-		LinearLayout dock = row(0);
+		LinearLayout dock = row(DOCK_ITEM_GAP);
 		dock.setPadding(14, 0, 14, 0);
 		dock.setGravity(Gravity.CENTER);
 		dock.setBackground(glass(Color.argb(155, 10, 16, 27), Color.argb(180, 7, 12, 22), 18, Color.argb(95, 105, 116, 150)));
@@ -7686,24 +7685,7 @@ public final class TritonModernFragment extends Fragment {
 				{"window-restore-regular.png", "windowspy"}, {"circle-info-solid.png", "remote"},
 				{"border-none-solid.png", "overlays"}, {"gear-solid.png", "settings"}
 		};
-		int trackWidth = dockItems.length * DOCK_ITEM_SIZE + (dockItems.length - 1) * DOCK_ITEM_GAP;
-		FrameLayout track = new FrameLayout(requireContext());
-		View indicator = new View(requireContext());
-		indicator.setBackground(glass(PURPLE, PURPLE_DARK, 16, PURPLE_SOFT));
-		indicator.setAlpha(1.0F);
-		indicator.setClickable(false);
-		indicator.setFocusable(false);
-		FrameLayout.LayoutParams indicatorParams = new FrameLayout.LayoutParams(DOCK_ITEM_SIZE, DOCK_ITEM_SIZE);
-		indicatorParams.gravity = Gravity.TOP | Gravity.LEFT;
-		track.addView(indicator, indicatorParams);
-
-		LinearLayout itemRow = row(DOCK_ITEM_GAP);
-		int[] activeIndex = {-1};
-		int[] indicatorTargetIndex = {-1};
-		ValueAnimator[] positionAnimation = new ValueAnimator[1];
-		int itemIndex = 0;
 		for (String[] item : dockItems) {
-			int tabIndex = itemIndex;
 			boolean active = (page == Page.DASHBOARD && item[1].equals("dashboard"))
 					|| (page == Page.SCRIPTS && item[1].equals("scripts"))
 					|| (page == Page.MODULES && item[1].equals("libraries"))
@@ -7715,45 +7697,12 @@ public final class TritonModernFragment extends Fragment {
 					|| (page == Page.OVERLAYS && item[1].equals("overlays"))
 					|| (page == Page.SETTINGS && item[1].equals("settings"));
 			FrameLayout tab = new FrameLayout(requireContext());
+			if (active) {
+				tab.setBackground(glass(PURPLE, PURPLE_DARK, 16, PURPLE_SOFT));
+			}
 			tab.addView(icon(item[0], active ? TEXT : MUTED), centered(24, 24));
 			tab.setClickable(true);
 			tab.setFocusable(true);
-			tab.setFocusableInTouchMode(true);
-			if (active) {
-				activeIndex[0] = tabIndex;
-				indicatorTargetIndex[0] = tabIndex;
-				indicatorParams.leftMargin = tabIndex * (DOCK_ITEM_SIZE + DOCK_ITEM_GAP);
-				indicator.setLayoutParams(indicatorParams);
-				indicator.setTranslationX(0.0F);
-				indicator.setAlpha(1.0F);
-			}
-			tab.setOnHoverListener((target, event) -> {
-				if (event.getAction() == MotionEvent.ACTION_HOVER_ENTER) {
-					indicatorTargetIndex[0] = tabIndex;
-					moveDockIndicator(indicator, tabIndex, positionAnimation, true);
-				} else if (event.getAction() == MotionEvent.ACTION_HOVER_EXIT) {
-					dock.post(() -> {
-						if (indicatorTargetIndex[0] == tabIndex && activeIndex[0] >= 0) {
-							indicatorTargetIndex[0] = activeIndex[0];
-							moveDockIndicator(indicator, activeIndex[0], positionAnimation, true);
-						}
-					});
-				}
-				return false;
-			});
-			tab.setOnFocusChangeListener((target, hasFocus) -> {
-				if (hasFocus) {
-					indicatorTargetIndex[0] = tabIndex;
-					moveDockIndicator(indicator, tabIndex, positionAnimation, true);
-					return;
-				}
-				dock.post(() -> {
-					if (!dock.hasFocus() && activeIndex[0] >= 0) {
-						indicatorTargetIndex[0] = activeIndex[0];
-						moveDockIndicator(indicator, activeIndex[0], positionAnimation, true);
-					}
-				});
-			});
 			addPressAnimation(tab);
 			if (item[1].equals("dashboard")) {
 				tab.setOnClickListener(view -> openPage(Page.DASHBOARD));
@@ -7776,69 +7725,9 @@ public final class TritonModernFragment extends Fragment {
 			} else if (item[1].equals("settings")) {
 				tab.setOnClickListener(view -> openPage(Page.SETTINGS));
 			}
-			itemRow.addView(tab, new LinearLayout.LayoutParams(DOCK_ITEM_SIZE, DOCK_ITEM_SIZE));
-			itemIndex++;
+			dock.addView(tab, new LinearLayout.LayoutParams(DOCK_ITEM_SIZE, DOCK_ITEM_SIZE));
 		}
-		track.addView(itemRow, new FrameLayout.LayoutParams(trackWidth, DOCK_ITEM_SIZE));
-		dock.addView(track, new LinearLayout.LayoutParams(trackWidth, DOCK_ITEM_SIZE));
-		dock.setOnHoverListener((target, event) -> {
-			if (event.getAction() == MotionEvent.ACTION_HOVER_EXIT && activeIndex[0] >= 0) {
-				indicatorTargetIndex[0] = activeIndex[0];
-				moveDockIndicator(indicator, activeIndex[0], positionAnimation, true);
-			}
-			return false;
-		});
-		track.addOnLayoutChangeListener((view, left, top, right, bottom, oldLeft, oldTop, oldRight, oldBottom) -> {
-			if (indicatorTargetIndex[0] >= 0 && (right - left != oldRight - oldLeft || bottom - top != oldBottom - oldTop)) {
-				moveDockIndicator(indicator, indicatorTargetIndex[0], positionAnimation, false);
-			}
-		});
-		track.post(() -> {
-			if (activeIndex[0] >= 0) {
-				indicatorTargetIndex[0] = activeIndex[0];
-				moveDockIndicator(indicator, activeIndex[0], positionAnimation, false);
-			}
-		});
 		return dock;
-	}
-
-	private void moveDockIndicator(View indicator, int targetIndex, ValueAnimator[] positionAnimation, boolean animate) {
-		if (targetIndex < 0) {
-			return;
-		}
-		int targetLeft = targetIndex * (DOCK_ITEM_SIZE + DOCK_ITEM_GAP);
-		boolean motionEnabled = animate && animatedHoverHighlight && ValueAnimator.areAnimatorsEnabled();
-		cancelDockIndicatorAnimation(positionAnimation);
-		if (indicator.getWidth() <= 0) {
-			FrameLayout.LayoutParams params = (FrameLayout.LayoutParams) indicator.getLayoutParams();
-			params.leftMargin = targetLeft;
-			indicator.setLayoutParams(params);
-			indicator.setAlpha(1.0F);
-			return;
-		}
-
-		int currentLeft = indicator.getLeft();
-		if (!motionEnabled) {
-			indicator.offsetLeftAndRight(targetLeft - currentLeft);
-			indicator.setAlpha(1.0F);
-			return;
-		}
-
-		ValueAnimator position = ValueAnimator.ofInt(currentLeft, targetLeft);
-		position.addUpdateListener(animation -> {
-			int animatedLeft = (Integer) animation.getAnimatedValue();
-			indicator.offsetLeftAndRight(animatedLeft - indicator.getLeft());
-		});
-		position.setDuration(DOCK_INDICATOR_MS);
-		positionAnimation[0] = position;
-		position.start();
-	}
-
-	private void cancelDockIndicatorAnimation(ValueAnimator[] positionAnimation) {
-		if (positionAnimation[0] != null) {
-			positionAnimation[0].cancel();
-			positionAnimation[0] = null;
-		}
 	}
 
 	private View primaryButton(String iconFile, String text, String trailingIcon) {
