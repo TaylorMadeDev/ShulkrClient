@@ -12,6 +12,7 @@ const GoogleStrategy = require("passport-google-oauth20").Strategy;
 const jwt = require("jsonwebtoken");
 const Stripe = require("stripe");
 const { pathToFileURL } = require("url");
+const { parseScriptSettings, validateValues, reconcileValues } = require("./scriptSettings");
 
 const rootDir = path.resolve(__dirname, "..", "..");
 const runDir = path.join(rootDir, "run");
@@ -30,6 +31,9 @@ const usersPath = path.join(dataDir, "users.json");
 const tamperEventsPath = path.join(dataDir, "tamper-events.json");
 const automationsPath = path.join(dataDir, "automations.json");
 const libraryReportsPath = path.join(dataDir, "library-reports.json");
+const scriptRegistryPath = path.join(dataDir, "script-registry.json");
+const scriptSettingsPath = path.join(dataDir, "script-settings.json");
+const scriptShortcutsPath = path.join(dataDir, "script-shortcuts.json");
 const AUTOMATION_FORMAT_VERSION = 1;
 const AUTOMATION_LIMITS = Object.freeze({ maxNodes: 500, maxEdges: 1500, maxGraphBytes: 2 * 1024 * 1024, maxNameLength: 120, maxDescriptionLength: 2000, maxCodeBytes: 2 * 1024 * 1024 });
 const AUTOMATION_DATA_TYPES = new Set(["execution", "number", "text", "boolean", "coordinates", "block", "entity", "target", "item", "variable", "any"]);
@@ -188,7 +192,7 @@ if (googleClientId && googleClientSecret) {
 }
 
 const scriptExtensions = new Set([".py", ".pyj", ".lua", ".js", ".txt"]);
-const hiddenRoots = new Set(["system", "templates", "plugins", "plugins_disabled", "exports", "blockpacks", "automations"]);
+const hiddenRoots = new Set(["system", "templates", "plugins", "plugins_disabled", "exports", "blockpacks", "automations", "shulkr_runtime", "shulkr_config"]);
 const tierCatalog = {
   free: {
     tier: "Free",
@@ -997,7 +1001,7 @@ async function normalizeControlPayload(type, input) {
   if (type === "run_script") {
     const file = scriptPathFromRequest(payload.path);
     await fs.access(file);
-    return { path: normalizeSlashes(path.relative(scriptDir, file)) };
+    return prepareConfiguredScriptExecution(file);
   }
   if (type === "send_chat") {
     const message = String(payload.message || "").trim();
@@ -1574,16 +1578,144 @@ async function walkScripts(dir = scriptDir, depth = 0) {
   return result;
 }
 
+async function loadScriptRegistry() {
+  const registry = await readJson(scriptRegistryPath, { version: 1, scripts: {} });
+  return registry && typeof registry === "object" && registry.scripts && typeof registry.scripts === "object"
+    ? registry
+    : { version: 1, scripts: {} };
+}
+
+async function ensureScriptIdentity(relativePath, registry = null) {
+  const normalized = normalizeSlashes(relativePath);
+  const current = registry || await loadScriptRegistry();
+  if (!current.scripts[normalized]) {
+    current.scripts[normalized] = { id: crypto.randomUUID(), installedAt: new Date().toISOString(), lastRunAt: null };
+    await writeJson(scriptRegistryPath, current);
+  }
+  return current.scripts[normalized];
+}
+
+async function moveScriptIdentity(fromPath, toPath) {
+  const registry = await loadScriptRegistry();
+  const from = normalizeSlashes(fromPath);
+  const to = normalizeSlashes(toPath);
+  registry.scripts[to] = registry.scripts[from] || { id: crypto.randomUUID(), installedAt: new Date().toISOString(), lastRunAt: null };
+  delete registry.scripts[from];
+  await writeJson(scriptRegistryPath, registry);
+}
+
+async function removeScriptIdentity(relativePath) {
+  const registry = await loadScriptRegistry();
+  const normalized = normalizeSlashes(relativePath);
+  const identity = registry.scripts[normalized];
+  delete registry.scripts[normalized];
+  await writeJson(scriptRegistryPath, registry);
+  if (!identity?.id) return;
+  const [settings, shortcuts] = await Promise.all([readJson(scriptSettingsPath, {}), readJson(scriptShortcutsPath, {})]);
+  delete settings[identity.id];
+  delete shortcuts[identity.id];
+  await Promise.all([writeJson(scriptSettingsPath, settings), writeJson(scriptShortcutsPath, shortcuts)]);
+  await fs.rm(path.join(scriptDir, "shulkr_runtime", `${identity.id}.py`), { force: true });
+  await fs.rm(path.join(scriptDir, "shulkr_config", `${identity.id}.json`), { force: true });
+}
+
+async function moveFolderIdentities(fromPath, toPath) {
+  const registry = await loadScriptRegistry();
+  const from = normalizeSlashes(fromPath).replace(/\/$/, "");
+  const to = normalizeSlashes(toPath).replace(/\/$/, "");
+  for (const [scriptPath, identity] of Object.entries({ ...registry.scripts })) {
+    if (scriptPath !== from && !scriptPath.startsWith(`${from}/`)) continue;
+    registry.scripts[`${to}${scriptPath.slice(from.length)}`] = identity;
+    delete registry.scripts[scriptPath];
+  }
+  await writeJson(scriptRegistryPath, registry);
+}
+
+async function removeFolderIdentities(folderPath) {
+  const registry = await loadScriptRegistry();
+  const folder = normalizeSlashes(folderPath).replace(/\/$/, "");
+  const removed = Object.entries(registry.scripts).filter(([scriptPath]) => scriptPath === folder || scriptPath.startsWith(`${folder}/`));
+  const [settings, shortcuts] = await Promise.all([readJson(scriptSettingsPath, {}), readJson(scriptShortcutsPath, {})]);
+  for (const [scriptPath, identity] of removed) {
+    delete registry.scripts[scriptPath];
+    delete settings[identity.id];
+    delete shortcuts[identity.id];
+  }
+  await Promise.all([writeJson(scriptRegistryPath, registry), writeJson(scriptSettingsPath, settings), writeJson(scriptShortcutsPath, shortcuts)]);
+}
+
+async function scriptMetadata(file, identity) {
+  const source = await fs.readFile(file, "utf8");
+  const metadata = parseScriptSettings(source);
+  const stored = await readJson(scriptSettingsPath, {});
+  const saved = stored[identity.id]?.values || {};
+  const reconciled = reconcileValues(metadata.definitions, saved);
+  return {
+    ...metadata,
+    values: reconciled.values,
+    warnings: [...reconciled.warnings, ...metadata.issues.map(issue => `Line ${issue.line}: ${issue.message}`)],
+    sourceHash: crypto.createHash("sha256").update(source).digest("hex")
+  };
+}
+
+async function prepareConfiguredScriptExecution(file) {
+  const relative = normalizeSlashes(path.relative(scriptDir, file));
+  const identity = await ensureScriptIdentity(relative);
+  const metadata = await scriptMetadata(file, identity);
+  if (metadata.issues.length) throw automationError(422, "SCRIPT_METADATA_INVALID", "Script settings metadata must be fixed before configured execution", { issues: metadata.issues });
+  const validation = validateValues(metadata.definitions, metadata.values);
+  if (!validation.valid) throw automationError(422, "SCRIPT_SETTINGS_INVALID", "Saved script settings are invalid", { errors: validation.errors });
+  if (!metadata.definitions.length) return { path: relative, sourcePath: relative, scriptId: identity.id, configured: false };
+  const runtimeDir = safeInside(scriptDir, path.join(scriptDir, "shulkr_runtime"));
+  const configDir = safeInside(scriptDir, path.join(scriptDir, "shulkr_config"));
+  await Promise.all([fs.mkdir(runtimeDir, { recursive: true }), fs.mkdir(configDir, { recursive: true })]);
+  const configFile = safeInside(configDir, path.join(configDir, `${identity.id}.json`));
+  const wrapperFile = safeInside(runtimeDir, path.join(runtimeDir, `${identity.id}.py`));
+  await fs.writeFile(configFile, JSON.stringify({ version: 1, scriptId: identity.id, scriptPath: relative, values: validation.values }, null, 2) + "\n", "utf8");
+  const wrapper = [
+    "# Generated by Shulkr. Do not edit.",
+    "import builtins, json, os, runpy",
+    `_config_path = ${JSON.stringify(configFile)}`,
+    `_script_path = ${JSON.stringify(file)}`,
+    "with open(_config_path, 'r', encoding='utf-8') as _handle:",
+    "    _payload = json.load(_handle)",
+    "builtins.SHULKR_SETTINGS = _payload.get('values', {})",
+    "builtins.shulkr_setting = lambda key, default=None: builtins.SHULKR_SETTINGS.get(key, default)",
+    "os.environ['SHULKR_SCRIPT_SETTINGS_FILE'] = _config_path",
+    "os.environ['SHULKR_SCRIPT_ID'] = _payload.get('scriptId', '')",
+    "runpy.run_path(_script_path, run_name='__main__')",
+    ""
+  ].join("\n");
+  await fs.writeFile(wrapperFile, wrapper, "utf8");
+  const registry = await loadScriptRegistry();
+  if (registry.scripts[relative]) registry.scripts[relative].lastRunAt = new Date().toISOString();
+  await writeJson(scriptRegistryPath, registry);
+  return { path: normalizeSlashes(path.relative(scriptDir, wrapperFile)), sourcePath: relative, scriptId: identity.id, configured: true };
+}
+
 async function scriptSummary(file) {
   const stat = await fs.stat(file);
   const relative = normalizeSlashes(path.relative(scriptDir, file));
+  const identity = await ensureScriptIdentity(relative);
+  const metadata = await scriptMetadata(file, identity);
+  const shortcuts = await readJson(scriptShortcutsPath, {});
   return {
+    id: identity.id,
     path: relative,
     name: path.basename(file),
     extension: path.extname(file).replace(".", "").toLowerCase(),
     sizeBytes: stat.size,
     modifiedAt: stat.mtimeMs,
-    description: await scriptDescription(file)
+    description: await scriptDescription(file),
+    author: "Local",
+    version: "local",
+    installedAt: identity.installedAt,
+    lastRunAt: identity.lastRunAt,
+    shortcut: shortcuts[identity.id] || "",
+    settingCount: metadata.definitions.length,
+    settings: metadata.definitions,
+    metadataIssues: metadata.issues,
+    settingWarnings: metadata.warnings
   };
 }
 
@@ -3397,6 +3529,7 @@ app.patch("/api/scripts/folders", requireFeature("scripts.write"), async (req, r
     }
     await fs.mkdir(path.dirname(target), { recursive: true });
     await fs.rename(from, target);
+    await moveFolderIdentities(path.relative(scriptDir, from), path.relative(scriptDir, target));
     res.json({ path: normalizeSlashes(path.relative(scriptDir, target)), name: path.basename(target) });
   } catch (error) {
     next(error);
@@ -3406,8 +3539,10 @@ app.patch("/api/scripts/folders", requireFeature("scripts.write"), async (req, r
 app.delete("/api/scripts/folders", requireFeature("scripts.delete"), async (req, res, next) => {
   try {
     const folder = folderPathFromRequest(req.body?.path || req.query.path);
+    const relative = normalizeSlashes(path.relative(scriptDir, folder));
     await fs.rm(folder, { recursive: true, force: true });
-    res.json({ ok: true, path: normalizeSlashes(path.relative(scriptDir, folder)) });
+    await removeFolderIdentities(relative);
+    res.json({ ok: true, path: relative });
   } catch (error) {
     next(error);
   }
@@ -3448,6 +3583,7 @@ app.patch("/api/scripts", requireFeature("scripts.write"), async (req, res, next
     }
     await fs.mkdir(path.dirname(target), { recursive: true });
     await fs.rename(from, target);
+    await moveScriptIdentity(path.relative(scriptDir, from), path.relative(scriptDir, target));
     res.json(await scriptSummary(target));
   } catch (error) {
     next(error);
@@ -3466,11 +3602,69 @@ app.get("/api/scripts/read", requireFeature("scripts.read"), async (req, res, ne
 app.delete("/api/scripts", requireFeature("scripts.delete"), async (req, res, next) => {
   try {
     const file = scriptPathFromRequest(req.body?.path || req.query.path);
+    const relative = normalizeSlashes(path.relative(scriptDir, file));
     await fs.rm(file, { force: true });
-    res.json({ ok: true, path: normalizeSlashes(path.relative(scriptDir, file)) });
+    await removeScriptIdentity(relative);
+    res.json({ ok: true, path: relative });
   } catch (error) {
     next(error);
   }
+});
+
+app.get("/api/scripts/:id/settings", requireFeature("scripts.read"), async (req, res, next) => {
+  try {
+    const script = (await scripts()).find(item => item.id === req.params.id);
+    if (!script) throw automationError(404, "SCRIPT_NOT_FOUND", "Installed script not found");
+    const file = scriptPathFromRequest(script.path);
+    const identity = await ensureScriptIdentity(script.path);
+    const metadata = await scriptMetadata(file, identity);
+    res.json({ scriptId: script.id, path: script.path, definitions: metadata.definitions, issues: metadata.issues, values: metadata.values, warnings: metadata.warnings, sourceHash: metadata.sourceHash });
+  } catch (error) { next(error); }
+});
+
+app.put("/api/scripts/:id/settings", requireFeature("scripts.write"), async (req, res, next) => {
+  try {
+    const script = (await scripts()).find(item => item.id === req.params.id);
+    if (!script) throw automationError(404, "SCRIPT_NOT_FOUND", "Installed script not found");
+    const file = scriptPathFromRequest(script.path);
+    const identity = await ensureScriptIdentity(script.path);
+    const metadata = await scriptMetadata(file, identity);
+    if (metadata.issues.length) throw automationError(422, "SCRIPT_METADATA_INVALID", "Fix malformed metadata before saving variables", { issues: metadata.issues });
+    const validation = validateValues(metadata.definitions, req.body?.values || {});
+    if (!validation.valid) throw automationError(422, "SCRIPT_SETTINGS_INVALID", "One or more script variables are invalid", { errors: validation.errors });
+    const all = await readJson(scriptSettingsPath, {});
+    all[identity.id] = { values: validation.values, sourceHash: metadata.sourceHash, updatedAt: new Date().toISOString() };
+    await writeJson(scriptSettingsPath, all);
+    res.json({ scriptId: identity.id, values: validation.values, warnings: metadata.warnings, updatedAt: all[identity.id].updatedAt });
+  } catch (error) { next(error); }
+});
+
+app.delete("/api/scripts/:id/settings", requireFeature("scripts.write"), async (req, res, next) => {
+  try {
+    const script = (await scripts()).find(item => item.id === req.params.id);
+    if (!script) throw automationError(404, "SCRIPT_NOT_FOUND", "Installed script not found");
+    const all = await readJson(scriptSettingsPath, {});
+    delete all[script.id];
+    await writeJson(scriptSettingsPath, all);
+    const metadata = await scriptMetadata(scriptPathFromRequest(script.path), await ensureScriptIdentity(script.path));
+    res.json({ scriptId: script.id, values: Object.fromEntries(metadata.definitions.map(item => [item.key, item.defaultValue])) });
+  } catch (error) { next(error); }
+});
+
+app.put("/api/scripts/:id/shortcut", requireFeature("scripts.write"), async (req, res, next) => {
+  try {
+    const script = (await scripts()).find(item => item.id === req.params.id);
+    if (!script) throw automationError(404, "SCRIPT_NOT_FOUND", "Installed script not found");
+    const shortcut = String(req.body?.shortcut || "").trim();
+    if (shortcut && !/^(?:(?:Ctrl|Alt|Shift|Meta)\+){0,4}(?:[A-Z0-9]|F(?:[1-9]|1[0-2])|Space|Enter|Home|End|PageUp|PageDown|Insert)$/i.test(shortcut)) throw automationError(422, "SHORTCUT_INVALID", "Shortcut combination is invalid");
+    const all = await readJson(scriptShortcutsPath, {});
+    const conflict = Object.entries(all).find(([id, value]) => id !== script.id && String(value).toLowerCase() === shortcut.toLowerCase());
+    if (shortcut && conflict) throw automationError(409, "SHORTCUT_CONFLICT", "Shortcut is already assigned to another installed script", { scriptId: conflict[0] });
+    if (shortcut) all[script.id] = shortcut;
+    else delete all[script.id];
+    await writeJson(scriptShortcutsPath, all);
+    res.json({ scriptId: script.id, shortcut });
+  } catch (error) { next(error); }
 });
 
 app.get("/api/modules", requireFeature("libraries.read"), async (_req, res) => {

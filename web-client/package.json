@@ -8,7 +8,7 @@
     "build": "vite build",
     "preview": "vite preview --host 127.0.0.1 --port 5178",
     "test": "node --test",
-    "lint": "node --check src/main.js && node --check src/flow/graph.js && node --check src/flow/nodeRegistry.js && node --check src/flow/validation.js && node --check src/flow/persistence.js && node --check src/flow/history.js && node --check src/flow/compiler.js && node --check src/flow/store.js && node --check src/flow/editor.js && node --check src/flow/migrations.js",
+    "lint": "node --check src/main.js && node --check src/search.js && node --check src/shortcuts.js && node --check src/scriptSettings.js && node --check src/flow/graph.js && node --check src/flow/nodeRegistry.js && node --check src/flow/validation.js && node --check src/flow/persistence.js && node --check src/flow/history.js && node --check src/flow/compiler.js && node --check src/flow/store.js && node --check src/flow/editor.js && node --check src/flow/migrations.js",
     "typecheck": "npm run lint"
   },
   "devDependencies": {

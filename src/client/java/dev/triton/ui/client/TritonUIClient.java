@@ -5,6 +5,8 @@ import dev.triton.ui.client.app.FluxusAppState;
 import dev.triton.ui.client.config.FluxusConfig;
 import dev.triton.ui.client.module.ModuleManager;
 import dev.triton.ui.client.modern.TritonModernFragment;
+import dev.triton.ui.client.script.ScriptSettingsRuntime;
+import dev.triton.ui.script.ShortcutBinding;
 import icyllis.modernui.mc.MuiModApi;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
@@ -20,7 +22,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.CompletableFuture;
 
 public final class TritonUIClient implements ClientModInitializer {
 	public static final Logger LOGGER = LoggerFactory.getLogger("shulkr");
@@ -32,8 +37,10 @@ public final class TritonUIClient implements ClientModInitializer {
 	private static FluxusAppState appState;
 	private static TritonModernFragment activeModernFragment;
 	private static int telemetryTicks;
+	private static boolean modernUiSearchConflictDisabled;
 	private static String remoteActiveScript = "";
 	private static ModuleManager moduleManager;
+	private static final Set<String> runningShortcutScripts = new HashSet<>();
 
 	@Override
 	public void onInitializeClient() {
@@ -63,6 +70,7 @@ public final class TritonUIClient implements ClientModInitializer {
 		applySavedKeybindings();
 
 		ClientTickEvents.END_CLIENT_TICK.register(client -> {
+			disableModernUiSearchConflict();
 			moduleManager.onClientTick(client);
 			if (++telemetryTicks >= 20) {
 				telemetryTicks = 0;
@@ -101,15 +109,25 @@ public final class TritonUIClient implements ClientModInitializer {
 		});
 	}
 
+	private static void disableModernUiSearchConflict() {
+		if (modernUiSearchConflictDisabled) return;
+		KeyMapping modernUiCenter = KeyMapping.get("key.modernui.openCenter");
+		if (modernUiCenter == null) return;
+		modernUiCenter.setKey(InputConstants.UNKNOWN);
+		KeyMapping.resetMapping();
+		modernUiSearchConflictDisabled = true;
+		LOGGER.info("Disabled the conflicting ModernUI K binding so Shulkr can use Ctrl+K search.");
+	}
+
 	private static void applySavedKeybindings() {
 		if (openDemo != null) {
-			openDemo.setKey(InputConstants.Type.KEYSYM.getOrCreate(config.openMenuKey()));
+			openDemo.setKey(InputConstants.Type.KEYSYM.getOrCreate(config.openMenuShortcut().modifiers() == 0 ? config.openMenuShortcut().key() : InputConstants.UNKNOWN.getValue()));
 		}
 		if (editOverlay != null) {
-			editOverlay.setKey(InputConstants.Type.KEYSYM.getOrCreate(config.overlayEditKey()));
+			editOverlay.setKey(InputConstants.Type.KEYSYM.getOrCreate(config.overlayEditShortcut().modifiers() == 0 ? config.overlayEditShortcut().key() : InputConstants.UNKNOWN.getValue()));
 		}
 		if (runLastScript != null) {
-			runLastScript.setKey(InputConstants.Type.KEYSYM.getOrCreate(config.runLastScriptKey()));
+			runLastScript.setKey(InputConstants.Type.KEYSYM.getOrCreate(config.runLastScriptShortcut().modifiers() == 0 ? config.runLastScriptShortcut().key() : InputConstants.UNKNOWN.getValue()));
 		}
 	}
 
@@ -184,30 +202,63 @@ public final class TritonUIClient implements ClientModInitializer {
 		return config;
 	}
 
+	public static void reloadConfig() {
+		config = FluxusConfig.load();
+		applySavedKeybindings();
+	}
+
 	public static FluxusAppState appState() {
 		return appState;
 	}
 
 	public static int shortcutKey(String action) {
-		return switch (String.valueOf(action)) {
-			case "open-ui" -> config.openMenuKey();
-			case "overlay-edit" -> config.overlayEditKey();
-			case "run-last-script" -> config.runLastScriptKey();
-			default -> InputConstants.UNKNOWN.getValue();
+		return shortcutBinding(action).key();
+	}
+
+	public static ShortcutBinding shortcutBinding(String action) {
+		String id = String.valueOf(action);
+		if (id.startsWith("script:")) return config.scriptShortcuts().getOrDefault(id.substring("script:".length()), ShortcutBinding.unbound());
+		return switch (id) {
+			case "open-ui" -> config.openMenuShortcut();
+			case "overlay-edit" -> config.overlayEditShortcut();
+			case "run-last-script" -> config.runLastScriptShortcut();
+			default -> ShortcutBinding.unbound();
 		};
 	}
 
 	public static void setShortcutKey(String action, int key) {
+		setShortcutBinding(action, key < 0 ? ShortcutBinding.unbound() : new ShortcutBinding(key, 0));
+	}
+
+	public static String shortcutConflict(String action, ShortcutBinding candidate) {
+		if (candidate == null || !candidate.bound()) return "";
+		for (String appAction : new String[]{"open-ui", "overlay-edit", "run-last-script"}) {
+			if (!appAction.equals(action) && candidate.equals(shortcutBinding(appAction))) return appAction;
+		}
+		for (Map.Entry<String, ShortcutBinding> entry : config.scriptShortcuts().entrySet()) {
+			String scriptAction = "script:" + entry.getKey();
+			if (!scriptAction.equals(action) && candidate.equals(entry.getValue())) return scriptAction;
+		}
+		return "";
+	}
+
+	public static boolean setShortcutBinding(String action, ShortcutBinding binding) {
+		if (!shortcutConflict(action, binding).isBlank()) return false;
 		switch (String.valueOf(action)) {
-			case "open-ui" -> config.setOpenMenuKey(key);
-			case "overlay-edit" -> config.setOverlayEditKey(key);
-			case "run-last-script" -> config.setRunLastScriptKey(key);
+			case "open-ui" -> config.setOpenMenuShortcut(binding);
+			case "overlay-edit" -> config.setOverlayEditShortcut(binding);
+			case "run-last-script" -> config.setRunLastScriptShortcut(binding);
 			default -> {
-				return;
+				if (!String.valueOf(action).startsWith("script:")) return false;
+				Map<String, ShortcutBinding> scripts = config.scriptShortcuts();
+				String id = String.valueOf(action).substring("script:".length());
+				if (binding == null || !binding.bound()) scripts.remove(id); else scripts.put(id, binding);
+				config.setScriptShortcuts(scripts);
 			}
 		}
 		config.save();
 		applySavedKeybindings();
+		return true;
 	}
 
 	public static String lastRunScriptPath() {
@@ -251,11 +302,73 @@ public final class TritonUIClient implements ClientModInitializer {
 		activeModernFragment = fragment;
 	}
 
+	public static void clearActiveModernFragment(TritonModernFragment fragment) {
+		if (activeModernFragment == fragment) activeModernFragment = null;
+	}
+
 	public static boolean handleGlobalKey(int key, int action, int modifiers) {
 		Minecraft client = Minecraft.getInstance();
+		TritonModernFragment fragment = activeModernFragment;
+		if (fragment != null && fragment.handleGlobalKey(key, action, modifiers)) return true;
+		if (action != 1) return false;
+		if (key == InputConstants.KEY_K && (modifiers & ShortcutBinding.CTRL) != 0) {
+			MuiModApi.openScreen(TritonModernFragment.forGlobalSearch());
+			return true;
+		}
+		if (fragment != null && fragment.shortcutsSuppressed()) return false;
+		if (fragment == null && client.screen != null) return false;
+		if (config.openMenuShortcut().modifiers() != 0 && config.openMenuShortcut().matches(key, modifiers)) {
+			if (fragment != null) client.setScreen(null); else MuiModApi.openScreen(new TritonModernFragment());
+			return true;
+		}
+		if (config.overlayEditShortcut().modifiers() != 0 && config.overlayEditShortcut().matches(key, modifiers)) {
+			ShulkrHudOverlay.setRendererActive(true);
+			ShulkrHudOverlay.setEditMode(!ShulkrHudOverlay.editMode());
+			return true;
+		}
+		if (config.runLastScriptShortcut().modifiers() != 0 && config.runLastScriptShortcut().matches(key, modifiers)) {
+			runStoredScript(client);
+			return true;
+		}
+		for (Map.Entry<String, ShortcutBinding> entry : config.scriptShortcuts().entrySet()) {
+			if (entry.getValue().matches(key, modifiers)) {
+				runScriptShortcut(client, entry.getKey());
+				return true;
+			}
+		}
 		if (moduleManager != null && moduleManager.handleKeyPress(client, key, action)) {
 			return true;
 		}
-		return activeModernFragment != null && activeModernFragment.handleGlobalKey(key, action, modifiers);
+		return false;
+	}
+
+	private static void runScriptShortcut(Minecraft client, String scriptId) {
+		synchronized (runningShortcutScripts) {
+			if (!runningShortcutScripts.add(scriptId)) {
+				notifyClient(client, "That script shortcut is already starting.");
+				return;
+			}
+		}
+		CompletableFuture.supplyAsync(() -> {
+			try {
+				var script = ScriptSettingsRuntime.resolveScript(scriptId);
+				if (script == null) throw new IllegalStateException("The assigned script is missing.");
+				return ScriptSettingsRuntime.prepare(script);
+			} catch (Exception error) {
+				throw new RuntimeException(error);
+			}
+		}).whenComplete((prepared, error) -> client.execute(() -> {
+			if (error != null) {
+				runningShortcutScripts.remove(scriptId);
+				notifyClient(client, "Script shortcut failed: " + (error.getCause() == null ? error.getMessage() : error.getCause().getMessage()));
+				LOGGER.error("Failed to prepare script shortcut {}", scriptId, error);
+				return;
+			}
+			Minescript.runEditorCommandAsync(prepared.commandPath(), handled -> client.execute(() -> {
+				runningShortcutScripts.remove(scriptId);
+				if (handled) rememberLastScript(prepared.commandPath() + ".py");
+				notifyClient(client, handled ? "Started script shortcut." : "Minescript could not start the assigned script.");
+			}));
+		}));
 	}
 }

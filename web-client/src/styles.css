@@ -685,8 +685,17 @@ a {
   color: var(--text-muted);
 }
 
+.search-clear[hidden] {
+  display: none;
+}
+
 .global-search kbd {
-  padding: 3px 7px;
+  display: inline-flex;
+  min-width: 25px;
+  min-height: 24px;
+  padding: 4px 8px;
+  align-items: center;
+  justify-content: center;
   border: 1px solid rgba(157, 77, 255, 0.2);
   border-radius: 6px;
   background: rgba(32, 24, 50, 0.8);
@@ -946,7 +955,9 @@ a {
 
 .global-search-results button > i:last-child {
   color: var(--text-muted);
-  font-size: 0.7rem;
+  font-size: 0.76rem;
+  line-height: 1;
+  font-weight: 700;
 }
 
 .global-search-results strong,
@@ -4454,6 +4465,33 @@ img,svg,canvas{max-width:100%}
     padding: 0 20px;
   }
 }
+
+/* Search, installed-script configuration, and shortcut controls */
+.search-clear{display:inline-grid;place-items:center;flex:0 0 26px;width:26px;height:26px;padding:0;border:0;border-radius:7px;background:transparent;color:var(--text-muted)}
+.search-clear:hover,.search-clear:focus-visible{background:rgba(157,77,255,.14);color:var(--text)}
+.script-workspace-tabs{display:flex;align-items:center;gap:8px;margin-bottom:18px;padding:5px;border:1px solid var(--border);border-radius:12px;background:rgba(13,9,21,.68);width:max-content;max-width:100%}
+.script-workspace-tabs button{display:flex;align-items:center;gap:8px;height:38px;padding:0 16px;border:1px solid transparent;border-radius:9px;background:transparent;color:var(--text-secondary);font-weight:700}
+.script-workspace-tabs button.active{border-color:rgba(157,77,255,.45);background:linear-gradient(135deg,rgba(157,77,255,.38),rgba(255,58,165,.16));color:var(--text)}
+.script-workspace-tabs button span{display:grid;place-items:center;min-width:20px;height:20px;padding:0 5px;border-radius:999px;background:rgba(255,255,255,.08);font-size:.7rem}
+.script-inline-meta{display:block;margin-top:5px;color:var(--text-muted);font-size:.68rem}
+.script-inline-meta kbd{padding:2px 5px;border:1px solid var(--border);border-radius:5px;background:rgba(157,77,255,.12);color:var(--text)}
+.script-warning{display:block;margin-top:5px;color:#ffbd6b;font-size:.7rem}
+.script-metadata-warning{border-color:rgba(255,174,75,.26)}
+.settings-search{display:flex;align-items:center;gap:10px;width:min(520px,100%);height:42px;margin:0 0 16px;padding:0 13px;border:1px solid var(--border);border-radius:10px;background:rgba(255,255,255,.025);color:var(--text-muted)}
+.settings-search input{flex:1;min-width:0;border:0;outline:0;background:transparent;color:var(--text)}
+.settings-search-empty{text-align:center}.settings-search-empty .btn{margin-top:12px}
+.shortcut-settings-grid{align-items:start}.shortcut-list{display:grid;gap:8px}
+.shortcut-row{display:grid;grid-template-columns:minmax(0,1fr) auto auto;align-items:center;gap:12px;width:100%;min-height:64px;padding:10px 12px;border:1px solid var(--border);border-radius:10px;background:rgba(255,255,255,.02);color:var(--text);text-align:left}
+.shortcut-row:hover,.shortcut-row.recording{border-color:var(--border-hover);background:rgba(157,77,255,.08)}
+.shortcut-row>span:first-child{min-width:0}.shortcut-row strong,.shortcut-row small{display:block}.shortcut-row small{margin-top:4px;color:var(--text-muted);font-size:.72rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.shortcut-keycaps{display:flex;align-items:center;gap:4px}.shortcut-keycaps kbd{display:inline-flex;align-items:center;justify-content:center;min-width:28px;height:27px;padding:0 8px;border:1px solid rgba(157,77,255,.34);border-radius:6px;background:rgba(28,20,44,.9);color:var(--text);font-size:.72rem;font-family:inherit;font-weight:700}.shortcut-keycaps kbd.recording{min-width:88px;color:var(--accent-purple)}
+.shortcut-plus,.shortcut-unassigned{color:var(--text-muted);font-size:.72rem}.shortcut-clear{display:grid;place-items:center;width:28px;height:28px;border-radius:7px;color:var(--text-muted)}.shortcut-clear:hover{background:rgba(255,74,112,.14);color:#ff6f8f}.shortcut-error,.script-setting-errors,.script-setting-warnings{margin:12px 0;padding:10px 12px;border:1px solid rgba(255,174,75,.3);border-radius:9px;background:rgba(255,174,75,.08);color:#ffd08a;font-size:.78rem}.shortcut-error i{margin-right:8px}
+.script-settings-modal .card-header p{margin:5px 0 0;color:var(--text-muted);font-size:.75rem}.script-settings-form{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}.script-setting-field{display:flex;flex-direction:column;gap:8px;min-width:0}.script-setting-field>label{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.script-setting-field>label small{flex-basis:100%;color:var(--text-muted);font-weight:400}.script-setting-field input:not([type=checkbox]):not([type=range]),.script-setting-field select{width:100%;height:42px;padding:0 11px;border:1px solid var(--border);border-radius:9px;background:rgba(255,255,255,.035);color:var(--text)}.script-setting-field input:focus,.script-setting-field select:focus{outline:0;border-color:var(--border-hover)}
+.script-setting-field .required{padding:2px 6px;border-radius:999px;background:rgba(255,58,165,.12);color:#ff91ce;font-size:.62rem}.setting-constraints{color:var(--text-muted);font-size:.67rem}.field-error{min-height:16px;color:#ff7894;font-size:.7rem}.script-slider{display:flex;align-items:center;gap:12px}.script-slider input{flex:1}.script-slider output{min-width:50px;padding:5px 8px;border:1px solid var(--border);border-radius:7px;text-align:center}.coordinate-inputs{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.coordinate-inputs label{display:grid;gap:5px}.coordinate-inputs span{color:var(--text-muted);font-size:.66rem}.script-variable-toggle{width:max-content}.script-settings-form .modal-actions{grid-column:1/-1}.modal-action-spacer{flex:1}.script-setting-errors{border-color:rgba(255,74,112,.34);background:rgba(255,74,112,.08);color:#ff9caf}.script-setting-errors p,.script-setting-warnings p{margin:4px 0}
+.filter-empty{padding:8px;color:var(--text-muted);font-size:.75rem}
+
+@media(max-width:900px){.global-search kbd{min-width:23px;min-height:22px;padding:3px 6px;font-size:.7rem}.script-settings-form{grid-template-columns:1fr}}
+@media(max-width:600px){.global-search kbd{display:none}.script-workspace-tabs{width:100%}.script-workspace-tabs button{flex:1;justify-content:center;padding:0 10px}.shortcut-row{grid-template-columns:minmax(0,1fr) auto}.shortcut-clear{grid-column:2}.coordinate-inputs{grid-template-columns:1fr}}
 
 .hub-category:hover {
   border-color: var(--border-hover);

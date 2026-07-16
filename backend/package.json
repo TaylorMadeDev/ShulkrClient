@@ -7,7 +7,7 @@
     "start": "node src/server.js",
     "dev": "node --watch src/server.js",
     "test": "node --test",
-    "lint": "node --check src/server.js",
+    "lint": "node --check src/server.js && node --check src/scriptSettings.js",
     "typecheck": "npm run lint"
   },
   "dependencies": {

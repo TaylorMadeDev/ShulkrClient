@@ -1,11 +1,15 @@
 package dev.triton.ui.client.config;
 
+import dev.triton.ui.script.ShortcutBinding;
 import net.fabricmc.loader.api.FabricLoader;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Base64;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -47,6 +51,10 @@ public final class FluxusConfig {
 	private int openMenuKey = 85;
 	private int overlayEditKey = -1;
 	private int runLastScriptKey = 117;
+	private String openMenuShortcut = new ShortcutBinding(85, 0).serialize();
+	private String overlayEditShortcut = "";
+	private String runLastScriptShortcut = new ShortcutBinding(117, 0).serialize();
+	private String scriptShortcutData = "";
 	private String lastScriptPath = "";
 
 	public static FluxusConfig load() {
@@ -101,6 +109,10 @@ public final class FluxusConfig {
 			config.openMenuKey = readInt(json, "openMenuKey", config.openMenuKey);
 			config.overlayEditKey = readInt(json, "overlayEditKey", config.overlayEditKey);
 			config.runLastScriptKey = readInt(json, "runLastScriptKey", config.runLastScriptKey);
+			config.openMenuShortcut = readString(json, "openMenuShortcut", new ShortcutBinding(config.openMenuKey, 0).serialize());
+			config.overlayEditShortcut = readString(json, "overlayEditShortcut", config.overlayEditKey < 0 ? "" : new ShortcutBinding(config.overlayEditKey, 0).serialize());
+			config.runLastScriptShortcut = readString(json, "runLastScriptShortcut", new ShortcutBinding(config.runLastScriptKey, 0).serialize());
+			config.scriptShortcutData = readString(json, "scriptShortcutData", "");
 			config.lastScriptPath = readString(json, "lastScriptPath", config.lastScriptPath);
 		} catch (IOException ignored) {
 			config.save();
@@ -248,6 +260,36 @@ public final class FluxusConfig {
 		return lastScriptPath;
 	}
 
+	public ShortcutBinding openMenuShortcut() {
+		return ShortcutBinding.parse(openMenuShortcut, new ShortcutBinding(openMenuKey, 0));
+	}
+
+	public ShortcutBinding overlayEditShortcut() {
+		return ShortcutBinding.parse(overlayEditShortcut, overlayEditKey < 0 ? ShortcutBinding.unbound() : new ShortcutBinding(overlayEditKey, 0));
+	}
+
+	public ShortcutBinding runLastScriptShortcut() {
+		return ShortcutBinding.parse(runLastScriptShortcut, new ShortcutBinding(runLastScriptKey, 0));
+	}
+
+	public Map<String, ShortcutBinding> scriptShortcuts() {
+		Map<String, ShortcutBinding> result = new LinkedHashMap<>();
+		if (scriptShortcutData.isBlank()) return result;
+		Base64.Decoder decoder = Base64.getUrlDecoder();
+		for (String entry : scriptShortcutData.split(",")) {
+			int equals = entry.indexOf('=');
+			if (equals < 1) continue;
+			try {
+				String id = new String(decoder.decode(entry.substring(0, equals)), StandardCharsets.UTF_8);
+				String binding = new String(decoder.decode(entry.substring(equals + 1)), StandardCharsets.UTF_8);
+				ShortcutBinding parsed = ShortcutBinding.parse(binding, ShortcutBinding.unbound());
+				if (parsed.bound()) result.put(id, parsed);
+			} catch (IllegalArgumentException ignored) {
+			}
+		}
+		return result;
+	}
+
 	public void setTheme(String theme) {
 		this.theme = theme;
 	}
@@ -376,6 +418,34 @@ public final class FluxusConfig {
 		this.lastScriptPath = lastScriptPath == null ? "" : lastScriptPath;
 	}
 
+	public void setOpenMenuShortcut(ShortcutBinding binding) {
+		openMenuShortcut = binding == null ? "" : binding.serialize();
+		openMenuKey = binding == null ? -1 : binding.key();
+	}
+
+	public void setOverlayEditShortcut(ShortcutBinding binding) {
+		overlayEditShortcut = binding == null ? "" : binding.serialize();
+		overlayEditKey = binding == null ? -1 : binding.key();
+	}
+
+	public void setRunLastScriptShortcut(ShortcutBinding binding) {
+		runLastScriptShortcut = binding == null ? "" : binding.serialize();
+		runLastScriptKey = binding == null ? -1 : binding.key();
+	}
+
+	public void setScriptShortcuts(Map<String, ShortcutBinding> shortcuts) {
+		Base64.Encoder encoder = Base64.getUrlEncoder().withoutPadding();
+		StringBuilder result = new StringBuilder();
+		for (Map.Entry<String, ShortcutBinding> entry : shortcuts.entrySet()) {
+			if (entry.getValue() == null || !entry.getValue().bound()) continue;
+			if (!result.isEmpty()) result.append(',');
+			result.append(encoder.encodeToString(entry.getKey().getBytes(StandardCharsets.UTF_8)))
+					.append('=')
+					.append(encoder.encodeToString(entry.getValue().serialize().getBytes(StandardCharsets.UTF_8)));
+		}
+		scriptShortcutData = result.toString();
+	}
+
 	private String toJson() {
 		return "{\n"
 				+ "  \"theme\": \"" + escape(theme) + "\",\n"
@@ -409,6 +479,10 @@ public final class FluxusConfig {
 				+ "  \"openMenuKey\": " + openMenuKey + ",\n"
 				+ "  \"overlayEditKey\": " + overlayEditKey + ",\n"
 				+ "  \"runLastScriptKey\": " + runLastScriptKey + ",\n"
+				+ "  \"openMenuShortcut\": \"" + escape(openMenuShortcut) + "\",\n"
+				+ "  \"overlayEditShortcut\": \"" + escape(overlayEditShortcut) + "\",\n"
+				+ "  \"runLastScriptShortcut\": \"" + escape(runLastScriptShortcut) + "\",\n"
+				+ "  \"scriptShortcutData\": \"" + escape(scriptShortcutData) + "\",\n"
 				+ "  \"lastScriptPath\": \"" + escape(lastScriptPath) + "\"\n"
 				+ "}\n";
 	}

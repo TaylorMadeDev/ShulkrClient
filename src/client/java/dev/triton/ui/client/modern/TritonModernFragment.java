@@ -11,11 +11,14 @@ import dev.triton.ui.client.app.FluxusAppState.ScriptSummary;
 import dev.triton.ui.client.app.FluxusAppState.TemplateItem;
 import dev.triton.ui.client.config.FluxusConfig;
 import dev.triton.ui.client.module.ModuleManager;
+import dev.triton.ui.client.script.ScriptSettingsRuntime;
+import dev.triton.ui.script.ShortcutBinding;
 import icyllis.modernui.R;
 import icyllis.modernui.animation.Animator;
 import icyllis.modernui.animation.AnimatorSet;
 import icyllis.modernui.animation.ObjectAnimator;
 import icyllis.modernui.animation.ValueAnimator;
+import icyllis.modernui.core.Core;
 import icyllis.modernui.fragment.Fragment;
 import icyllis.modernui.graphics.Color;
 import icyllis.modernui.graphics.drawable.GradientDrawable;
@@ -40,6 +43,7 @@ import icyllis.modernui.view.ViewGroup;
 import icyllis.modernui.widget.FrameLayout;
 import icyllis.modernui.widget.CheckBox;
 import icyllis.modernui.widget.EditText;
+import icyllis.modernui.widget.HorizontalScrollView;
 import icyllis.modernui.widget.ImageView;
 import icyllis.modernui.widget.LinearLayout;
 import icyllis.modernui.widget.ScrollView;
@@ -60,6 +64,7 @@ import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.HitResult;
 import net.minescript.fabric.fluxus.ShulkrHudOverlay;
+import org.lwjgl.glfw.GLFW;
 
 import java.awt.Desktop;
 import java.awt.FileDialog;
@@ -85,6 +90,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.Executors;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
@@ -200,6 +206,11 @@ public final class TritonModernFragment extends Fragment {
 	private final Map<Path, String> editorSavedContents = new HashMap<>();
 	private final Map<Path, List<String>> editorFunctionCache = new HashMap<>();
 	private final Map<String, Boolean> filterSwitchStates = new HashMap<>();
+	private final Map<Page, String> pageSearchQueries = new HashMap<>();
+	private final Map<Page, Integer> pageScrollPositions = new HashMap<>();
+	private final Map<SettingsTab, Integer> settingsScrollPositions = new HashMap<>();
+	private String globalSearchQuery = "";
+	private Page restorePageSearchFocus;
 	private List<String> localCompletionCache = List.of();
 	private final Set<Path> dirtyScripts = new HashSet<>();
 	private final Set<Path> selectedEditorItems = new LinkedHashSet<>();
@@ -208,6 +219,9 @@ public final class TritonModernFragment extends Fragment {
 	private SettingsTab settingsTab = SettingsTab.CUSTOMIZATION;
 	private String settingsMessage = "Settings synced locally.";
 	private String detectedPython = "";
+	private EnvironmentDiagnosticReport environmentDiagnosticReport;
+	private boolean environmentDiagnosticRunning;
+	private String environmentDiagnosticText = "";
 	private String completionRemainder = "";
 	private String openDropdownKey = "";
 	private boolean dropdownClosing;
@@ -247,6 +261,25 @@ public final class TritonModernFragment extends Fragment {
 	private boolean creatingScript;
 	private long lastCreateScriptAt;
 	private String lastCreateScriptKey = "";
+	private boolean renderingShell;
+	private boolean resizeRenderPending;
+	private int lastRenderedWidth;
+	private int lastRenderedHeight;
+	private ScrollView currentPageScroll;
+	private ScrollView currentSettingsScroll;
+
+	private enum DiagnosticState {
+		SUCCESS,
+		WARNING,
+		ERROR,
+		PENDING
+	}
+
+	private record DiagnosticItem(String name, String value, DiagnosticState state, String fixKey) {}
+
+	private record EnvironmentDiagnosticReport(List<DiagnosticItem> items, Instant completedAt) {}
+
+	private record ProcessResult(boolean started, boolean timedOut, int exitCode, String output, String error) {}
 	private boolean currentScriptRunning;
 	private boolean localCompletionDirty = true;
 	private long lastEditorClickAt;
@@ -261,6 +294,7 @@ public final class TritonModernFragment extends Fragment {
 	private int lintGeneration;
 	private int editorLineCount;
 	private final String initialPage;
+	private final boolean initialGlobalSearch;
 	private static final String[][] SHULKR_ADDONS = {
 			{"core-runtime", "Core Runtime", "The event bridge, lifecycle, and shared services used by every Shulkr addon.", "v0.1", "Bundled", "box-solid.png", "purple"},
 			{"overlay-engine", "Overlay Engine", "HUD widgets, edit mode, snapping, themes, and resolution-safe positioning.", "v0.1", "Bundled", "border-none-solid.png", "blue"},
@@ -271,11 +305,20 @@ public final class TritonModernFragment extends Fragment {
 	};
 
 	public TritonModernFragment() {
-		this(null);
+		this(null, false);
 	}
 
 	public TritonModernFragment(String initialPage) {
+		this(initialPage, false);
+	}
+
+	private TritonModernFragment(String initialPage, boolean initialGlobalSearch) {
 		this.initialPage = initialPage;
+		this.initialGlobalSearch = initialGlobalSearch;
+	}
+
+	public static TritonModernFragment forGlobalSearch() {
+		return new TritonModernFragment(null, true);
 	}
 
 	private final String[][] spyEntities = {
@@ -313,10 +356,25 @@ public final class TritonModernFragment extends Fragment {
 
 	@Override
 	public View onCreateView(LayoutInflater inflater, ViewGroup container, DataSet savedInstanceState) {
-		shell = new FrameLayout(requireContext());
+		shell = new FrameLayout(requireContext()) {
+			@Override
+			protected void onSizeChanged(int width, int height, int oldWidth, int oldHeight) {
+				super.onSizeChanged(width, height, oldWidth, oldHeight);
+				if (oldWidth > 0 && oldHeight > 0 && (width != oldWidth || height != oldHeight)) {
+					scheduleResponsiveRender();
+				}
+			}
+		};
 		shell.setBackground(round(BACKDROP, 0, 0));
 		TritonUIClient.setActiveModernFragment(this);
 		ensureEditorScriptsReady();
+		if (initialGlobalSearch) {
+			globalSearchQuery = "";
+			openDropdownKey = "command-palette";
+			dropdownAnchorX = 30;
+			dropdownAnchorY = effectiveTopBarHeight();
+			dropdownAnchorWidth = 360;
+		}
 		renderShell();
 		return shell;
 	}
@@ -324,7 +382,7 @@ public final class TritonModernFragment extends Fragment {
 	@Override
 	public void onDestroy() {
 		super.onDestroy();
-		TritonUIClient.setActiveModernFragment(null);
+		TritonUIClient.clearActiveModernFragment(this);
 		if (ruffLintTask != null) {
 			ruffLintTask.cancel(true);
 		}
@@ -334,42 +392,99 @@ public final class TritonModernFragment extends Fragment {
 		lintExecutor.shutdownNow();
 	}
 
+	@Override
+	public void onResume() {
+		super.onResume();
+		TritonUIClient.setActiveModernFragment(this);
+	}
+
+	@Override
+	public void onPause() {
+		TritonUIClient.clearActiveModernFragment(this);
+		super.onPause();
+	}
+
+	@Override
+	public void onDestroyView() {
+		TritonUIClient.clearActiveModernFragment(this);
+		super.onDestroyView();
+	}
+
+	@Override
+	public void onDetach() {
+		TritonUIClient.clearActiveModernFragment(this);
+		super.onDetach();
+	}
+
 	public boolean handleGlobalKey(int key, int action, int modifiers) {
-		if (!capturingShortcutAction.isBlank() && action == 1) {
-			int nextKey = (key == InputConstants.KEY_ESCAPE || key == InputConstants.KEY_BACKSPACE || key == InputConstants.KEY_DELETE)
-					? InputConstants.UNKNOWN.getValue()
-					: key;
-			TritonUIClient.setShortcutKey(capturingShortcutAction, nextKey);
+		if (action != 1) return false;
+		boolean recording = !capturingShortcutAction.isBlank();
+		boolean globalSearch = key == InputConstants.KEY_K && (modifiers & ShortcutBinding.CTRL) != 0;
+		boolean editorRename = page == Page.EDITOR && key == InputConstants.KEY_F2;
+		if (!recording && !globalSearch && !editorRename) return false;
+		Core.postOnUiThread(() -> handleGlobalKeyOnUiThread(key, modifiers));
+		return true;
+	}
+
+	private void handleGlobalKeyOnUiThread(int key, int modifiers) {
+		if (getContext() == null || shell == null) return;
+		if (!capturingShortcutAction.isBlank()) {
+			if (key == InputConstants.KEY_ESCAPE) {
+				capturingShortcutAction = "";
+				settingsMessage = "Shortcut recording cancelled.";
+				renderShell();
+				return;
+			}
+			ShortcutBinding next = (key == InputConstants.KEY_BACKSPACE || key == InputConstants.KEY_DELETE)
+					? ShortcutBinding.unbound()
+					: new ShortcutBinding(key, modifiers & (ShortcutBinding.SHIFT | ShortcutBinding.CTRL | ShortcutBinding.ALT | ShortcutBinding.META));
+			String conflict = TritonUIClient.shortcutConflict(capturingShortcutAction, next);
+			if (!conflict.isBlank()) {
+				settingsMessage = shortcutBindingLabel(next) + " conflicts with " + shortcutDisplayName(conflict) + ".";
+				renderShell();
+				return;
+			}
+			TritonUIClient.setShortcutBinding(capturingShortcutAction, next);
 			settingsConfig = TritonUIClient.config();
 			String label = shortcutDisplayName(capturingShortcutAction);
 			capturingShortcutAction = "";
-			settingsMessage = nextKey == InputConstants.UNKNOWN.getValue()
+			settingsMessage = !next.bound()
 					? label + " shortcut cleared."
-					: label + " bound to " + keybindLabel(nextKey) + ".";
+					: label + " bound to " + shortcutBindingLabel(next) + ".";
 			renderShell();
-			return true;
+			return;
 		}
-		if (action != 1) {
-			return false;
-		}
-		if (key == InputConstants.KEY_K && (modifiers & 2) != 0) {
+		if (key == InputConstants.KEY_K && (modifiers & ShortcutBinding.CTRL) != 0) {
+			globalSearchQuery = "";
 			openDropdownKey = "command-palette";
 			dropdownAnchorX = 30;
 			dropdownAnchorY = effectiveTopBarHeight();
 			dropdownAnchorWidth = 360;
 			renderShell();
-			return true;
+			return;
 		}
-		if (page != Page.EDITOR || key != InputConstants.KEY_F2) {
-			return false;
-		}
+		if (page != Page.EDITOR || key != InputConstants.KEY_F2) return;
 		Path target = lastClickedEditorItem != null ? lastClickedEditorItem
 				: (!selectedEditorItems.isEmpty() ? selectedEditorItems.iterator().next() : selectedScript);
 		beginRename(target);
-		return true;
+	}
+
+	public boolean shortcutsSuppressed() {
+		if (shell == null) return false;
+		View focused = shell.findFocus();
+		return focused instanceof EditText || (codeEditor != null && codeEditor.hasFocus()) || openDropdownKey.equals("publish-script");
 	}
 
 	private void renderShell() {
+		if (renderingShell || shell == null || getContext() == null) return;
+		renderingShell = true;
+		if (currentPageScroll != null) pageScrollPositions.put(page, currentPageScroll.getScrollY());
+		if (currentSettingsScroll != null) settingsScrollPositions.put(settingsTab, currentSettingsScroll.getScrollY());
+		currentPageScroll = null;
+		currentSettingsScroll = null;
+		lastRenderedWidth = viewportWidth();
+		lastRenderedHeight = viewportHeight();
+		try {
 		currentFloatingDropdown = null;
 		currentDropdownArrow = null;
 		currentHeader = null;
@@ -379,24 +494,41 @@ public final class TritonModernFragment extends Fragment {
 		shell.addView(host, new FrameLayout.LayoutParams(match(), match()));
 		LinearLayout root = new LinearLayout(requireContext());
 		root.setOrientation(LinearLayout.HORIZONTAL);
-		int outerPadding = densityOuterPadding();
+		int outerPadding = responsiveOuterPadding();
 		root.setPadding(outerPadding, outerPadding, outerPadding, outerPadding);
 		host.addView(root, new FrameLayout.LayoutParams(match(), match()));
 
 		boolean floatingDockOnly = settingsConfig.navigationMode().equals("Floating dock only");
 		boolean compactNavigation = useCompactNavigation();
 		if (!floatingDockOnly) {
-			int sidebarWidth = compactNavigation ? 86 : configuredSidebarWidth();
+			int sidebarWidth = compactNavigation ? responsiveSidebarRailWidth() : responsiveSidebarWidth();
 			root.addView(sidebar(compactNavigation), new LinearLayout.LayoutParams(sidebarWidth, match()));
 		}
 		int contentInset = contentWidthInset();
 		int leadingGap = floatingDockOnly ? contentInset : Math.max(pageGap(), contentInset);
 		root.addView(activePage(), weighted(1.0F, leadingGap, 0, contentInset, floatingDockOnly ? 82 : 0));
 		if (floatingDockOnly) {
-			FrameLayout.LayoutParams dockParams = new FrameLayout.LayoutParams(DOCK_WIDTH, 70, Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL);
+			FrameLayout.LayoutParams dockParams = new FrameLayout.LayoutParams(responsiveDockWidth(), 70, Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL);
 			dockParams.setMargins(0, 0, 0, 14);
 			host.addView(dock(true), dockParams);
 		}
+		} finally {
+			renderingShell = false;
+		}
+	}
+
+	private void scheduleResponsiveRender() {
+		if (resizeRenderPending || shell == null) return;
+		resizeRenderPending = true;
+		shell.postOnAnimation(() -> {
+			resizeRenderPending = false;
+			if (shell == null || getContext() == null) return;
+			int width = viewportWidth();
+			int height = viewportHeight();
+			if (width != lastRenderedWidth || height != lastRenderedHeight) {
+				renderShell();
+			}
+		});
 	}
 
 	private View activePage() {
@@ -862,9 +994,10 @@ public final class TritonModernFragment extends Fragment {
 			grid.addView(empty, new LinearLayout.LayoutParams(match(), 140));
 		}
 		int index = 0;
+		int columns = responsiveGridColumns(4);
 		while (index < scripts.size()) {
 			LinearLayout line = row(10);
-			for (int col = 0; col < 4; col++) {
+			for (int col = 0; col < columns; col++) {
 				if (index < scripts.size()) {
 					line.addView(scriptCard(scripts.get(index++)), new LinearLayout.LayoutParams(0, 238, 1.0F));
 				} else {
@@ -948,9 +1081,10 @@ public final class TritonModernFragment extends Fragment {
 			grid.addView(empty, new LinearLayout.LayoutParams(match(), 140));
 		}
 		int index = 0;
+		int columns = responsiveGridColumns(4);
 		while (index < modules.size()) {
 			LinearLayout line = row(10);
-			for (int col = 0; col < 4; col++) {
+			for (int col = 0; col < columns; col++) {
 				if (index < modules.size()) {
 					line.addView(moduleCard(modules.get(index++)), new LinearLayout.LayoutParams(0, 184, 1.0F));
 				} else {
@@ -1159,12 +1293,16 @@ public final class TritonModernFragment extends Fragment {
 	}
 
 	private List<ModuleItem> visibleModules(List<ModuleItem> allModules) {
+		String pageQuery = pageSearchQueries.getOrDefault(Page.MODULES, "").trim().toLowerCase(Locale.ROOT);
 		return allModules.stream()
 				.filter(module -> moduleFilter.equals("All")
 						|| (moduleFilter.equals("Installed") ? module.installed() : module.category().equalsIgnoreCase(moduleFilter)))
 				.filter(module -> moduleSearchQuery.isBlank()
 						|| (module.name() + " " + module.description() + " " + module.author() + " " + module.category())
 						.toLowerCase(Locale.ROOT).contains(moduleSearchQuery.toLowerCase(Locale.ROOT)))
+				.filter(module -> pageQuery.isBlank()
+						|| (module.name() + " " + module.description() + " " + module.author() + " " + module.category() + " " + module.id())
+						.toLowerCase(Locale.ROOT).contains(pageQuery))
 				.toList();
 	}
 
@@ -1243,10 +1381,11 @@ public final class TritonModernFragment extends Fragment {
 
 		LinearLayout grid = column(10);
 		int index = 0;
-		int rows = Math.max(1, Math.min(2, (templates.size() + 3) / 4));
+		int columns = responsiveGridColumns(4);
+		int rows = Math.max(1, Math.min(2, (templates.size() + columns - 1) / columns));
 		for (int row = 0; row < rows; row++) {
 			LinearLayout line = row(10);
-			for (int col = 0; col < 4; col++) {
+			for (int col = 0; col < columns; col++) {
 				if (index < templates.size()) {
 					line.addView(templateCard(templates.get(index++)), new LinearLayout.LayoutParams(0, 224, 1.0F));
 				} else {
@@ -1390,13 +1529,12 @@ public final class TritonModernFragment extends Fragment {
 	private List<TemplateItem> visibleTemplates() {
 		List<TemplateItem> templates = FluxusAppState.get().templates();
 		if (templates.isEmpty()) {
-			return List.of(TemplateItem.defaults());
+			templates = List.of(TemplateItem.defaults());
 		}
-		if (templateFilter.equals("All")) {
-			return templates;
-		}
+		String query = pageSearchQueries.getOrDefault(Page.TEMPLATES, "").trim().toLowerCase(Locale.ROOT);
 		return templates.stream()
-				.filter(template -> templateMatchesFilter(template, templateFilter))
+				.filter(template -> query.isBlank() || (template.name() + " " + template.description() + " " + template.category() + " " + template.difficulty() + " " + template.id()).toLowerCase(Locale.ROOT).contains(query))
+				.filter(template -> templateFilter.equals("All") || templateMatchesFilter(template, templateFilter))
 				.toList();
 	}
 
@@ -2235,13 +2373,14 @@ public final class TritonModernFragment extends Fragment {
 	}
 
 	private View settingsCenter() {
-		LinearLayout center = column(18);
+		LinearLayout center = column(responsivePageGap());
 
 		LinearLayout panel = column(14);
 		panel.setPadding(18, 18, 18, 18);
 		panel.setBackground(panel(16));
 
-		LinearLayout header = row(12);
+		boolean compactHeader = availableMainWidth() < responsiveBreakpoint(900);
+		LinearLayout header = compactHeader ? column(8) : row(12);
 		header.setGravity(Gravity.CENTER_VERTICAL);
 		LinearLayout title = column(6);
 		LinearLayout titleLine = row(10);
@@ -2250,11 +2389,19 @@ public final class TritonModernFragment extends Fragment {
 		titleLine.addView(label("Settings", 24, TEXT));
 		title.addView(titleLine);
 		title.addView(label("Tune Shulkr visuals, script files, editor behavior, shortcuts, and safety defaults.", 14, MUTED));
-		header.addView(title, new LinearLayout.LayoutParams(0, wrap(), 1.0F));
-		header.addView(settingsStatus("Theme", settingsConfig.theme().replace(" glass", ""), "eye-dropper-solid.png"), new LinearLayout.LayoutParams(148, 60));
-		header.addView(settingsStatus("Config", "Synced", "check-double-solid.png"), new LinearLayout.LayoutParams(120, 60));
-		header.addView(settingsStatus("User", currentProfile().displayName(), "user-solid.png"), new LinearLayout.LayoutParams(132, 60));
-		panel.addView(header, new LinearLayout.LayoutParams(match(), 74));
+		header.addView(title, compactHeader ? new LinearLayout.LayoutParams(match(), wrap()) : new LinearLayout.LayoutParams(0, wrap(), 1.0F));
+		LinearLayout statuses = row(8);
+		statuses.addView(settingsStatus("Theme", settingsConfig.theme().replace(" glass", ""), "eye-dropper-solid.png"), new LinearLayout.LayoutParams(148, 60));
+		statuses.addView(settingsStatus("Config", "Synced", "check-double-solid.png"), new LinearLayout.LayoutParams(120, 60));
+		statuses.addView(settingsStatus("User", currentProfile().displayName(), "user-solid.png"), new LinearLayout.LayoutParams(132, 60));
+		if (compactHeader) {
+			HorizontalScrollView statusScroll = horizontalScroller();
+			statusScroll.addView(statuses, new HorizontalScrollView.LayoutParams(wrap(), match()));
+			header.addView(statusScroll, new LinearLayout.LayoutParams(match(), 62));
+		} else {
+			header.addView(statuses, new LinearLayout.LayoutParams(wrap(), 60));
+		}
+		panel.addView(header, new LinearLayout.LayoutParams(match(), compactHeader ? 128 : 74));
 
 		LinearLayout toolbar = row(8);
 		for (SettingsTab tab : SettingsTab.values()) {
@@ -2270,19 +2417,23 @@ public final class TritonModernFragment extends Fragment {
 			});
 			toolbar.addView(chip, new LinearLayout.LayoutParams(width, 34));
 		}
-		panel.addView(toolbar, new LinearLayout.LayoutParams(match(), 38));
+		HorizontalScrollView tabScroll = horizontalScroller();
+		tabScroll.addView(toolbar, new HorizontalScrollView.LayoutParams(wrap(), match()));
+		panel.addView(tabScroll, new LinearLayout.LayoutParams(match(), 38));
 
 		panel.addView(settingsTabContent(), new LinearLayout.LayoutParams(match(), 0, 1.0F));
 		center.addView(panel, new LinearLayout.LayoutParams(match(), 0, 1.0F));
 
 		LinearLayout dock = dock();
-		LinearLayout.LayoutParams dockLp = new LinearLayout.LayoutParams(DOCK_WIDTH, 70);
+		LinearLayout.LayoutParams dockLp = new LinearLayout.LayoutParams(responsiveDockWidth(), 70);
 		dockLp.gravity = Gravity.CENTER_HORIZONTAL;
 		center.addView(dock, dockLp);
 		return center;
 	}
 
 	private View remoteViewerPage() {
+		ScrollView scroll = layoutScrollView();
+		scroll.setFillViewport(true);
 		LinearLayout page = column(18);
 		page.setPadding(20, 20, 20, 20);
 		page.setBackground(panel(16));
@@ -2319,10 +2470,13 @@ public final class TritonModernFragment extends Fragment {
 		actions.addView(copy, new LinearLayout.LayoutParams(160, 42));
 		help.addView(actions, new LinearLayout.LayoutParams(match(), 48));
 		page.addView(help, new LinearLayout.LayoutParams(match(), 230));
-		return page;
+		addCenteredDock(page);
+		scroll.addView(page, new ScrollView.LayoutParams(match(), wrap()));
+		return scroll;
 	}
 
 	private View settingsTabContent() {
+		if (stackSettingsCards()) return stackedSettingsTabContent();
 		LinearLayout body = row(14);
 		LinearLayout left = column(14);
 		LinearLayout right = column(14);
@@ -2341,7 +2495,7 @@ public final class TritonModernFragment extends Fragment {
 			left.addView(pythonInstallSettingsCard(), new LinearLayout.LayoutParams(match(), 416));
 			left.addView(pythonMinescriptCard(), new LinearLayout.LayoutParams(match(), 0, 1.0F));
 			right.addView(pythonHelpCard(), new LinearLayout.LayoutParams(match(), 300));
-			right.addView(settingsLiveStatusCard(), new LinearLayout.LayoutParams(match(), 0, 1.0F));
+			right.addView(environmentDiagnosticsCard(), new LinearLayout.LayoutParams(match(), 0, 1.0F));
 		} else if (settingsTab == SettingsTab.FILES) {
 			body.addView(right, new LinearLayout.LayoutParams(0, match(), 1.0F));
 			left.addView(fileSettingsCard(), new LinearLayout.LayoutParams(match(), 300));
@@ -2366,6 +2520,44 @@ public final class TritonModernFragment extends Fragment {
 			right.addView(settingsLiveStatusCard(), new LinearLayout.LayoutParams(match(), 0, 1.0F));
 		}
 		return body;
+	}
+
+	private View stackedSettingsTabContent() {
+		ScrollView scroll = layoutScrollView();
+		currentSettingsScroll = scroll;
+		LinearLayout content = column(12);
+		if (settingsTab == SettingsTab.CUSTOMIZATION) {
+			content.addView(appearanceSettingsCard(), new LinearLayout.LayoutParams(match(), 164));
+			content.addView(layoutSettingsCard(), new LinearLayout.LayoutParams(match(), wrap()));
+			content.addView(interfaceStyleSettingsCard(), new LinearLayout.LayoutParams(match(), wrap()));
+			content.addView(layoutPresetsCard(), new LinearLayout.LayoutParams(match(), wrap()));
+		} else if (settingsTab == SettingsTab.PYTHON) {
+			content.addView(pythonInstallSettingsCard(), new LinearLayout.LayoutParams(match(), 416));
+			content.addView(pythonMinescriptCard(), new LinearLayout.LayoutParams(match(), 250));
+			content.addView(pythonHelpCard(), new LinearLayout.LayoutParams(match(), 300));
+			content.addView(environmentDiagnosticsCard(), new LinearLayout.LayoutParams(match(), 520));
+		} else if (settingsTab == SettingsTab.FILES) {
+			content.addView(fileSettingsCard(), new LinearLayout.LayoutParams(match(), 300));
+			content.addView(fileBackupSettingsCard(), new LinearLayout.LayoutParams(match(), 260));
+			content.addView(settingsLiveStatusCard(), new LinearLayout.LayoutParams(match(), 320));
+		} else if (settingsTab == SettingsTab.EDITOR) {
+			content.addView(editorSettingsCard(), new LinearLayout.LayoutParams(match(), 260));
+			content.addView(editorLintSettingsCard(), new LinearLayout.LayoutParams(match(), 260));
+			content.addView(settingsLiveStatusCard(), new LinearLayout.LayoutParams(match(), 320));
+		} else if (settingsTab == SettingsTab.SHORTCUTS) {
+			content.addView(shortcutSettingsCard(), new LinearLayout.LayoutParams(match(), 300));
+			content.addView(shortcutHelperCard(), new LinearLayout.LayoutParams(match(), 340));
+		} else if (settingsTab == SettingsTab.PRIVACY) {
+			content.addView(privacySettingsCard(), new LinearLayout.LayoutParams(match(), 270));
+			content.addView(safetyRuntimeCard(), new LinearLayout.LayoutParams(match(), 300));
+		} else {
+			content.addView(advancedSettingsCard(), new LinearLayout.LayoutParams(match(), 340));
+			content.addView(settingsLiveStatusCard(), new LinearLayout.LayoutParams(match(), 320));
+		}
+		scroll.addView(content, new ScrollView.LayoutParams(match(), wrap()));
+		int savedScroll = settingsScrollPositions.getOrDefault(settingsTab, 0);
+		scroll.post(() -> scroll.scrollTo(0, savedScroll));
+		return scroll;
 	}
 
 	private View appearanceSettingsCard() {
@@ -2541,6 +2733,88 @@ public final class TritonModernFragment extends Fragment {
 		card.addView(settingsValueRow("Recommended", "Python 3.11+ from python.org"), new LinearLayout.LayoutParams(match(), 38));
 		card.addView(settingsValueRow("Current status", pythonStatusLabel()), new LinearLayout.LayoutParams(match(), 38));
 		return card;
+	}
+
+	private View environmentDiagnosticsCard() {
+		LinearLayout card = settingsCard("Environment Diagnostics", "check-double-solid.png");
+		if (environmentDiagnosticReport == null && !environmentDiagnosticRunning) {
+			runFullEnvironmentDiagnostic(false);
+		}
+		String summary = environmentDiagnosticRunning ? "Running checks..." : environmentDiagnosticReport == null
+				? "No diagnostic has been run yet." : diagnosticSummary(environmentDiagnosticReport);
+		card.addView(label(summary, 12, environmentDiagnosticRunning ? MUTED : diagnosticSummaryColor(environmentDiagnosticReport)),
+				new LinearLayout.LayoutParams(match(), wrap()));
+
+		ScrollView scroller = new ScrollView(requireContext());
+		LinearLayout content = column(4);
+		if (environmentDiagnosticReport == null) {
+			content.addView(diagnosticRow(new DiagnosticItem("Configured Python version", "Running...", DiagnosticState.PENDING, "")),
+					new LinearLayout.LayoutParams(match(), 32));
+		} else {
+			for (DiagnosticItem item : environmentDiagnosticReport.items()) {
+				content.addView(diagnosticRow(item), new LinearLayout.LayoutParams(match(), 32));
+			}
+		}
+		scroller.addView(content, new ScrollView.LayoutParams(match(), wrap()));
+		card.addView(scroller, new LinearLayout.LayoutParams(match(), 0, 1.0F));
+
+		LinearLayout actions = row(8);
+		View run = settingsActionRow(environmentDiagnosticRunning ? "Running..." : "Run Full Diagnostic", "arrows-rotate-solid.png");
+		run.setOnClickListener(view -> {
+			if (!environmentDiagnosticRunning) {
+				runFullEnvironmentDiagnostic(true);
+			}
+		});
+		actions.addView(run, new LinearLayout.LayoutParams(0, 40, 1.0F));
+		View copy = settingsActionRow("Copy Diagnostic Report", "clipboard-solid.png");
+		copy.setOnClickListener(view -> {
+			copyToClipboard(environmentDiagnosticText.isBlank() ? "No diagnostic report has been run." : environmentDiagnosticText);
+			settingsMessage = "Diagnostic report copied.";
+			renderShell();
+		});
+		actions.addView(copy, new LinearLayout.LayoutParams(0, 40, 1.0F));
+		card.addView(actions, new LinearLayout.LayoutParams(match(), 42));
+		return card;
+	}
+
+	private View diagnosticRow(DiagnosticItem item) {
+		LinearLayout row = row(8);
+		row.setGravity(Gravity.CENTER_VERTICAL);
+		row.addView(label(item.name(), 11, MUTED), new LinearLayout.LayoutParams(0, wrap(), 1.0F));
+		TextView value = label(item.value(), 11, diagnosticColor(item.state()));
+		value.setGravity(Gravity.RIGHT | Gravity.CENTER_VERTICAL);
+		value.setSingleLine(true);
+		row.addView(value, new LinearLayout.LayoutParams(item.fixKey().isBlank() ? 112 : 88, 28));
+		if (!item.fixKey().isBlank()) {
+			View fix = settingsActionRow("Fix", "arrows-rotate-solid.png");
+			fix.setOnClickListener(view -> repairDiagnostic(item.fixKey()));
+			row.addView(fix, new LinearLayout.LayoutParams(62, 28));
+		}
+		return row;
+	}
+
+	private String diagnosticSummary(EnvironmentDiagnosticReport report) {
+		long errors = report.items().stream().filter(item -> item.state() == DiagnosticState.ERROR).count();
+		long warnings = report.items().stream().filter(item -> item.state() == DiagnosticState.WARNING).count();
+		return errors == 0 && warnings == 0 ? "Environment is ready." : errors + " error(s), " + warnings + " warning(s) found.";
+	}
+
+	private int diagnosticSummaryColor(EnvironmentDiagnosticReport report) {
+		if (report == null) {
+			return MUTED;
+		}
+		return report.items().stream().anyMatch(item -> item.state() == DiagnosticState.ERROR)
+				? Color.argb(255, 255, 120, 140) : report.items().stream().anyMatch(item -> item.state() == DiagnosticState.WARNING)
+				? Color.argb(255, 255, 196, 92) : GREEN;
+	}
+
+	private int diagnosticColor(DiagnosticState state) {
+		return switch (state) {
+			case SUCCESS -> GREEN;
+			case WARNING -> Color.argb(255, 255, 196, 92);
+			case ERROR -> Color.argb(255, 255, 120, 140);
+			default -> MUTED;
+		};
 	}
 
 	private View interfaceStyleSettingsCard() {
@@ -2743,11 +3017,16 @@ public final class TritonModernFragment extends Fragment {
 	}
 
 	private View shortcutHelperCard() {
-		LinearLayout card = settingsCard("Shortcut Notes", "keyboard");
-		card.addView(label("Click any shortcut row, then press the key you want. Press Escape, Backspace, or Delete to clear a binding.", 12, MUTED));
+		LinearLayout card = settingsCard("Installed Script Shortcuts", "keyboard");
+		card.addView(label("Click a row and press a combination. Escape cancels; Backspace or Delete clears. Script shortcuts are suppressed while typing.", 12, MUTED));
 		card.addView(settingsValueRow("Last script", lastRunScriptLabel()), new LinearLayout.LayoutParams(match(), 38));
 		card.addView(settingsValueRow("Palette", "Ctrl + K"), new LinearLayout.LayoutParams(match(), 38));
 		card.addView(settingsValueRow("Rename in editor", "F2"), new LinearLayout.LayoutParams(match(), 38));
+		for (Path script : editorScripts.stream().filter(Files::isRegularFile).limit(7).toList()) {
+			String action = scriptShortcutAction(script);
+			card.addView(settingsKeyRow(script.getFileName().toString(), action, displayScriptPath(script)), new LinearLayout.LayoutParams(match(), 40));
+		}
+		if (editorScripts.isEmpty()) card.addView(label("No installed scripts are available yet.", 12, FAINT));
 		return card;
 	}
 
@@ -3039,14 +3318,32 @@ public final class TritonModernFragment extends Fragment {
 		TextView helper = label(capturing ? "Press key..." : helperText, 11, capturing ? TEXT : FAINT);
 		helper.setSingleLine(true);
 		row.addView(helper, new LinearLayout.LayoutParams(0, wrap(), 1.0F));
-		TextView keycap = keycap(capturing ? "..." : keybindLabel(TritonUIClient.shortcutKey(shortcutAction)));
-		row.addView(keycap, new LinearLayout.LayoutParams(96, 24));
+		TextView keycap = keycap(capturing ? "..." : shortcutBindingLabel(TritonUIClient.shortcutBinding(shortcutAction)));
+		row.addView(keycap, new LinearLayout.LayoutParams(132, 24));
 		row.setOnClickListener(view -> {
 			capturingShortcutAction = shortcutAction;
 			settingsMessage = "Press a key for " + shortcutDisplayName(shortcutAction) + ".";
 			renderShell();
 		});
 		return row;
+	}
+
+	private String scriptShortcutAction(Path script) {
+		try {
+			return "script:" + ScriptSettingsRuntime.stableId(script);
+		} catch (IOException error) {
+			return "script:missing-" + Integer.toUnsignedString(script.toString().hashCode());
+		}
+	}
+
+	private String shortcutBindingLabel(ShortcutBinding binding) {
+		if (binding == null || !binding.bound()) return "Unbound";
+		StringBuilder label = new StringBuilder();
+		if ((binding.modifiers() & ShortcutBinding.CTRL) != 0) label.append("Ctrl + ");
+		if ((binding.modifiers() & ShortcutBinding.ALT) != 0) label.append("Alt + ");
+		if ((binding.modifiers() & ShortcutBinding.SHIFT) != 0) label.append("Shift + ");
+		if ((binding.modifiers() & ShortcutBinding.META) != 0) label.append("Meta + ");
+		return label.append(keybindLabel(binding.key())).toString();
 	}
 
 	private View settingsActionRow(String text, String iconFile) {
@@ -3230,6 +3527,14 @@ public final class TritonModernFragment extends Fragment {
 	}
 
 	private String shortcutDisplayName(String action) {
+		if (action != null && action.startsWith("script:")) {
+			try {
+				Path script = ScriptSettingsRuntime.resolveScript(action.substring("script:".length()));
+				return script == null ? "Installed script" : script.getFileName().toString();
+			} catch (IOException ignored) {
+				return "Installed script";
+			}
+		}
 		return switch (action) {
 			case SHORTCUT_OPEN_UI -> "Open Shulkr";
 			case SHORTCUT_OVERLAY_EDIT -> "Overlay edit mode";
@@ -3394,6 +3699,204 @@ public final class TritonModernFragment extends Fragment {
 		renderShell();
 	}
 
+	private void runFullEnvironmentDiagnostic(boolean refreshUi) {
+		if (environmentDiagnosticRunning) {
+			return;
+		}
+		environmentDiagnosticRunning = true;
+		if (refreshUi) {
+			renderShell();
+		}
+		lintExecutor.execute(() -> {
+			EnvironmentDiagnosticReport report = collectEnvironmentDiagnostic();
+			environmentDiagnosticReport = report;
+			environmentDiagnosticText = formatDiagnosticReport(report);
+			environmentDiagnosticRunning = false;
+			if (shell != null) {
+				shell.post(this::renderShell);
+			}
+		});
+	}
+
+	private EnvironmentDiagnosticReport collectEnvironmentDiagnostic() {
+		Path minescriptDirectory = resolveMinescriptDirectory();
+		String configuredPython = readMinescriptConfigValue("python").trim();
+		List<DiagnosticItem> items = new ArrayList<>();
+		String version = "Unavailable";
+		String architecture = "Unavailable";
+		String actualExecutable = "";
+		ProcessResult pythonResult = null;
+		Path configuredPath = configuredPythonPath(configuredPython);
+
+		if (configuredPython.isBlank()) {
+			items.add(new DiagnosticItem("Configured Python version", "Not configured", DiagnosticState.ERROR, "python"));
+			items.add(new DiagnosticItem("Python architecture", "Unknown", DiagnosticState.ERROR, "python"));
+			items.add(new DiagnosticItem("Executable exists", "No", DiagnosticState.ERROR, "python"));
+			items.add(new DiagnosticItem("Python starts successfully", "No", DiagnosticState.ERROR, "python"));
+			items.add(new DiagnosticItem("pip installed", "Unknown", DiagnosticState.WARNING, "python"));
+			items.add(new DiagnosticItem("Minescript config matches executable", "No", DiagnosticState.ERROR, "python"));
+		} else {
+			pythonResult = runProcessResult(new String[]{configuredPython, "-c",
+					"import sys, platform; print(sys.version.split()[0]); print(platform.architecture()[0]); print(sys.executable)"});
+			String[] lines = pythonResult.output().split("\\R");
+			if (pythonResult.started() && pythonResult.exitCode() == 0 && lines.length > 0 && !lines[0].isBlank()) {
+				version = lines[0].trim();
+				architecture = lines.length > 1 ? lines[1].trim() : "Unknown";
+				actualExecutable = lines.length > 2 ? lines[2].trim() : "";
+			}
+			DiagnosticState startsState = pythonResult.started() && pythonResult.exitCode() == 0 ? DiagnosticState.SUCCESS : DiagnosticState.ERROR;
+			items.add(new DiagnosticItem("Configured Python version", version, startsState, startsState == DiagnosticState.SUCCESS ? "" : "python"));
+			items.add(new DiagnosticItem("Python architecture", architecture, startsState, startsState == DiagnosticState.SUCCESS ? "" : "python"));
+			boolean executableExists = (configuredPath != null && Files.isRegularFile(configuredPath))
+					|| (!actualExecutable.isBlank() && Files.isRegularFile(Paths.get(actualExecutable)));
+			items.add(new DiagnosticItem("Executable exists", executableExists ? "Yes" : "No",
+					executableExists ? DiagnosticState.SUCCESS : DiagnosticState.ERROR, executableExists ? "" : "python"));
+			items.add(new DiagnosticItem("Python starts successfully", startsState == DiagnosticState.SUCCESS ? "Yes" : "No", startsState,
+					startsState == DiagnosticState.SUCCESS ? "" : "python"));
+
+			boolean matches = !actualExecutable.isBlank() && configuredPath != null
+					&& configuredPath.equals(normalizePath(Paths.get(actualExecutable)));
+			items.add(new DiagnosticItem("Minescript config matches executable", matches ? "Yes" : "No",
+					matches ? DiagnosticState.SUCCESS : DiagnosticState.WARNING, matches ? "" : "python-config"));
+
+			if (startsState == DiagnosticState.SUCCESS) {
+				ProcessResult pipResult = runProcessResult(new String[]{configuredPython, "-m", "pip", "--version"});
+				boolean pipOk = pipResult.started() && pipResult.exitCode() == 0;
+				items.add(new DiagnosticItem("pip installed", pipOk ? firstLine(pipResult.output()) : "Not installed",
+						pipOk ? DiagnosticState.SUCCESS : DiagnosticState.WARNING, pipOk ? "" : "pip"));
+			} else {
+				items.add(new DiagnosticItem("pip installed", "Unknown", DiagnosticState.WARNING, "python"));
+			}
+		}
+
+		String execConfig = readMinescriptConfigValue("command_path");
+		Path execDirectory = minescriptDirectory.resolve("system").resolve("exec").normalize();
+		boolean execAvailable = Files.isDirectory(execDirectory);
+		boolean execConfigured = execConfig.isBlank() || execConfig.equals("system/exec;");
+		items.add(new DiagnosticItem("system/exec available", execAvailable && execConfigured ? "Yes" : execAvailable ? "Config mismatch" : "Missing",
+				execAvailable && execConfigured ? DiagnosticState.SUCCESS : execAvailable ? DiagnosticState.WARNING : DiagnosticState.ERROR,
+				execAvailable && execConfigured ? "" : "exec-config"));
+
+		String pyjConfig = readMinescriptConfigValue("pyjinn_import_path");
+		Path pyjDirectory = minescriptDirectory.resolve("system").resolve("pyj").normalize();
+		boolean pyjAvailable = Files.isDirectory(pyjDirectory);
+		boolean pyjConfigured = pyjConfig.isBlank() || pyjConfig.equals("system/pyj;");
+		items.add(new DiagnosticItem("system/pyj available", pyjAvailable && pyjConfigured ? "Yes" : pyjAvailable ? "Config mismatch" : "Missing",
+				pyjAvailable && pyjConfigured ? DiagnosticState.SUCCESS : pyjAvailable ? DiagnosticState.WARNING : DiagnosticState.ERROR,
+				pyjAvailable && pyjConfigured ? "" : "pyj-config"));
+		Instant completed = Instant.now();
+		items.add(new DiagnosticItem("Last diagnostic time", completed.toString(), DiagnosticState.SUCCESS, ""));
+		return new EnvironmentDiagnosticReport(items, completed);
+	}
+
+	private String formatDiagnosticReport(EnvironmentDiagnosticReport report) {
+		StringBuilder reportText = new StringBuilder("Shulkr Environment Diagnostics\n");
+		reportText.append("Completed: ").append(report.completedAt()).append("\n\n");
+		for (DiagnosticItem item : report.items()) {
+			reportText.append(item.name()).append(": ").append(item.value()).append(" [").append(item.state()).append("]\n");
+		}
+		return reportText.toString();
+	}
+
+	private String firstLine(String output) {
+		int newline = output.indexOf('\n');
+		return (newline >= 0 ? output.substring(0, newline) : output).trim();
+	}
+
+	private Path configuredPythonPath(String configuredPython) {
+		if (configuredPython == null || configuredPython.isBlank()) {
+			return null;
+		}
+		try {
+			Path path = Paths.get(configuredPython);
+			return normalizePath(path.isAbsolute() ? path : Paths.get(System.getProperty("user.dir")).resolve(path));
+		} catch (Exception ignored) {
+			return null;
+		}
+	}
+
+	private Path normalizePath(Path path) {
+		return path.toAbsolutePath().normalize();
+	}
+
+	private ProcessResult runProcessResult(String[] command) {
+		try {
+			Process process = new ProcessBuilder(command).redirectErrorStream(true).start();
+			if (!process.waitFor(5, TimeUnit.SECONDS)) {
+				process.destroyForcibly();
+				return new ProcessResult(true, true, -1, "", "Timed out after 5 seconds");
+			}
+			String output = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8).trim();
+			return new ProcessResult(true, false, process.exitValue(), output, "");
+		} catch (Exception e) {
+			return new ProcessResult(false, false, -1, "", e.toString());
+		}
+	}
+
+	private void repairDiagnostic(String fixKey) {
+		if (environmentDiagnosticRunning) {
+			return;
+		}
+		environmentDiagnosticRunning = true;
+		settingsMessage = "Repairing environment...";
+		renderShell();
+		lintExecutor.execute(() -> {
+			String message;
+			try {
+				switch (fixKey) {
+					case "python" -> {
+						String detected = detectPythonExecutable();
+						if (detected.isBlank()) {
+							throw new IOException("No usable Python executable was detected.");
+						}
+						writeMinescriptConfigValue("python", detected);
+						detectedPython = detected;
+						message = "Python configuration repaired.";
+					}
+					case "python-config" -> {
+						String configured = readMinescriptConfigValue("python");
+						ProcessResult result = runProcessResult(new String[]{configured, "-c", "import sys; print(sys.executable)"});
+						if (result.exitCode() != 0 || result.output().isBlank()) {
+							throw new IOException("Configured Python could not report its executable.");
+						}
+						writeMinescriptConfigValue("python", firstLine(result.output()));
+						message = "Minescript Python path synchronized.";
+					}
+					case "pip" -> {
+						String configured = readMinescriptConfigValue("python");
+						ProcessResult result = runProcessResult(new String[]{configured, "-m", "ensurepip", "--upgrade"});
+						if (result.exitCode() != 0) {
+							throw new IOException(result.output().isBlank() ? "ensurepip failed." : firstLine(result.output()));
+						}
+						message = "pip repair completed.";
+					}
+					case "exec-config" -> {
+						writeMinescriptConfigValue("command_path", "system/exec;");
+						message = "system/exec configuration repaired.";
+					}
+					case "pyj-config" -> {
+						writeMinescriptConfigValue("pyjinn_import_path", "system/pyj;");
+						message = "system/pyj configuration repaired.";
+					}
+					default -> message = "No automatic repair is available for this issue.";
+				}
+			} catch (Exception e) {
+				message = "Environment repair failed: " + e.getMessage();
+				appendEditorLog("Environment repair exception: " + e);
+			}
+			String resultMessage = message;
+			if (shell != null) {
+				shell.post(() -> {
+					environmentDiagnosticRunning = false;
+					settingsMessage = resultMessage;
+					runFullEnvironmentDiagnostic(true);
+				});
+			} else {
+				environmentDiagnosticRunning = false;
+			}
+		});
+	}
+
 	private String pythonStatusLabel() {
 		String python = readMinescriptConfigValue("python");
 		if (python.isBlank()) {
@@ -3451,6 +3954,8 @@ public final class TritonModernFragment extends Fragment {
 		settingsConfig = new FluxusConfig();
 		applyConfigPalette();
 		settingsConfig.save();
+		TritonUIClient.reloadConfig();
+		settingsConfig = TritonUIClient.config();
 		capturingShortcutAction = "";
 		repairMinescriptConfig();
 		settingsMessage = "Settings reset to defaults.";
@@ -4634,23 +5139,33 @@ public final class TritonModernFragment extends Fragment {
 		if (scriptRunSafetyLabel().equals("needs throttle")) {
 			appendEditorLog("Warning: this script has `while True` without sleep; add a throttle to avoid freezing.");
 		}
-		String command = scriptDir.relativize(selectedScript).toString().replace('\\', '/');
-		int dot = command.lastIndexOf('.');
-		String commandName = dot > 0 ? command.substring(0, dot) : command;
+		Path scriptToRun = selectedScript;
 		currentScriptRunning = true;
-		appendEditorLog("Queued " + fileName + " to start.");
+		appendEditorLog("Validating variables for " + fileName + "...");
 		renderShell();
-		Minescript.runEditorCommandAsync(commandName, handled -> {
-			if (shell != null) {
-				shell.post(() -> {
-					currentScriptRunning = handled;
-					if (handled) {
-						TritonUIClient.rememberLastScript(command);
-					}
-					appendEditorLog((handled ? "Started " : "Failed to start ") + fileName + ".");
+		CompletableFuture.supplyAsync(() -> {
+			try { return ScriptSettingsRuntime.prepare(scriptToRun); }
+			catch (IOException error) { throw new RuntimeException(error); }
+		}).whenComplete((prepared, error) -> {
+			if (shell == null) return;
+			shell.post(() -> {
+				if (error != null) {
+					currentScriptRunning = false;
+					Throwable cause = error.getCause() == null ? error : error.getCause();
+					appendEditorLog("Cannot run " + fileName + ": " + cause.getMessage());
 					renderShell();
+					return;
+				}
+				appendEditorLog("Queued " + fileName + (prepared.configured() ? " with " + prepared.settingCount() + " configured variable(s)." : "."));
+				Minescript.runEditorCommandAsync(prepared.commandPath(), handled -> {
+					if (shell != null) shell.post(() -> {
+						currentScriptRunning = handled;
+						if (handled) TritonUIClient.rememberLastScript(prepared.commandPath() + ".py");
+						appendEditorLog((handled ? "Started " : "Failed to start ") + fileName + ".");
+						renderShell();
+					});
 				});
-			}
+			});
 		});
 	}
 
@@ -5267,19 +5782,57 @@ public final class TritonModernFragment extends Fragment {
 		renderShell();
 	}
 
-	private void openScriptFolder() {
-		try {
-			Files.createDirectories(scriptDir);
-			if (Desktop.isDesktopSupported()) {
-				Desktop.getDesktop().open(scriptDir.toFile());
-				appendEditorLog("Opened " + scriptDir + ".");
-			} else {
-				appendEditorLog("Script folder: " + scriptDir);
-			}
-		} catch (IOException e) {
-			appendEditorLog("Open folder failed: " + e.getMessage());
+	private Path resolveMinescriptDirectory() {
+		Path configuredFile = minescriptConfigFile;
+		if (configuredFile != null && configuredFile.getParent() != null) {
+			return normalizePath(configuredFile.getParent());
 		}
-		refreshConsoleLogList();
+		if (scriptDir != null) {
+			return normalizePath(scriptDir);
+		}
+		return normalizePath(Paths.get(System.getProperty("user.dir"), "minescript"));
+	}
+
+	private void openScriptFolder() {
+		Path folder = resolveMinescriptDirectory();
+		Path runtimeRoot = normalizePath(Paths.get(System.getProperty("user.dir")));
+		lintExecutor.execute(() -> {
+			try {
+				if (!folder.startsWith(runtimeRoot)) {
+					throw new IOException("Resolved Minescript folder is outside the current runtime directory.");
+				}
+				if (Files.notExists(folder)) {
+					Files.createDirectories(folder);
+				}
+				if (!Files.isDirectory(folder)) {
+					throw new IOException("Resolved Minescript path is not a directory: " + folder);
+				}
+				if (System.getProperty("os.name", "").toLowerCase(Locale.ROOT).contains("win")) {
+					new ProcessBuilder("explorer.exe", folder.toString()).start();
+				} else if (Desktop.isDesktopSupported()) {
+					Desktop.getDesktop().open(folder.toFile());
+				} else {
+					throw new IOException("No platform file explorer is available.");
+				}
+				if (shell != null) {
+					shell.post(() -> {
+						settingsMessage = "Opened Minescript folder.";
+						appendEditorLog("Opened " + folder + ".");
+						refreshConsoleLogList();
+						renderShell();
+					});
+				}
+			} catch (Exception e) {
+				appendEditorLog("Open Minescript folder exception: " + e);
+				if (shell != null) {
+					shell.post(() -> {
+						settingsMessage = "Could not open Minescript folder: " + e.getMessage();
+						refreshConsoleLogList();
+						renderShell();
+					});
+				}
+			}
+		});
 	}
 
 	private void appendEditorLog(String message) {
@@ -6672,10 +7225,25 @@ public final class TritonModernFragment extends Fragment {
 		if (settingsConfig.headerBehaviour().equals("Hide while scrolling") && headerHidden) {
 			header.setVisibility(View.GONE);
 		}
-		frame.addView(header, new LinearLayout.LayoutParams(match(), effectiveTopBarHeight()));
-		LinearLayout body = row(pageGap());
-		body.addView(main, new LinearLayout.LayoutParams(0, match(), 1.0F));
-		addConfiguredRightPanel(body, side);
+		frame.addView(header, new LinearLayout.LayoutParams(match(), responsiveTopBarHeight()));
+		View body;
+		if (stackRightPanel()) {
+			ScrollView bodyScroll = layoutScrollView();
+			bodyScroll.setFillViewport(true);
+			currentPageScroll = bodyScroll;
+			LinearLayout stackedBody = column(responsivePageGap());
+			stackedBody.addView(main, new LinearLayout.LayoutParams(match(), responsiveMainHeight()));
+			addConfiguredRightPanelStacked(stackedBody, side);
+			bodyScroll.addView(stackedBody, new ScrollView.LayoutParams(match(), wrap()));
+			int savedScroll = pageScrollPositions.getOrDefault(page, 0);
+			bodyScroll.post(() -> bodyScroll.scrollTo(0, savedScroll));
+			body = bodyScroll;
+		} else {
+			LinearLayout horizontalBody = row(responsivePageGap());
+			horizontalBody.addView(main, new LinearLayout.LayoutParams(0, match(), 1.0F));
+			addConfiguredRightPanel(horizontalBody, side);
+			body = horizontalBody;
+		}
 		if (lastAnimatedPage != page) {
 			animatePageSwap(body);
 			lastAnimatedPage = page;
@@ -6701,7 +7269,7 @@ public final class TritonModernFragment extends Fragment {
 			return;
 		}
 		if (!behaviour.equals("Collapsed by default")) {
-			body.addView(side, new LinearLayout.LayoutParams(SIDE_WIDTH, match()));
+			body.addView(side, new LinearLayout.LayoutParams(responsiveRightPanelWidth(), match()));
 			return;
 		}
 		LinearLayout collapsible = row(8);
@@ -6713,9 +7281,25 @@ public final class TritonModernFragment extends Fragment {
 		});
 		collapsible.addView(toggle, new LinearLayout.LayoutParams(42, 42));
 		if (rightPanelExpanded) {
-			collapsible.addView(side, new LinearLayout.LayoutParams(SIDE_WIDTH, match()));
+			collapsible.addView(side, new LinearLayout.LayoutParams(responsiveRightPanelWidth(), match()));
 		}
-		body.addView(collapsible, new LinearLayout.LayoutParams(rightPanelExpanded ? SIDE_WIDTH + 50 : 42, match()));
+		body.addView(collapsible, new LinearLayout.LayoutParams(rightPanelExpanded ? responsiveRightPanelWidth() + 50 : 42, match()));
+	}
+
+	private void addConfiguredRightPanelStacked(LinearLayout body, View side) {
+		String behaviour = settingsConfig.rightPanelBehaviour();
+		if (behaviour.equals("Hidden") || (behaviour.equals("Contextual") && !pageHasContextualPanel())) return;
+		if (behaviour.equals("Collapsed by default")) {
+			View toggle = toolbarButton(rightPanelExpanded ? "chevron-down-solid.png" : "chevron-right-solid.png",
+					rightPanelExpanded ? "Collapse utility tools" : "Show utility tools");
+			toggle.setOnClickListener(view -> {
+				rightPanelExpanded = !rightPanelExpanded;
+				renderShell();
+			});
+			body.addView(toggle, new LinearLayout.LayoutParams(match(), 42));
+			if (!rightPanelExpanded) return;
+		}
+		body.addView(side, new LinearLayout.LayoutParams(match(), responsiveSidePanelHeight()));
 	}
 
 	private boolean pageHasContextualPanel() {
@@ -6725,17 +7309,122 @@ public final class TritonModernFragment extends Fragment {
 
 	private boolean useCompactNavigation() {
 		String mode = settingsConfig.navigationMode();
+		if (screenWidth() > 0 && screenWidth() < responsiveBreakpoint(1050)) {
+			return true;
+		}
 		if (mode.equals("Compact icon rail")) {
 			return true;
 		}
 		if (!mode.equals("Auto-collapse")) {
 			return false;
 		}
-		int width = shell == null ? 0 : shell.getWidth();
-		if (width <= 0 && Minecraft.getInstance().getWindow() != null) {
-			width = Minecraft.getInstance().getWindow().getGuiScaledWidth();
+		return screenWidth() > 0 && screenWidth() < responsiveBreakpoint(1320);
+	}
+
+	private int viewportWidth() {
+		if (shell != null && shell.getWidth() > 0) return shell.getWidth();
+		Minecraft minecraft = Minecraft.getInstance();
+		return minecraft != null && minecraft.getWindow() != null ? minecraft.getWindow().getWidth() : 1920;
+	}
+
+	private int viewportHeight() {
+		if (shell != null && shell.getHeight() > 0) return shell.getHeight();
+		Minecraft minecraft = Minecraft.getInstance();
+		return minecraft != null && minecraft.getWindow() != null ? minecraft.getWindow().getHeight() : 1080;
+	}
+
+	private int screenWidth() {
+		Minecraft minecraft = Minecraft.getInstance();
+		if (minecraft != null && minecraft.getWindow() != null && minecraft.getWindow().getScreenWidth() > 0) {
+			float[] horizontalScale = {1.0F};
+			float[] verticalScale = {1.0F};
+			GLFW.glfwGetWindowContentScale(minecraft.getWindow().handle(), horizontalScale, verticalScale);
+			return Math.max(1, Math.round(minecraft.getWindow().getScreenWidth() / Math.max(1.0F, horizontalScale[0])));
 		}
-		return width > 0 && width < 1280;
+		return viewportWidth();
+	}
+
+	private int screenUnits(int layoutPixels) {
+		float framebufferScale = viewportWidth() / (float) Math.max(1, screenWidth());
+		return Math.max(0, Math.round(layoutPixels / Math.max(1.0F, framebufferScale)));
+	}
+
+	private int responsiveBreakpoint(int baseWidth) {
+		float customScale = settingsConfig == null ? 1.0F : settingsConfig.uiScale() / 100.0F;
+		return Math.round(baseWidth * Math.max(0.8F, customScale));
+	}
+
+	private boolean isSmallWindow() {
+		return screenWidth() < responsiveBreakpoint(980);
+	}
+
+	private boolean isMediumWindow() {
+		return screenWidth() < responsiveBreakpoint(1400);
+	}
+
+	private boolean stackRightPanel() {
+		return isSmallWindow();
+	}
+
+	private int responsiveOuterPadding() {
+		return isSmallWindow() ? Math.min(8, densityOuterPadding())
+				: isMediumWindow() ? Math.min(12, densityOuterPadding()) : densityOuterPadding();
+	}
+
+	private int responsivePageGap() {
+		return isSmallWindow() ? Math.min(10, pageGap()) : isMediumWindow() ? Math.min(14, pageGap()) : pageGap();
+	}
+
+	private int responsiveSidebarRailWidth() {
+		return isSmallWindow() ? 72 : 82;
+	}
+
+	private int responsiveSidebarWidth() {
+		return Math.max(260, Math.min(configuredSidebarWidth(), viewportWidth() / 4));
+	}
+
+	private int responsiveRightPanelWidth() {
+		if (viewportWidth() >= responsiveBreakpoint(1500)) return SIDE_WIDTH;
+		if (viewportWidth() >= responsiveBreakpoint(1150)) return 290;
+		return 260;
+	}
+
+	private int responsiveMainHeight() {
+		return Math.max(660, viewportHeight() - responsiveOuterPadding() * 2 - responsiveTopBarHeight() - 24);
+	}
+
+	private int responsiveSidePanelHeight() {
+		return Math.max(560, Math.min(820, responsiveMainHeight()));
+	}
+
+	private int responsiveDockWidth() {
+		return Math.min(DOCK_WIDTH, Math.max(520, viewportWidth() - responsiveOuterPadding() * 2 - 24));
+	}
+
+	private int responsiveTopBarHeight() {
+		return isSmallWindow() ? 96 : effectiveTopBarHeight();
+	}
+
+	private int availableMainWidth() {
+		int width = screenWidth() - screenUnits(responsiveOuterPadding() * 2 + contentWidthInset() + responsivePageGap());
+		if (!settingsConfig.navigationMode().equals("Floating dock only")) {
+			width -= screenUnits(useCompactNavigation() ? responsiveSidebarRailWidth() : responsiveSidebarWidth());
+		}
+		if (!stackRightPanel() && !settingsConfig.rightPanelBehaviour().equals("Hidden")) {
+			width -= screenUnits(responsiveRightPanelWidth() + responsivePageGap());
+		}
+		return Math.max(320, width);
+	}
+
+	private boolean stackSettingsCards() {
+		return availableMainWidth() < responsiveBreakpoint(900);
+	}
+
+	private int responsiveGridColumns(int preferred) {
+		int width = availableMainWidth();
+		if (width < responsiveBreakpoint(560)) return 1;
+		if (width < responsiveBreakpoint(1000)) return Math.min(2, preferred);
+		return preferred;
 	}
 
 	private int configuredSidebarWidth() {
@@ -6747,6 +7436,7 @@ public final class TritonModernFragment extends Fragment {
 	}
 
 	private int contentWidthInset() {
+		if (isMediumWindow()) return 0;
 		return switch (settingsConfig.contentWidth()) {
 			case "Centered" -> 72;
 			case "Full width" -> 0;
@@ -6816,48 +7506,31 @@ public final class TritonModernFragment extends Fragment {
 
 	private FrameLayout.LayoutParams floatingDropdownLayoutParams() {
 		if (openDropdownKey.equals("publish-modal")) {
-			return new FrameLayout.LayoutParams(720, 520, Gravity.CENTER);
+			int frameWidth = currentPageFrame == null ? viewportWidth() : currentPageFrame.getWidth();
+			int frameHeight = currentPageFrame == null ? viewportHeight() : currentPageFrame.getHeight();
+			return new FrameLayout.LayoutParams(Math.min(720, Math.max(320, frameWidth - 16)),
+					Math.min(520, Math.max(300, frameHeight - 16)), Gravity.CENTER);
 		}
-		if (openDropdownKey.equals("new-script")) {
-			FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(220, 118, Gravity.TOP | Gravity.LEFT);
-			int x = clampedDropdownX(220);
-			params.setMargins(x, dropdownAnchorY + 6, 0, 0);
-			return params;
-		}
-		if (openDropdownKey.equals("script-actions")) {
-			FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(224, 208, Gravity.TOP | Gravity.LEFT);
-			int x = clampedDropdownX(224);
-			params.setMargins(x, dropdownAnchorY + 6, 0, 0);
-			return params;
-		}
-		if (openDropdownKey.equals("smart-insert")) {
-			FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(244, 178, Gravity.TOP | Gravity.LEFT);
-			int x = clampedDropdownX(244);
-			params.setMargins(x, dropdownAnchorY + 6, 0, 0);
-			return params;
-		}
-		if (openDropdownKey.equals("library-script-actions")) {
-			FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(236, 148, Gravity.TOP | Gravity.LEFT);
-			int x = clampedDropdownX(236);
-			params.setMargins(x, dropdownAnchorY + 6, 0, 0);
-			return params;
-		}
-		if (openDropdownKey.equals("editor-script-context")) {
-			FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(232, 188, Gravity.TOP | Gravity.LEFT);
-			int x = clampedDropdownX(232);
-			params.setMargins(x, dropdownAnchorY + 6, 0, 0);
-			return params;
-		}
-		if (openDropdownKey.equals("command-palette")) {
-			FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(360, 300, Gravity.TOP | Gravity.LEFT);
-			int x = clampedDropdownX(360);
-			params.setMargins(x, dropdownAnchorY + 6, 0, 0);
-			return params;
-		}
-		int width = Math.max(260, dropdownAnchorWidth);
-		FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(width, dropdownOptionsHeight(settingsDropdownOptions(openDropdownKey).length), Gravity.TOP | Gravity.LEFT);
-		int x = clampedDropdownX(width);
-		params.setMargins(x, dropdownAnchorY + 6, 0, 0);
+		int preferredWidth = openDropdownKey.equals("new-script") ? 220
+				: openDropdownKey.equals("script-actions") ? 224
+				: openDropdownKey.equals("smart-insert") ? 244
+				: openDropdownKey.equals("library-script-actions") ? 236
+				: openDropdownKey.equals("editor-script-context") ? 232
+				: openDropdownKey.equals("command-palette") ? 420
+				: Math.max(260, dropdownAnchorWidth);
+		int preferredHeight = openDropdownKey.equals("new-script") ? 118
+				: openDropdownKey.equals("script-actions") ? 208
+				: openDropdownKey.equals("smart-insert") ? 178
+				: openDropdownKey.equals("library-script-actions") ? 148
+				: openDropdownKey.equals("editor-script-context") ? 188
+				: openDropdownKey.equals("command-palette") ? 340
+				: dropdownOptionsHeight(settingsDropdownOptions(openDropdownKey).length);
+		int frameWidth = currentPageFrame == null ? viewportWidth() : currentPageFrame.getWidth();
+		int frameHeight = currentPageFrame == null ? viewportHeight() : currentPageFrame.getHeight();
+		int width = Math.min(preferredWidth, Math.max(220, frameWidth - 16));
+		int height = Math.min(preferredHeight, Math.max(80, frameHeight - 16));
+		FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(width, height, Gravity.TOP | Gravity.LEFT);
+		params.setMargins(clampedDropdownX(width), clampedDropdownY(height), 0, 0);
 		return params;
 	}
 
@@ -6891,6 +7564,12 @@ public final class TritonModernFragment extends Fragment {
 		}
 		int max = Math.max(0, frameWidth - width - 8);
 		return Math.max(8, Math.min(dropdownAnchorX, max));
+	}
+
+	private int clampedDropdownY(int height) {
+		int frameHeight = currentPageFrame == null ? viewportHeight() : currentPageFrame.getHeight();
+		int max = Math.max(8, frameHeight - height - 8);
+		return Math.max(8, Math.min(dropdownAnchorY + 6, max));
 	}
 
 	private View newScriptDropdownMenu() {
@@ -6939,39 +7618,54 @@ public final class TritonModernFragment extends Fragment {
 		LinearLayout menu = column(7);
 		menu.setPadding(10, 10, 10, 10);
 		menu.setBackground(dropdownSurface(12));
-		menu.addView(label("COMMAND PALETTE", 12, PURPLE), new LinearLayout.LayoutParams(match(), 24));
-		menu.addView(dropdownAction("Open Editor", "code-solid.png", () -> {
-			openDropdownKey = "";
-			openPage(Page.EDITOR);
-		}), new LinearLayout.LayoutParams(match(), 30));
-		menu.addView(dropdownAction("Create Python Script", "plus-solid.png", () -> {
-			openDropdownKey = "";
-			createNewScript("NewScript.py", "import minescript as ms\n\nms.echo(\"Hello from {name}!\")\n");
-		}), new LinearLayout.LayoutParams(match(), 30));
-		menu.addView(dropdownAction("Save Current Script", "clipboard-check-solid.png", () -> {
-			openDropdownKey = "";
-			saveCurrentScript();
-		}), new LinearLayout.LayoutParams(match(), 30));
-		menu.addView(dropdownAction("Run Current Script", "play-solid.png", () -> {
-			openDropdownKey = "";
-			runCurrentScript();
-		}), new LinearLayout.LayoutParams(match(), 30));
-		menu.addView(dropdownAction("Open Libraries", "box-solid.png", () -> {
-			openDropdownKey = "";
-			openPage(Page.MODULES);
-		}), new LinearLayout.LayoutParams(match(), 30));
-		menu.addView(dropdownAction("Open Overlays", "border-none-solid.png", () -> {
-			openDropdownKey = "";
-			openPage(Page.OVERLAYS);
-		}), new LinearLayout.LayoutParams(match(), 30));
-		menu.addView(dropdownAction("Toggle Overlay Edit Mode", "eye-dropper-solid.png", () -> {
-			openDropdownKey = "";
-			enterOverlayEditMode();
-		}), new LinearLayout.LayoutParams(match(), 30));
-		menu.addView(dropdownAction("Refresh UI State", "arrows-rotate-solid.png", () -> {
-			openDropdownKey = "";
-			refreshEditorPage("Refreshed from command palette.");
-		}), new LinearLayout.LayoutParams(match(), 30));
+		menu.addView(label("SEARCH SHULKR", 12, PURPLE), new LinearLayout.LayoutParams(match(), 24));
+		EditText input = new EditText(requireContext());
+		input.setSingleLine(true);
+		input.setHint("Pages, scripts, templates, libraries...");
+		input.setText(globalSearchQuery);
+		input.setTextSize(12);
+		input.setTextColor(TEXT);
+		input.setHintTextColor(FAINT);
+		input.setPadding(10, 0, 10, 0);
+		input.setBackground(round(Color.argb(145, 10, 15, 26), 8, STROKE_HOVER));
+		input.addTextChangedListener(new TextWatcher() {
+			public void beforeTextChanged(CharSequence value, int start, int count, int after) {}
+			public void onTextChanged(CharSequence value, int start, int before, int count) {
+				if (value.toString().equals(globalSearchQuery)) return;
+				globalSearchQuery = value.toString();
+				input.post(() -> renderShell());
+			}
+			public void afterTextChanged(Editable value) {}
+		});
+		input.post(() -> { input.requestFocus(); input.setSelection(input.getText().length()); });
+		menu.addView(input, new LinearLayout.LayoutParams(match(), 38));
+		String query = globalSearchQuery.trim().toLowerCase(Locale.ROOT);
+		int shown = 0;
+		Object[][] pages = {
+				{Page.DASHBOARD, "Dashboard", "house-solid.png", "overview home"}, {Page.SCRIPTS, "Script Hub", "code-solid.png", "published community scripts"},
+				{Page.EDITOR, "Installed Scripts & Editor", "code-solid.png", "local files variables"}, {Page.MODULES, "Libraries", "puzzle-piece-solid.png", "python imports"},
+				{Page.ADDONS, "Modules", "box-open-solid.png", "client addons"}, {Page.TEMPLATES, "Templates", "layer-group-solid.png", "starter scaffolds"},
+				{Page.WINDOWSPY, "WindowSpy", "window-restore-regular.png", "blocks entities nbt"}, {Page.OVERLAYS, "Overlays", "border-none-solid.png", "hud widgets"},
+				{Page.SETTINGS, "Settings", "gear-solid.png", "themes files shortcuts python"}, {Page.ABOUT, "About", "circle-info-solid.png", "credits versions"}
+		};
+		for (Object[] candidate : pages) {
+			String searchable = (candidate[1] + " " + candidate[3]).toLowerCase(Locale.ROOT);
+			if (!query.isBlank() && !searchable.contains(query)) continue;
+			Page target = (Page) candidate[0];
+			menu.addView(dropdownAction((String) candidate[1], (String) candidate[2], () -> { openDropdownKey = ""; openPage(target); }), new LinearLayout.LayoutParams(match(), 30));
+			if (++shown >= 8) break;
+		}
+		if (shown < 8) for (Path script : editorScripts) {
+			String searchable = (displayScriptPath(script) + " " + readFileQuietly(script)).toLowerCase(Locale.ROOT);
+			if (query.isBlank() || !searchable.contains(query)) continue;
+			menu.addView(dropdownAction("Script · " + displayScriptPath(script), scriptIcon(script.getFileName().toString()), () -> { openDropdownKey = ""; page = Page.EDITOR; selectEditorScript(script); renderShell(); }), new LinearLayout.LayoutParams(match(), 30));
+			if (++shown >= 8) break;
+		}
+		if (shown == 0) {
+			TextView empty = label("No Shulkr pages or scripts match this search.", 12, MUTED);
+			empty.setGravity(Gravity.CENTER);
+			menu.addView(empty, new LinearLayout.LayoutParams(match(), 48));
+		}
 		return menu;
 	}
 
@@ -7362,8 +8056,10 @@ public final class TritonModernFragment extends Fragment {
 
 
 	private View topToolbar() {
-		LinearLayout top = row(16);
+		LinearLayout top = isSmallWindow() ? column(6) : row(isMediumWindow() ? 10 : 16);
 		top.setGravity(Gravity.CENTER_VERTICAL);
+		LinearLayout actions = row(8);
+		actions.setGravity(Gravity.CENTER_VERTICAL);
 
 		String placeholder = page == Page.SCRIPTS ? "Search scripts, e.g. AutoCrystal..."
 				: page == Page.EDITOR ? "Search scripts, commands, snippets..."
@@ -7375,46 +8071,42 @@ public final class TritonModernFragment extends Fragment {
 				: page == Page.OVERLAYS ? "Search overlays, widgets, HUD presets..."
 				: page == Page.ABOUT ? "Search about, credits, versions, changelog..."
 				: "Search scripts, libraries, templates...";
-		top.addView(searchBar(placeholder), new LinearLayout.LayoutParams(SEARCH_WIDTH, 48));
-
-		View spacer = new View(requireContext());
-		top.addView(spacer, new LinearLayout.LayoutParams(0, 1, 1.0F));
 		if (page == Page.SCRIPTS) {
 			View publishButton = primaryActionButton("folder-plus-solid.png", "Publish");
 			publishButton.setOnClickListener(view -> openPublishModal(selectedScript));
-			top.addView(publishButton, new LinearLayout.LayoutParams(126, 42));
+			actions.addView(publishButton, new LinearLayout.LayoutParams(126, 42));
 			View refreshButton = toolbarButton("arrows-rotate-solid.png", "Refresh");
 			refreshButton.setOnClickListener(view -> renderShell());
-			top.addView(refreshButton, new LinearLayout.LayoutParams(116, 42));
-			top.addView(iconOnly("bell-solid.png"), new LinearLayout.LayoutParams(42, 42));
+			actions.addView(refreshButton, new LinearLayout.LayoutParams(116, 42));
+			actions.addView(iconOnly("bell-solid.png"), new LinearLayout.LayoutParams(42, 42));
 		} else if (page == Page.EDITOR) {
 			View newButton = primaryButton("plus-solid.png", "New Script", "chevron-down-solid.png");
 			newButton.setOnClickListener(view -> {
 				toggleDropdown("new-script", view, 220);
 			});
-			top.addView(newButton, new LinearLayout.LayoutParams(156, 42));
+			actions.addView(newButton, new LinearLayout.LayoutParams(156, 42));
 			View openButton = toolbarButton("folder-open-solid.png", "Open");
 			openButton.setOnClickListener(view -> openScriptFilePicker());
-			top.addView(openButton, new LinearLayout.LayoutParams(96, 42));
+			actions.addView(openButton, new LinearLayout.LayoutParams(96, 42));
 			View saveButton = toolbarButton("clipboard-solid.png", "Save");
 			saveButton.setOnClickListener(view -> saveCurrentScript());
-			top.addView(saveButton, new LinearLayout.LayoutParams(96, 42));
+			actions.addView(saveButton, new LinearLayout.LayoutParams(96, 42));
 			View runButton = primaryActionButton("play-solid.png", "Run");
 			runButton.setOnClickListener(view -> runCurrentScript());
-			top.addView(runButton, new LinearLayout.LayoutParams(92, 42));
+			actions.addView(runButton, new LinearLayout.LayoutParams(92, 42));
 			View stopButton = toolbarButton("border-all-solid.png", "Stop");
 			stopButton.setOnClickListener(view -> stopScripts());
-			top.addView(stopButton, new LinearLayout.LayoutParams(92, 42));
+			actions.addView(stopButton, new LinearLayout.LayoutParams(92, 42));
 		} else if (page == Page.OVERLAYS) {
 			View widgetButton = primaryActionButton("plus-solid.png", "Widget");
 			widgetButton.setOnClickListener(view -> createOverlayWidget());
-			top.addView(widgetButton, new LinearLayout.LayoutParams(112, 42));
+			actions.addView(widgetButton, new LinearLayout.LayoutParams(112, 42));
 			View editButton = toolbarButton("eye-dropper-solid.png", "Edit");
 			editButton.setOnClickListener(view -> enterOverlayEditMode());
-			top.addView(editButton, new LinearLayout.LayoutParams(96, 42));
+			actions.addView(editButton, new LinearLayout.LayoutParams(96, 42));
 			View saveButton = toolbarButton("clipboard-check-solid.png", "Save");
 			saveButton.setOnClickListener(view -> saveOverlayPreset());
-			top.addView(saveButton, new LinearLayout.LayoutParams(96, 42));
+			actions.addView(saveButton, new LinearLayout.LayoutParams(96, 42));
 			View toggleButton = toolbarButton(overlayRendererActive ? "border-none-solid.png" : "play-solid.png", overlayRendererActive ? "Hide" : "Show");
 			toggleButton.setOnClickListener(view -> {
 				overlayRendererActive = !overlayRendererActive;
@@ -7426,16 +8118,37 @@ public final class TritonModernFragment extends Fragment {
 				overlayMessage = overlayRendererActive ? "Overlay HUD is now visible in-game." : "Overlay HUD hidden.";
 				renderShell();
 			});
-			top.addView(toggleButton, new LinearLayout.LayoutParams(104, 42));
+			actions.addView(toggleButton, new LinearLayout.LayoutParams(104, 42));
 		} else if (page == Page.MODULES || page == Page.ADDONS || page == Page.TEMPLATES || page == Page.WINDOWSPY || page == Page.SETTINGS
 				|| page == Page.ABOUT) {
-			top.addView(iconOnly("bell-solid.png"), new LinearLayout.LayoutParams(42, 42));
+			actions.addView(iconOnly("bell-solid.png"), new LinearLayout.LayoutParams(42, 42));
+		}
+		if (isSmallWindow()) {
+			top.addView(searchBar(placeholder), new LinearLayout.LayoutParams(match(), 44));
+			if (actions.getChildCount() > 0) {
+				HorizontalScrollView actionScroll = horizontalScroller();
+				actionScroll.addView(actions, new HorizontalScrollView.LayoutParams(wrap(), match()));
+				top.addView(actionScroll, new LinearLayout.LayoutParams(match(), 44));
+			}
+		} else {
+			int preferredSearch = isMediumWindow() ? Math.min(SEARCH_WIDTH, Math.max(260, availableMainWidth() / 2)) : SEARCH_WIDTH;
+			top.addView(searchBar(placeholder), new LinearLayout.LayoutParams(0, 48, 1.0F));
+			if (actions.getChildCount() > 0) {
+				HorizontalScrollView actionScroll = horizontalScroller();
+				actionScroll.setFillViewport(false);
+				actionScroll.addView(actions, new HorizontalScrollView.LayoutParams(wrap(), match()));
+				top.addView(actionScroll, new LinearLayout.LayoutParams(Math.min(preferredSearch, Math.max(42, availableMainWidth() / 2)), 44));
+			}
 		}
 		return top;
 	}
 
 	private List<LibraryScriptItem> visiblePublishedScripts() {
 		List<LibraryScriptItem> sorted = FluxusAppState.get().libraryScripts();
+		String query = pageSearchQueries.getOrDefault(Page.SCRIPTS, "").trim().toLowerCase(Locale.ROOT);
+		sorted = sorted.stream()
+				.filter(script -> query.isBlank() || (script.name() + " " + script.author() + " " + script.about() + " " + script.category() + " " + String.join(" ", script.tags()) + " " + script.id() + " " + script.fileName()).toLowerCase(Locale.ROOT).contains(query))
+				.toList();
 		if (scriptFilter.equals("All")) {
 			return sorted;
 		}
@@ -7611,14 +8324,6 @@ public final class TritonModernFragment extends Fragment {
 		header.addView(reset, new LinearLayout.LayoutParams(56, 28));
 		panel.addView(header, new LinearLayout.LayoutParams(match(), 30));
 
-		LinearLayout search = row(10);
-		search.setPadding(12, 0, 12, 0);
-		search.setGravity(Gravity.CENTER_VERTICAL);
-		search.setBackground(round(Color.argb(116, 10, 15, 26), 8, STROKE));
-		search.addView(icon("magnifying-glass-solid.png", FAINT), new LinearLayout.LayoutParams(15, 15));
-		search.addView(label("Search filters...", 12, MUTED));
-		panel.addView(search, new LinearLayout.LayoutParams(match(), 42));
-
 		LinearLayout catsHeader = row(8);
 		catsHeader.setGravity(Gravity.CENTER_VERTICAL);
 		catsHeader.addView(label("Categories", 15, TEXT), new LinearLayout.LayoutParams(0, wrap(), 1.0F));
@@ -7637,19 +8342,6 @@ public final class TritonModernFragment extends Fragment {
 			});
 			panel.addView(check, new LinearLayout.LayoutParams(match(), 26));
 		}
-
-		panel.addView(label("Sort by", 15, TEXT));
-		panel.addView(selectField("Recently modified"), new LinearLayout.LayoutParams(match(), 38));
-		panel.addView(label("Time", 15, TEXT));
-		panel.addView(selectField("All Time"), new LinearLayout.LayoutParams(match(), 38));
-
-		LinearLayout other = column(12);
-		other.setPadding(0, 12, 0, 0);
-		other.addView(label("Other", 15, TEXT));
-		other.addView(filterSwitch("Published scripts", true));
-		other.addView(filterSwitch("Installable", true));
-		other.addView(filterSwitch("Show about text", true));
-		panel.addView(other, new LinearLayout.LayoutParams(match(), wrap()));
 		return panel;
 	}
 
@@ -8009,13 +8701,65 @@ public final class TritonModernFragment extends Fragment {
 		search.setGravity(Gravity.CENTER_VERTICAL);
 		search.setBackground(round(Color.argb(124, 8, 13, 24), 12, Color.argb(100, 105, 116, 150)));
 		search.addView(icon("magnifying-glass-solid.png", MUTED), new LinearLayout.LayoutParams(18, 18));
-		search.addView(label(placeholder, 13, MUTED), new LinearLayout.LayoutParams(0, wrap(), 1.0F));
-		search.addView(keycap("Ctrl"));
-		search.addView(keycap("K"));
+		Page searchPage = page;
+		EditText input = new EditText(requireContext());
+		input.setSingleLine(true);
+		input.setHint(placeholder);
+		input.setText(pageSearchQueries.getOrDefault(searchPage, ""));
+		input.setTextColor(TEXT);
+		input.setHintTextColor(MUTED);
+		input.setTextSize(13);
+		input.setBackground(null);
+		input.setPadding(0, 0, 0, 0);
+		input.addTextChangedListener(new TextWatcher() {
+			public void beforeTextChanged(CharSequence value, int start, int count, int after) {}
+			public void onTextChanged(CharSequence value, int start, int before, int count) {
+				String next = value.toString();
+				if (next.equals(pageSearchQueries.getOrDefault(searchPage, ""))) return;
+				pageSearchQueries.put(searchPage, next);
+				if (searchPage == Page.SETTINGS && !next.isBlank()) settingsTab = settingsTabForSearch(next);
+				restorePageSearchFocus = searchPage;
+				input.post(() -> renderShell());
+			}
+			public void afterTextChanged(Editable value) {}
+		});
+		search.addView(input, new LinearLayout.LayoutParams(0, 40, 1.0F));
+		if (restorePageSearchFocus == searchPage) {
+			restorePageSearchFocus = null;
+			input.post(() -> { input.requestFocus(); input.setSelection(input.getText().length()); });
+		}
+		if (!pageSearchQueries.getOrDefault(searchPage, "").isBlank()) {
+			View clear = iconButton("broom-solid.png", MUTED);
+			clear.setOnClickListener(view -> { pageSearchQueries.put(searchPage, ""); renderShell(); });
+			search.addView(clear, new LinearLayout.LayoutParams(28, 28));
+		}
+		TextView ctrl = keycap("Ctrl");
+		ctrl.setTextSize(11);
+		ctrl.setPadding(9, 0, 9, 0);
+		TextView k = keycap("K");
+		k.setTextSize(11);
+		k.setPadding(9, 0, 9, 0);
+		search.addView(ctrl, new LinearLayout.LayoutParams(48, 28));
+		search.addView(k, new LinearLayout.LayoutParams(34, 28));
 		makeHover(search, round(Color.argb(124, 8, 13, 24), 12, Color.argb(100, 105, 116, 150)),
 				round(Color.argb(170, 13, 18, 31), 12, STROKE_HOVER));
-		search.setOnClickListener(view -> openCommandPalette(search));
 		return search;
+	}
+
+	private SettingsTab settingsTabForSearch(String value) {
+		String query = value.toLowerCase(Locale.ROOT);
+		if (containsAny(query, "python", "pip", "minescript", "environment", "diagnostic")) return SettingsTab.PYTHON;
+		if (containsAny(query, "shortcut", "key", "binding", "hotkey")) return SettingsTab.SHORTCUTS;
+		if (containsAny(query, "file", "folder", "backup", "autosave")) return SettingsTab.FILES;
+		if (containsAny(query, "editor", "ruff", "autocomplete", "indent")) return SettingsTab.EDITOR;
+		if (containsAny(query, "privacy", "name", "capture")) return SettingsTab.PRIVACY;
+		if (containsAny(query, "advanced", "cache", "repair", "reset")) return SettingsTab.ADVANCED;
+		return SettingsTab.CUSTOMIZATION;
+	}
+
+	private boolean containsAny(String value, String... terms) {
+		for (String term : terms) if (value.contains(term)) return true;
+		return false;
 	}
 
 	private View toolbarButton(String iconFile, String text) {
@@ -8145,29 +8889,56 @@ public final class TritonModernFragment extends Fragment {
 		search.setPadding(12, 0, 12, 0);
 		search.setBackground(round(Color.argb(116, 10, 15, 26), 8, STROKE));
 		search.addView(icon("magnifying-glass-solid.png", FAINT), new LinearLayout.LayoutParams(14, 14));
-		search.addView(label(placeholder, 12, MUTED), new LinearLayout.LayoutParams(0, wrap(), 1.0F));
+		EditText input = new EditText(requireContext());
+		input.setSingleLine(true);
+		input.setHint(placeholder);
+		input.setText(pageSearchQueries.getOrDefault(Page.EDITOR, ""));
+		input.setTextSize(12);
+		input.setTextColor(TEXT);
+		input.setHintTextColor(MUTED);
+		input.setBackground(null);
+		input.setPadding(0, 0, 0, 0);
+		input.addTextChangedListener(new TextWatcher() {
+			public void beforeTextChanged(CharSequence value, int start, int count, int after) {}
+			public void onTextChanged(CharSequence value, int start, int before, int count) {
+				String next = value.toString();
+				if (next.equals(pageSearchQueries.getOrDefault(Page.EDITOR, ""))) return;
+				pageSearchQueries.put(Page.EDITOR, next);
+				restorePageSearchFocus = Page.EDITOR;
+				input.post(() -> renderShell());
+			}
+			public void afterTextChanged(Editable value) {}
+		});
+		search.addView(input, new LinearLayout.LayoutParams(0, 34, 1.0F));
 		makeHover(search, round(Color.argb(116, 10, 15, 26), 8, STROKE),
 				round(Color.argb(165, 13, 19, 32), 8, STROKE_HOVER));
 		return search;
 	}
 
 	private List<Path> rootFolders() {
+		String query = pageSearchQueries.getOrDefault(Page.EDITOR, "").trim().toLowerCase(Locale.ROOT);
 		return editorFolders.stream()
 				.filter(folder -> Objects.equals(folder.getParent(), scriptDir))
+				.filter(folder -> query.isBlank() || displayScriptPath(folder).toLowerCase(Locale.ROOT).contains(query)
+						|| editorScripts.stream().anyMatch(script -> script.startsWith(folder) && displayScriptPath(script).toLowerCase(Locale.ROOT).contains(query)))
 				.sorted(Comparator.comparing(path -> path.getFileName().toString().toLowerCase(Locale.ROOT)))
 				.toList();
 	}
 
 	private List<Path> rootScripts() {
+		String query = pageSearchQueries.getOrDefault(Page.EDITOR, "").trim().toLowerCase(Locale.ROOT);
 		return editorScripts.stream()
 				.filter(script -> Objects.equals(script.getParent(), scriptDir))
+				.filter(script -> query.isBlank() || displayScriptPath(script).toLowerCase(Locale.ROOT).contains(query))
 				.sorted(Comparator.comparing(path -> path.getFileName().toString().toLowerCase(Locale.ROOT)))
 				.toList();
 	}
 
 	private List<Path> scriptsUnder(Path folder) {
+		String query = pageSearchQueries.getOrDefault(Page.EDITOR, "").trim().toLowerCase(Locale.ROOT);
 		return editorScripts.stream()
 				.filter(script -> script.startsWith(folder))
+				.filter(script -> query.isBlank() || displayScriptPath(script).toLowerCase(Locale.ROOT).contains(query))
 				.sorted(Comparator.comparing(path -> folder.relativize(path).toString().toLowerCase(Locale.ROOT)))
 				.toList();
 	}
@@ -8230,6 +9001,12 @@ public final class TritonModernFragment extends Fragment {
 		}
 		if (active) {
 			row.addView(label("*", 13, GREEN), new LinearLayout.LayoutParams(14, wrap()));
+		}
+		ShortcutBinding scriptBinding = TritonUIClient.shortcutBinding(scriptShortcutAction(script));
+		if (scriptBinding.bound()) {
+			TextView shortcut = keycap(shortcutBindingLabel(scriptBinding));
+			shortcut.setTextSize(9);
+			row.addView(shortcut, new LinearLayout.LayoutParams(84, 22));
 		}
 		row.addView(label(modifiedAgo(script), 12, MUTED), new LinearLayout.LayoutParams(48, wrap()));
 		row.setOnClickListener(view -> handleEditorItemClick(script, false));
@@ -8711,6 +9488,13 @@ public final class TritonModernFragment extends Fragment {
 				currentHeader.setVisibility(hide ? View.GONE : View.VISIBLE);
 			}
 		});
+		return scroll;
+	}
+
+	private HorizontalScrollView horizontalScroller() {
+		HorizontalScrollView scroll = new HorizontalScrollView(requireContext());
+		scroll.setFillViewport(false);
+		scroll.setHorizontalScrollBarEnabled(false);
 		return scroll;
 	}
 

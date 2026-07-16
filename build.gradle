@@ -52,7 +52,13 @@ dependencies {
 	implementation "icyllis.modernui:ModernUI-Fabric:${project.minecraft_version}-${project.modernui_version}"
 	implementation "org.pyjinn:pyjinn-lib:${project.pyjinn_version}:all"
 	include "org.pyjinn:pyjinn-lib:${project.pyjinn_version}:all"
+	testImplementation "org.junit.jupiter:junit-jupiter:5.12.2"
+	testRuntimeOnly "org.junit.platform:junit-platform-launcher:1.12.2"
 	
+}
+
+test {
+	useJUnitPlatform()
 }
 
 processResources {

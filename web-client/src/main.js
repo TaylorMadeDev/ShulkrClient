@@ -1,6 +1,9 @@
 ﻿import "./styles.css";
 
 import { flowStore } from "./flow/store.js";
+import { buildGlobalSearchIndex, filterSearch, matchesSearch, searchGlobalIndex } from "./search.js";
+import { defaultsForSettings, validateScriptValues } from "./scriptSettings.js";
+import { eventMatchesShortcut, findShortcutConflict, isTypingTarget, loadShortcutConfig, normalizeShortcut, saveShortcutConfig, shortcutFromKeyboardEvent } from "./shortcuts.js";
 
 let flowEditorModule = null;
 let flowEditorPromise = null;
@@ -40,7 +43,10 @@ const state = {
   clients: [],
   scripts: [],
   scriptFolders: [],
-  scriptSearch: "",
+  installedScriptSearch: "",
+  editorSearch: "",
+  scriptView: "installed",
+  installedFilter: "all",
   scriptFolder: "all",
   libraries: [],
   clientModules: [],
@@ -59,6 +65,7 @@ const state = {
   editorContent: "",
   editorDirty: false,
   hubSearch: "",
+  hubFilterSearch: "",
   hubCategory: "all",
   hubSort: "recent",
   hubPage: 1,
@@ -78,6 +85,10 @@ const state = {
   remoteDraftName: "QuickRemoteScript.py",
   remoteDraftCode: "# Quick remote script\nimport minescript as ms\n\nms.echo(\"Remote script online\")\n",
   settingsTab: "customization",
+  settingsSearch: "",
+  shortcutConfig: loadShortcutConfig(),
+  recordingShortcut: "",
+  shortcutError: "",
   theme: localStorage.getItem("shulkr_theme") || "nova",
   density: localStorage.getItem("shulkr_density") || "comfortable",
   auth: loadAuth()
@@ -231,6 +242,8 @@ async function refreshAll() {
     state.entitlements = snapshot.entitlements || null;
     state.clients = clients || [];
     state.scripts = snapshot.scripts || [];
+    state.shortcutConfig.scripts = Object.fromEntries(state.scripts.filter(script => script.id && (script.shortcut || state.shortcutConfig.scripts[script.id])).map(script => [script.id, script.shortcut || state.shortcutConfig.scripts[script.id]]));
+    saveShortcutConfig(state.shortcutConfig);
     state.scriptFolders = Array.isArray(scriptFolders) ? scriptFolders : [];
     state.libraries = libraries || [];
     state.clientModules = clientModules || [];
@@ -300,6 +313,8 @@ async function refreshLiveState() {
   const [clients, scripts, stream, scriptFolders, analytics] = await Promise.all(requests);
   state.clients = Array.isArray(clients) ? clients : [];
   state.scripts = Array.isArray(scripts) ? scripts : [];
+  state.shortcutConfig.scripts = Object.fromEntries(state.scripts.filter(script => script.id && (script.shortcut || state.shortcutConfig.scripts[script.id])).map(script => [script.id, script.shortcut || state.shortcutConfig.scripts[script.id]]));
+  saveShortcutConfig(state.shortcutConfig);
   state.stream = stream || null;
   state.scriptFolders = Array.isArray(scriptFolders) ? scriptFolders : [];
   if (analytics) {
@@ -1414,6 +1429,7 @@ function topBar(title, icon) {
         <label class="global-search" data-testid="top-search">
           <i class="fa-solid fa-magnifying-glass"></i>
           <input id="search" value="${escapeAttr(state.search)}" placeholder="Search pages, scripts, devices..." autocomplete="off" aria-label="Search dashboard" />
+          <button type="button" class="search-clear" data-clear-search="global" aria-label="Clear global search" ${state.search ? "" : "hidden"}><i class="fa-solid fa-xmark"></i></button>
           <kbd>Ctrl</kbd><kbd>K</kbd>
         </label>
         <div class="global-search-results" id="global-search-results" hidden></div>
@@ -1470,34 +1486,42 @@ function updateGlobalSearchResults(value) {
   if (!container) return;
   const query = String(value || "").trim().toLowerCase();
   state.search = value;
+  const clear = document.querySelector('[data-clear-search="global"]');
+  if (clear) clear.hidden = !value;
   if (!query) {
     container.hidden = true;
     container.innerHTML = "";
     return;
   }
-  const pageResults = nav
-    .filter(([, label, , description]) => `${label} ${description}`.toLowerCase().includes(query))
-    .map(([page, label, icon, description]) => ({ kind: "page", id: page, label, detail: description, icon }));
-  const scriptResults = state.scripts
-    .filter(script => `${script.name || ""} ${script.fileName || ""} ${script.path || ""}`.toLowerCase().includes(query))
-    .map(script => ({ kind: "script", id: script.path, label: script.name || script.fileName || script.path, detail: "Open in Script Editor", icon: "fa-solid fa-file-code" }));
-  const clientResults = state.clients
-    .filter(client => `${client.displayName || ""} ${client.deviceName || ""} ${client.id || ""}`.toLowerCase().includes(query))
-    .map(client => ({ kind: "client", id: client.id, label: client.deviceName || client.displayName || "Minecraft client", detail: client.connected !== false ? "Connected device" : "Offline device", icon: "fa-solid fa-microchip" }));
-  const results = [...pageResults, ...scriptResults, ...clientResults].slice(0, 7);
+  const settings = [
+    { id: "themes", label: "Theme presets", description: "Dashboard palette and appearance", tab: "customization" },
+    { id: "density", label: "Interface density", description: "Compact comfortable spacious", tab: "layout" },
+    { id: "shortcuts", label: "Keyboard shortcuts", description: "Record clear and reset key combinations", tab: "shortcuts" },
+    { id: "connection", label: "Backend connection", description: "API URL and connection status", tab: "connection" },
+    { id: "account", label: "Account and entitlements", description: "Billing devices and features", tab: "account" }
+  ];
+  const index = buildGlobalSearchIndex({ nav, scripts: state.scripts, hub: getHubScripts(), clients: state.clients, templates: state.templates, libraries: state.libraries, modules: state.clientModules, settings });
+  const results = searchGlobalIndex(index, query, 10);
   container.hidden = false;
   container.innerHTML = results.length
     ? results.map(result => `<button type="button" data-global-result="${result.kind}" data-global-id="${escapeAttr(result.id)}"><i class="${result.icon}"></i><span><strong>${escapeHtml(result.label)}</strong><small>${escapeHtml(result.detail)}</small></span><i class="fa-solid fa-arrow-right"></i></button>`).join("")
-    : `<div class="global-search-empty">No pages, scripts, or devices match “${escapeHtml(value)}”.</div>`;
+    : `<div class="global-search-empty">No dashboard content matches “${escapeHtml(value)}”.</div>`;
   container.querySelectorAll("[data-global-result]").forEach(button => button.addEventListener("click", () => {
     const kind = button.dataset.globalResult;
     const id = button.dataset.globalId;
     state.search = "";
     if (kind === "page") return navigateToPage(id);
     if (kind === "script") return openScriptEditor(id);
+    if (kind === "hub") { state.hubSearch = ""; state.scriptView = "hub"; state.selectedScript = getHubScripts().find(item => item.id === id) || null; return navigateToPage("scripts"); }
     if (kind === "client") {
       state.selectedClient = state.clients.find(client => client.id === id) || state.selectedClient;
       navigateToPage("remote");
+    }
+    if (kind === "template") return navigateToPage("library");
+    if (kind === "library" || kind === "module") return navigateToPage("library");
+    if (kind === "setting") {
+      state.settingsTab = settings.find(item => item.id === id)?.tab || "customization";
+      navigateToPage("settings");
     }
   }));
 }
@@ -1631,49 +1655,64 @@ function profilePage() {
 }
 
 function scriptsPage() {
-  const term = state.scriptSearch.trim().toLowerCase();
+  if (state.scriptView === "hub") {
+    return `${topBar("Scripts", "fa-solid fa-file-code")}${scriptWorkspaceTabs()}${libraryPage(true)}`;
+  }
+  const term = state.installedScriptSearch.trim().toLowerCase();
   const folder = state.scriptFolder;
   const visibleScripts = state.scripts.filter(script => {
-    const matchesTerm = !term || `${script.name || ""} ${script.path || ""} ${script.description || ""}`.toLowerCase().includes(term);
+    const configuredValues = Object.values(script.configuredValues || {}).join(" ");
+    const matchesTerm = matchesSearch(script, term, ["name", "fileName", "path", "description", "author", "shortcut", () => configuredValues]);
     const matchesFolder = folder === "all" || String(script.path || "").startsWith(`${folder}/`);
-    return matchesTerm && matchesFolder;
+    const matchesFilter = state.installedFilter === "all"
+      || (state.installedFilter === "configurable" && script.settingCount > 0)
+      || (state.installedFilter === "shortcuts" && script.shortcut)
+      || (state.installedFilter === "recent" && (script.lastRunAt || script.installedAt));
+    return matchesTerm && matchesFolder && matchesFilter;
   });
   return `
     ${topBar("Scripts", "fa-solid fa-file-code")}
+    ${scriptWorkspaceTabs()}
     <section class="card">
       <div class="card-header">
-        <h3><i class="fa-solid fa-folder-open"></i> Local scripts</h3>
+        <h3><i class="fa-solid fa-folder-open"></i> Installed Scripts</h3>
         <div class="script-management-actions">
           <button class="btn btn-secondary" data-action="new-folder"><i class="fa-solid fa-folder-plus"></i> New folder</button>
           <button class="btn btn-primary" data-page="editor"><i class="fa-solid fa-code"></i> Open editor</button>
         </div>
       </div>
       <div class="script-management-toolbar">
-        <label><i class="fa-solid fa-magnifying-glass"></i><input id="script-search" value="${escapeAttr(state.scriptSearch)}" placeholder="Search local scripts…" aria-label="Search local scripts"></label>
+        <label><i class="fa-solid fa-magnifying-glass"></i><input id="installed-script-search" value="${escapeAttr(state.installedScriptSearch)}" placeholder="Search installed scripts…" aria-label="Search installed scripts">${state.installedScriptSearch ? `<button type="button" class="search-clear" data-clear-search="installed" aria-label="Clear installed script search"><i class="fa-solid fa-xmark"></i></button>` : ""}</label>
         <select id="script-folder-filter" aria-label="Filter by folder"><option value="all">All folders</option>${state.scriptFolders.map(item => `<option value="${escapeAttr(item.path)}" ${state.scriptFolder === item.path ? "selected" : ""}>${escapeHtml(item.path)}</option>`).join("")}</select>
+        <select id="installed-script-filter" aria-label="Filter installed scripts"><option value="all">All scripts</option><option value="configurable" ${state.installedFilter === "configurable" ? "selected" : ""}>Configurable</option><option value="shortcuts" ${state.installedFilter === "shortcuts" ? "selected" : ""}>With shortcuts</option><option value="recent" ${state.installedFilter === "recent" ? "selected" : ""}>Recently used</option></select>
         ${folder !== "all" ? `<button class="btn btn-secondary btn-sm" data-folder-rename="${escapeAttr(folder)}"><i class="fa-solid fa-pen"></i> Rename folder</button><button class="btn btn-secondary btn-sm" data-folder-delete="${escapeAttr(folder)}"><i class="fa-solid fa-trash"></i> Delete folder</button>` : ""}
       </div>
       <div class="list script-management-list">
-        ${visibleScripts.length ? visibleScripts.map(scriptManagementItem).join("") : empty(state.scripts.length ? "No scripts match these filters." : "No local scripts yet. Create one in the editor.")}
+        ${visibleScripts.length ? visibleScripts.map(scriptManagementItem).join("") : empty(state.scripts.length ? `No installed scripts match “${escapeHtml(state.installedScriptSearch.trim())}”. Clear the search or change the filters.` : "No installed scripts yet. Install one from Script Hub or create one in the editor.")}
       </div>
     </section>
   `;
 }
 
-function scriptManagementItem(script) {
-  const name = script.name || script.fileName || script.path || "Untitled";
-  return `<div class="list-item script-management-item"><button class="script-management-open" data-script-open="${escapeAttr(script.path)}" aria-label="Open ${escapeAttr(name)} in editor"><span class="icon"><i class="fa-solid fa-file-code"></i></span><span class="content"><strong>${escapeHtml(name)}</strong><small>${escapeHtml(script.description || script.path || "Local script")}</small></span></button><span class="meta">${formatBytes(script.sizeBytes || 0)} · ${script.modifiedAt ? timeAgo(script.modifiedAt) : "Unknown"}</span><div class="script-management-row-actions"><button class="btn-icon" data-script-rename="${escapeAttr(script.path)}" aria-label="Rename ${escapeAttr(name)}" title="Rename"><i class="fa-solid fa-pen"></i></button><button class="btn-icon" data-script-delete="${escapeAttr(script.path)}" aria-label="Delete ${escapeAttr(name)}" title="Delete"><i class="fa-solid fa-trash"></i></button></div></div>`;
+function scriptWorkspaceTabs() {
+  return `<div class="script-workspace-tabs" role="tablist" aria-label="Scripts view"><button role="tab" aria-selected="${state.scriptView === "hub"}" class="${state.scriptView === "hub" ? "active" : ""}" data-script-view="hub"><i class="fa-solid fa-cloud-arrow-down"></i> Script Hub</button><button role="tab" aria-selected="${state.scriptView === "installed"}" class="${state.scriptView === "installed" ? "active" : ""}" data-script-view="installed"><i class="fa-solid fa-hard-drive"></i> Installed Scripts <span>${state.scripts.length}</span></button></div>`;
 }
 
-function libraryPage() {
+function scriptManagementItem(script) {
+  const name = script.name || script.fileName || script.path || "Untitled";
+  const issues = script.metadataIssues || [];
+  return `<div class="list-item script-management-item ${issues.length ? "script-metadata-warning" : ""}"><button class="script-management-open" data-script-open="${escapeAttr(script.path)}" aria-label="Open ${escapeAttr(name)} in editor"><span class="icon"><i class="fa-solid fa-file-code"></i></span><span class="content"><strong>${escapeHtml(name)}</strong><small>${escapeHtml(script.description || script.path || "Local script")}</small><span class="script-inline-meta">${escapeHtml(script.author || "Local")} · ${escapeHtml(script.version || "local")} · ${script.settingCount || 0} variable${script.settingCount === 1 ? "" : "s"}${script.shortcut ? ` · <kbd>${escapeHtml(script.shortcut)}</kbd>` : ""}</span>${issues.length ? `<span class="script-warning"><i class="fa-solid fa-triangle-exclamation"></i> ${issues.length} metadata issue${issues.length === 1 ? "" : "s"}</span>` : ""}</span></button><span class="meta">${formatBytes(script.sizeBytes || 0)} · ${script.modifiedAt ? timeAgo(script.modifiedAt) : "Unknown"}</span><div class="script-management-row-actions"><button class="btn-icon" data-script-run="${escapeAttr(script.id)}" aria-label="Run ${escapeAttr(name)}" title="Run"><i class="fa-solid fa-play"></i></button>${script.settingCount ? `<button class="btn-icon" data-script-settings="${escapeAttr(script.id)}" aria-label="Edit variables for ${escapeAttr(name)}" title="Edit Variables"><i class="fa-solid fa-sliders"></i></button>` : ""}<button class="btn-icon" data-script-shortcut="${escapeAttr(script.id)}" aria-label="${script.shortcut ? "Change" : "Assign"} shortcut for ${escapeAttr(name)}" title="${script.shortcut ? "Change Shortcut" : "Assign Shortcut"}"><i class="fa-solid fa-keyboard"></i></button><button class="btn-icon" data-script-rename="${escapeAttr(script.path)}" aria-label="Rename ${escapeAttr(name)}" title="Rename"><i class="fa-solid fa-pen"></i></button><button class="btn-icon" data-script-delete="${escapeAttr(script.path)}" aria-label="Delete ${escapeAttr(name)}" title="Uninstall"><i class="fa-solid fa-trash"></i></button></div></div>`;
+}
+
+function libraryPage(embedded = false) {
   if (state.loading && state.library.length === 0) {
     return scriptHubSkeleton();
   }
   const all = getHubScripts();
-  const term = state.hubSearch.toLowerCase();
+  const term = state.hubSearch.trim().toLowerCase();
   const category = state.hubCategory.toLowerCase();
   let filtered = all.filter((s) => {
-    const matchesTerm = !term || (s.name || "").toLowerCase().includes(term) || (s.about || "").toLowerCase().includes(term) || (s.author || "").toLowerCase().includes(term);
+    const matchesTerm = matchesSearch(s, term, ["name", "title", "about", "description", "author", "tags", "category", "id", "fileName"]);
     const cat = (s.category || "Other").toLowerCase();
     const matchesCategory = category === "all" || cat === category || (category === "recent" && true);
     const matchesFilter = state.hubFilters[cat] !== false;
@@ -1693,7 +1732,7 @@ function libraryPage() {
   const categories = ["all", "recent", "visual automation", "python", "pyjinn", "farming", "combat", "world", "utility", "other"];
 
   return `
-    ${topBar("Script Hub", "fa-solid fa-file-code")}
+    ${embedded ? "" : topBar("Script Hub", "fa-solid fa-file-code")}
     <section class="hub-layout">
       <div class="hub-main">
         <div class="hub-header">
@@ -1710,6 +1749,7 @@ function libraryPage() {
         <div class="hub-searchbar">
           <i class="fa-solid fa-magnifying-glass"></i>
           <input id="hub-search" value="${escapeAttr(state.hubSearch)}" placeholder="Search scripts, e.g. AutoCrystal..." />
+          ${state.hubSearch ? `<button type="button" class="search-clear" data-clear-search="hub" aria-label="Clear Script Hub search"><i class="fa-solid fa-xmark"></i></button>` : ""}
           <kbd>Ctrl</kbd><kbd>K</kbd>
         </div>
         <div class="hub-categories">
@@ -1732,18 +1772,19 @@ function libraryPage() {
         <div class="filter-section">
           <div class="filter-search">
             <i class="fa-solid fa-magnifying-glass"></i>
-            <input id="filter-search" value="${escapeAttr(state.hubSearch)}" placeholder="Search filters..." />
+            <input id="filter-search" value="${escapeAttr(state.hubFilterSearch)}" placeholder="Search filters..." />
+            ${state.hubFilterSearch ? `<button type="button" class="search-clear" data-clear-search="hub-filters" aria-label="Clear filter search"><i class="fa-solid fa-xmark"></i></button>` : ""}
           </div>
         </div>
         <div class="filter-section">
           <div class="filter-heading">Categories</div>
           <div class="filter-checks">
-            ${Object.entries(state.hubFilters).map(([key, checked]) => `
+            ${Object.entries(state.hubFilters).filter(([key]) => key.includes(state.hubFilterSearch.trim().toLowerCase())).map(([key, checked]) => `
               <label class="filter-check">
                 <input type="checkbox" data-hub-filter="${key}" ${checked ? "checked" : ""} />
                 <span>${key.charAt(0).toUpperCase() + key.slice(1)}</span>
               </label>
-            `).join("")}
+            `).join("") || `<div class="filter-empty">No filters match.</div>`}
           </div>
         </div>
         <div class="filter-section">
@@ -1754,34 +1795,6 @@ function libraryPage() {
             <option value="stars" ${state.hubSort === "stars" ? "selected" : ""}>Most stars</option>
             <option value="name" ${state.hubSort === "name" ? "selected" : ""}>Name</option>
           </select>
-        </div>
-        <div class="filter-section">
-          <div class="filter-heading">Time</div>
-          <select id="hub-time">
-            <option>All Time</option>
-            <option>Today</option>
-            <option>This Week</option>
-            <option>This Month</option>
-            <option>This Year</option>
-          </select>
-        </div>
-        <div class="filter-section">
-          <div class="filter-heading">Other</div>
-          <label class="filter-toggle">
-            <input type="checkbox" checked />
-            <span class="toggle"></span>
-            <span>Published scripts</span>
-          </label>
-          <label class="filter-toggle">
-            <input type="checkbox" checked />
-            <span class="toggle"></span>
-            <span>Installable</span>
-          </label>
-          <label class="filter-toggle">
-            <input type="checkbox" checked />
-            <span class="toggle"></span>
-            <span>Show about text</span>
-          </label>
         </div>
       </aside>
     </section>
@@ -1939,8 +1952,8 @@ function editorPage() {
     return editorSkeletonPage();
   }
   const filtered = state.scripts.filter((s) => {
-    const term = state.scriptSearch.toLowerCase();
-    return !term || (s.name || s.fileName || s.path || "").toLowerCase().includes(term);
+    const term = state.editorSearch.trim().toLowerCase();
+    return matchesSearch(s, term, ["name", "fileName", "path", "description", "author", "id"]);
   });
   return `
     ${topBar("Script Editor", "fa-solid fa-code")}
@@ -1950,9 +1963,9 @@ function editorPage() {
           <h3><i class="fa-solid fa-folder-open"></i> Scripts</h3>
           <button class="btn btn-primary btn-sm" data-action="new-script"><i class="fa-solid fa-plus"></i> New</button>
         </div>
-        <label class="editor-script-search"><i class="fa-solid fa-magnifying-glass"></i><input id="script-search" value="${escapeAttr(state.scriptSearch)}" placeholder="Search scripts…" aria-label="Search scripts"></label>
+        <label class="editor-script-search"><i class="fa-solid fa-magnifying-glass"></i><input id="editor-script-search" value="${escapeAttr(state.editorSearch)}" placeholder="Search scripts…" aria-label="Search editor files">${state.editorSearch ? `<button type="button" class="search-clear" data-clear-search="editor" aria-label="Clear editor file search"><i class="fa-solid fa-xmark"></i></button>` : ""}</label>
         <div class="scripts-list">
-          ${filtered.map(scriptListItem).join("") || empty("No scripts found.")}
+          ${filtered.map(scriptListItem).join("") || empty(`No editor files match “${escapeHtml(state.editorSearch.trim())}”.`)}
         </div>
       </div>
       <div class="scripts-editor card">
@@ -2449,6 +2462,7 @@ function settingsPage() {
   const tabs = [
     ["customization", "Customization", "fa-solid fa-palette"],
     ["layout", "Layout", "fa-solid fa-table-columns"],
+    ["shortcuts", "Shortcuts", "fa-solid fa-keyboard"],
     ["connection", "Connection", "fa-solid fa-server"],
     ["account", "Account", "fa-solid fa-user-shield"]
   ];
@@ -2466,6 +2480,7 @@ function settingsPage() {
       <div class="settings-tabs">
         ${tabs.map(([id, label, icon]) => `<button class="${state.settingsTab === id ? "active" : ""}" data-settings-tab="${id}"><i class="${icon}"></i>${label}</button>`).join("")}
       </div>
+      <label class="settings-search"><i class="fa-solid fa-magnifying-glass"></i><input id="settings-search" value="${escapeAttr(state.settingsSearch)}" placeholder="Search settings…" aria-label="Search settings">${state.settingsSearch ? `<button type="button" class="search-clear" data-clear-search="settings" aria-label="Clear settings search"><i class="fa-solid fa-xmark"></i></button>` : ""}</label>
       <div class="settings-tab-panel">
         ${settingsTabContent(entitlements)}
       </div>
@@ -2474,6 +2489,20 @@ function settingsPage() {
 }
 
 function settingsTabContent(entitlements) {
+  const query = state.settingsSearch.trim();
+  const searchable = {
+    customization: "theme presets palette appearance colors nova midnight ember matrix",
+    layout: "layout interface density compact comfortable spacious sidebar animations card effects",
+    shortcuts: "keyboard shortcuts global search remote run new script installed scripts assign clear reset key combination",
+    connection: "backend connection api url remote stream status",
+    account: "account entitlements tier admin billing features devices"
+  };
+  if (query && !String(searchable[state.settingsTab] || "").toLowerCase().includes(query.toLowerCase())) {
+    const matchingTab = Object.entries(searchable).find(([, value]) => value.toLowerCase().includes(query.toLowerCase()));
+    return matchingTab
+      ? `<div class="card settings-search-empty">${empty(`No ${state.settingsTab} settings match “${escapeHtml(query)}”.`)}<button class="btn btn-secondary" data-settings-tab="${matchingTab[0]}">Show matching ${escapeHtml(matchingTab[0])} settings</button></div>`
+      : `<div class="card settings-search-empty">${empty(`No settings match “${escapeHtml(query)}”.`)}</div>`;
+  }
   if (state.settingsTab === "customization") {
     const themes = [
       ["nova", "Nova", "Purple energy", ["#08050c", "#9d4dff", "#ff3aa5"]],
@@ -2512,10 +2541,22 @@ function settingsTabContent(entitlements) {
       <div class="card"><div class="card-header"><h3><i class="fa-solid fa-wand-magic-sparkles"></i> Experience</h3></div><div class="meta-row"><span>Sidebar</span><span>Adaptive</span></div><div class="meta-row"><span>Animations</span><span>Enabled</span></div><div class="meta-row"><span>Card effects</span><span>Glass</span></div></div>
     </div>`;
   }
+  if (state.settingsTab === "shortcuts") {
+    const appLabels = { "global-search": ["Global search", "Focus cross-section search from anywhere"], "remote-run": ["Run selected remote script", "Available on the Remote page"], "new-script": ["Create a script", "Open the new-script workflow"] };
+    const appRows = Object.entries(appLabels).map(([id, [label, description]]) => shortcutSettingsRow(id, label, description, state.shortcutConfig.app[id] || "", "app")).join("");
+    const scriptRows = state.scripts.map(script => shortcutSettingsRow(script.id, script.name || script.path, script.path, state.shortcutConfig.scripts[script.id] || script.shortcut || "", "script")).join("");
+    return `<div class="settings-grid shortcut-settings-grid"><div class="card"><div class="card-header"><h3><i class="fa-solid fa-keyboard"></i> Application shortcuts</h3><button class="btn btn-secondary btn-sm" data-shortcut-reset><i class="fa-solid fa-rotate-left"></i> Reset defaults</button></div><p class="settings-note">Click a row, then press a key combination. Escape cancels; Backspace or Delete clears.</p>${state.shortcutError ? `<div class="shortcut-error"><i class="fa-solid fa-triangle-exclamation"></i>${escapeHtml(state.shortcutError)}</div>` : ""}<div class="shortcut-list">${appRows}</div></div><div class="card"><div class="card-header"><h3><i class="fa-solid fa-file-code"></i> Installed script shortcuts</h3></div><p class="settings-note">Script bindings use persistent script IDs and run through the same validated Minescript command flow.</p><div class="shortcut-list">${scriptRows || empty("Install a script to assign its shortcut.")}</div></div></div>`;
+  }
   if (state.settingsTab === "connection") {
     return `<div class="settings-grid"><div class="card"><div class="card-header"><h3><i class="fa-solid fa-server"></i> Backend connection</h3></div><div class="form-group"><label>Backend URL</label><input id="api-base" value="${escapeAttr(API_BASE)}" /></div><div class="settings-actions"><button class="btn btn-primary" data-action="save-api"><i class="fa-solid fa-floppy-disk"></i> Save</button><button class="btn btn-secondary" data-action="refresh"><i class="fa-solid fa-rotate"></i> Test connection</button></div></div><div class="card"><div class="card-header"><h3><i class="fa-solid fa-signal"></i> Status</h3></div><div class="meta-row"><span>Backend</span><span class="${state.online ? "settings-online" : ""}">${state.online ? "Connected" : "Offline"}</span></div><div class="meta-row"><span>Remote stream</span><span>${state.stream?.available ? "Ready" : "Unavailable"}</span></div></div></div>`;
   }
   return `<div class="settings-grid"><div class="card"><div class="card-header"><h3><i class="fa-solid fa-key"></i> Entitlements</h3></div><div class="meta-row"><span>Tier</span><span>${escapeHtml(entitlements.tier || "Premium")}</span></div><div class="meta-row"><span>Admin</span><span>${entitlements.isAdmin ? "Yes" : "No"}</span></div><div class="admin-tag-row settings-feature-tags">${(entitlements.features || []).map(feature => `<span class="hub-tag">${escapeHtml(feature)}</span>`).join("") || `<span class="hub-tag">client</span>`}</div></div><div class="card"><div class="card-header"><h3><i class="fa-solid fa-wallet"></i> Billing & account</h3></div><p class="settings-note">Manage your subscription, payment details, devices, and customer profile.</p><div class="settings-actions"><button class="btn btn-primary" data-page="billing"><i class="fa-solid fa-credit-card"></i> Billing</button><button class="btn btn-secondary" data-page="customerPortal"><i class="fa-solid fa-id-card"></i> Customer portal</button></div></div></div>`;
+}
+
+function shortcutSettingsRow(id, label, description, shortcut, kind) {
+  const recording = state.recordingShortcut === `${kind}:${id}`;
+  const keycaps = recording ? `<kbd class="recording">Press keys…</kbd>` : shortcut ? normalizeShortcut(shortcut).split("+").map(part => `<kbd>${escapeHtml(part)}</kbd>`).join(`<span class="shortcut-plus">+</span>`) : `<span class="shortcut-unassigned">Unassigned</span>`;
+  return `<button type="button" class="shortcut-row ${recording ? "recording" : ""}" data-shortcut-record="${kind}:${escapeAttr(id)}"><span><strong>${escapeHtml(label)}</strong><small>${escapeHtml(description)}</small></span><span class="shortcut-keycaps">${keycaps}</span>${shortcut ? `<span class="shortcut-clear" data-shortcut-clear="${kind}:${escapeAttr(id)}" role="button" tabindex="0" aria-label="Clear ${escapeAttr(label)} shortcut"><i class="fa-solid fa-xmark"></i></span>` : ""}</button>`;
 }
 
 function applyDashboardTheme(theme, density) {
@@ -2958,6 +2999,7 @@ function bind() {
       render();
     });
   });
+  document.querySelectorAll("[data-script-view]").forEach(node => node.addEventListener("click", () => { state.scriptView = node.dataset.scriptView; state.hubPage = 1; render(); }));
   document.querySelectorAll("[data-theme-choice]").forEach((node) => {
     node.addEventListener("click", () => {
       state.theme = node.dataset.themeChoice;
@@ -2988,10 +3030,7 @@ function bind() {
     node.addEventListener("click", () => handleAction(node.dataset.action));
   });
   document.querySelectorAll("[data-modal-close]").forEach((node) => {
-    node.addEventListener("click", () => {
-      state.modal = null;
-      render();
-    });
+    node.addEventListener("click", () => closeModalSafely());
   });
   document.querySelectorAll("[data-filter]").forEach((node) => {
     node.addEventListener("click", async () => {
@@ -3035,20 +3074,32 @@ function bind() {
     });
   });
   document.querySelectorAll("[data-script-open]").forEach(node => node.addEventListener("click", () => openScriptEditor(node.dataset.scriptOpen)));
+  document.querySelectorAll("[data-script-run]").forEach(node => node.addEventListener("click", () => runInstalledScript(node.dataset.scriptRun)));
+  document.querySelectorAll("[data-script-settings]").forEach(node => node.addEventListener("click", () => openInstalledScriptSettings(node.dataset.scriptSettings)));
+  document.querySelectorAll("[data-script-shortcut]").forEach(node => node.addEventListener("click", () => startScriptShortcutRecording(node.dataset.scriptShortcut)));
   document.querySelectorAll("[data-script-rename]").forEach(node => node.addEventListener("click", () => renameManagedScript(node.dataset.scriptRename)));
   document.querySelectorAll("[data-script-delete]").forEach(node => node.addEventListener("click", () => deleteManagedScript(node.dataset.scriptDelete)));
   document.querySelectorAll("[data-folder-rename]").forEach(node => node.addEventListener("click", () => renameScriptFolder(node.dataset.folderRename)));
   document.querySelectorAll("[data-folder-delete]").forEach(node => node.addEventListener("click", () => deleteScriptFolder(node.dataset.folderDelete)));
-  const scriptSearchInput = document.getElementById("script-search");
-  if (scriptSearchInput) scriptSearchInput.addEventListener("input", event => {
-    state.scriptSearch = event.target.value;
+  const installedSearchInput = document.getElementById("installed-script-search");
+  if (installedSearchInput) installedSearchInput.addEventListener("input", event => {
+    state.installedScriptSearch = event.target.value;
     render();
-    const replacement = document.getElementById("script-search");
+    const replacement = document.getElementById("installed-script-search");
+    replacement?.focus();
+    replacement?.setSelectionRange?.(replacement.value.length, replacement.value.length);
+  });
+  const editorSearchInput = document.getElementById("editor-script-search");
+  if (editorSearchInput) editorSearchInput.addEventListener("input", event => {
+    state.editorSearch = event.target.value;
+    render();
+    const replacement = document.getElementById("editor-script-search");
     replacement?.focus();
     replacement?.setSelectionRange?.(replacement.value.length, replacement.value.length);
   });
   const scriptFolderFilter = document.getElementById("script-folder-filter");
   if (scriptFolderFilter) scriptFolderFilter.addEventListener("change", event => { state.scriptFolder = event.target.value; render(); });
+  document.getElementById("installed-script-filter")?.addEventListener("change", event => { state.installedFilter = event.target.value; render(); });
   document.querySelectorAll("[data-hub-script]").forEach((node) => {
     node.addEventListener("click", (e) => {
       if (e.target.closest("[data-hub-install], [data-hub-view], [data-hub-more]")) return;
@@ -3186,8 +3237,72 @@ function bind() {
       state.hubSearch = e.target.value;
       state.hubPage = 1;
       render();
+      const replacement = document.getElementById("hub-search");
+      replacement?.focus();
+      replacement?.setSelectionRange?.(replacement.value.length, replacement.value.length);
     });
   }
+  const filterSearchInput = document.getElementById("filter-search");
+  if (filterSearchInput) filterSearchInput.addEventListener("input", event => {
+    state.hubFilterSearch = event.target.value;
+    render();
+    const replacement = document.getElementById("filter-search");
+    replacement?.focus();
+    replacement?.setSelectionRange?.(replacement.value.length, replacement.value.length);
+  });
+  const settingsSearch = document.getElementById("settings-search");
+  if (settingsSearch) settingsSearch.addEventListener("input", event => {
+    state.settingsSearch = event.target.value;
+    render();
+    const replacement = document.getElementById("settings-search");
+    replacement?.focus();
+    replacement?.setSelectionRange?.(replacement.value.length, replacement.value.length);
+  });
+  document.querySelectorAll("[data-clear-search]").forEach(node => node.addEventListener("click", event => {
+    event.preventDefault();
+    const kind = node.dataset.clearSearch;
+    if (kind === "global") state.search = "";
+    if (kind === "installed") state.installedScriptSearch = "";
+    if (kind === "editor") state.editorSearch = "";
+    if (kind === "hub") { state.hubSearch = ""; state.hubPage = 1; }
+    if (kind === "hub-filters") state.hubFilterSearch = "";
+    if (kind === "settings") state.settingsSearch = "";
+    render();
+    const ids = { global: "search", installed: "installed-script-search", editor: "editor-script-search", hub: "hub-search", "hub-filters": "filter-search", settings: "settings-search" };
+    document.getElementById(ids[kind])?.focus();
+  }));
+  document.querySelectorAll("[data-shortcut-record]").forEach(node => node.addEventListener("click", event => {
+    if (event.target.closest("[data-shortcut-clear]")) return;
+    state.recordingShortcut = node.dataset.shortcutRecord;
+    state.shortcutError = "";
+    render();
+  }));
+  document.querySelectorAll("[data-shortcut-clear]").forEach(node => node.addEventListener("click", event => {
+    event.stopPropagation();
+    updateShortcutBinding(node.dataset.shortcutClear, "");
+  }));
+  document.querySelector("[data-shortcut-reset]")?.addEventListener("click", () => {
+    state.shortcutConfig.app = { "global-search": "Ctrl+K", "remote-run": "R", "new-script": "Ctrl+Shift+N" };
+    state.shortcutError = "";
+    saveShortcutConfig(state.shortcutConfig);
+    render();
+    toast("Application shortcuts reset to defaults");
+  });
+  const scriptSettingsForm = document.getElementById("script-settings-form");
+  if (scriptSettingsForm) {
+    scriptSettingsForm.addEventListener("input", event => {
+      if (state.modal?.type === "script-settings") state.modal.dirty = true;
+      if (event.target.type === "range") event.target.nextElementSibling.textContent = event.target.value;
+      if (event.target.type === "checkbox") event.target.closest("label")?.querySelector("span:last-child")?.replaceChildren(event.target.checked ? "On" : "Off");
+    });
+    scriptSettingsForm.addEventListener("submit", event => { event.preventDefault(); saveInstalledScriptSettings(scriptSettingsForm); });
+  }
+  document.querySelector("[data-script-settings-reset]")?.addEventListener("click", () => {
+    if (state.modal?.type !== "script-settings") return;
+    state.modal.values = defaultsForSettings(state.modal.definitions);
+    state.modal.dirty = true;
+    render();
+  });
   const globalSearchInput = document.getElementById("search");
   if (globalSearchInput) {
     const update = () => updateGlobalSearchResults(globalSearchInput.value);
@@ -3351,29 +3466,92 @@ async function handleAuthSubmit(mode) {
 function bindGlobalShortcuts() {
   if (keybindingsBound) return;
   keybindingsBound = true;
-  window.addEventListener("keydown", (e) => {
-    const target = e.target;
-    const typing = target instanceof HTMLElement && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable);
-    if (e.key === "Escape" && state.modal) {
-      state.modal = null;
-      render();
+  window.addEventListener("keydown", async (e) => {
+    if (state.recordingShortcut) {
+      e.preventDefault();
+      e.stopPropagation();
+      if (e.key === "Escape") { state.recordingShortcut = ""; state.shortcutError = ""; render(); return; }
+      if (e.key === "Backspace" || e.key === "Delete") { await updateShortcutBinding(state.recordingShortcut, ""); return; }
+      const combination = shortcutFromKeyboardEvent(e);
+      if (!combination) return;
+      await updateShortcutBinding(state.recordingShortcut, combination);
       return;
     }
-    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
+    if (e.key === "Escape" && state.modal) {
+      closeModalSafely();
+      return;
+    }
+    if (eventMatchesShortcut(e, state.shortcutConfig.app["global-search"])) {
       e.preventDefault();
-      const focusTarget = state.page === "scripts"
-        ? document.getElementById("script-search")
-        : document.getElementById("search")
-          || document.getElementById("hub-search");
+      const focusTarget = document.getElementById("search");
       focusTarget?.focus();
       focusTarget?.select?.();
       return;
     }
-    if (typing) return;
-    if (state.page === "remote" && e.key.toLowerCase() === "r" && state.selectedClient && state.selectedScript) {
+    if (isTypingTarget(e.target, Boolean(state.modal))) return;
+    if (eventMatchesShortcut(e, state.shortcutConfig.app["remote-run"]) && state.page === "remote" && state.selectedClient && state.selectedScript) {
+      e.preventDefault();
       handleAction("remote-run");
+      return;
+    }
+    if (eventMatchesShortcut(e, state.shortcutConfig.app["new-script"])) {
+      e.preventDefault();
+      handleAction("new-script");
+      return;
+    }
+    const scriptBinding = Object.entries(state.shortcutConfig.scripts).find(([, shortcut]) => eventMatchesShortcut(e, shortcut));
+    if (scriptBinding) {
+      e.preventDefault();
+      await runInstalledScript(scriptBinding[0]);
     }
   });
+}
+
+function closeModalSafely() {
+  if (state.modal?.type === "script-settings" && state.modal.dirty && !window.confirm("Discard unsaved script variable changes?")) return false;
+  state.modal = null;
+  render();
+  return true;
+}
+
+async function updateShortcutBinding(bindingId, shortcut) {
+  const separator = bindingId.indexOf(":");
+  const kind = bindingId.slice(0, separator);
+  const id = bindingId.slice(separator + 1);
+  const normalized = normalizeShortcut(shortcut);
+  const allBindings = {
+    ...Object.fromEntries(Object.entries(state.shortcutConfig.app).map(([key, value]) => [`app:${key}`, value])),
+    ...Object.fromEntries(Object.entries(state.shortcutConfig.scripts).map(([key, value]) => [`script:${key}`, value]))
+  };
+  const conflict = findShortcutConflict(allBindings, normalized, bindingId);
+  if (conflict) {
+    const conflictLabel = conflict.startsWith("script:")
+      ? state.scripts.find(script => script.id === conflict.slice(7))?.name || "another script"
+      : { "app:global-search": "Global search", "app:remote-run": "Run selected remote script", "app:new-script": "Create a script" }[conflict] || "another action";
+    state.shortcutError = `${normalized} is already assigned to ${conflictLabel}. Choose a different combination.`;
+    render();
+    return false;
+  }
+  try {
+    if (kind === "app") state.shortcutConfig.app[id] = normalized;
+    else {
+      if (normalized) state.shortcutConfig.scripts[id] = normalized;
+      else delete state.shortcutConfig.scripts[id];
+      const response = await api(`/api/scripts/${encodeURIComponent(id)}/shortcut`, { method: "PUT", body: JSON.stringify({ shortcut: normalized }) });
+      const script = state.scripts.find(item => item.id === id);
+      if (script) script.shortcut = response.shortcut;
+    }
+    saveShortcutConfig(state.shortcutConfig);
+    state.recordingShortcut = "";
+    state.shortcutError = "";
+    render();
+    toast(normalized ? `Shortcut saved: ${normalized}` : "Shortcut cleared");
+    return true;
+  } catch (error) {
+    state.shortcutError = error.message || "Shortcut could not be saved";
+    render();
+    return false;
+  }
 }
 
 async function handleAction(action) {
@@ -3431,6 +3609,66 @@ async function openScriptEditor(scriptPath) {
   } catch (error) {
     toast(error.message || "Failed to load script");
   }
+}
+
+async function openInstalledScriptSettings(scriptId) {
+  const script = state.scripts.find(item => item.id === scriptId);
+  if (!script) return toast("Installed script could not be found");
+  try {
+    const result = await api(`/api/scripts/${encodeURIComponent(scriptId)}/settings`);
+    state.modal = { type: "script-settings", script, definitions: result.definitions || [], issues: result.issues || [], warnings: result.warnings || [], values: structuredClone(result.values || {}), savedValues: structuredClone(result.values || {}), dirty: false };
+    render();
+  } catch (error) { toast(error.message || "Script variables could not be loaded"); }
+}
+
+function collectScriptSettingValues(form, definitions) {
+  const values = {};
+  for (const definition of definitions) {
+    if (definition.type === "boolean") values[definition.key] = form.querySelector(`[name="${CSS.escape(definition.key)}"]`)?.checked === true;
+    else if (definition.type === "coordinates") values[definition.key] = Object.fromEntries(["x", "y", "z"].map(axis => [axis, form.querySelector(`[name="${CSS.escape(`${definition.key}.${axis}`)}"]`)?.value]));
+    else values[definition.key] = form.querySelector(`[name="${CSS.escape(definition.key)}"]`)?.value;
+  }
+  return values;
+}
+
+async function saveInstalledScriptSettings(form) {
+  const modal = state.modal;
+  if (modal?.type !== "script-settings") return;
+  const validation = validateScriptValues(modal.definitions, collectScriptSettingValues(form, modal.definitions));
+  form.querySelectorAll("[data-setting-error]").forEach(node => { node.textContent = validation.errors[node.dataset.settingError] || ""; });
+  if (!validation.valid) return toast("Fix the highlighted variable values before saving");
+  try {
+    const result = await api(`/api/scripts/${encodeURIComponent(modal.script.id)}/settings`, { method: "PUT", body: JSON.stringify({ values: validation.values }) });
+    modal.values = structuredClone(result.values);
+    modal.savedValues = structuredClone(result.values);
+    modal.dirty = false;
+    state.modal = null;
+    await refreshLiveState();
+    render();
+    toast("Script variables saved");
+  } catch (error) {
+    if (error.details?.errors) for (const [key, message] of Object.entries(error.details.errors)) form.querySelector(`[data-setting-error="${CSS.escape(key)}"]`)?.replaceChildren(message);
+    toast(error.message || "Script variables could not be saved");
+  }
+}
+
+async function runInstalledScript(scriptId) {
+  const script = state.scripts.find(item => item.id === scriptId);
+  if (!script) return toast("Installed script is missing");
+  if (!state.selectedClient?.id) state.selectedClient = state.clients.find(client => client.connected !== false) || null;
+  if (!state.selectedClient?.id) return toast("Connect a Minecraft client before running a script");
+  try {
+    await api("/api/control/commands", { method: "POST", body: JSON.stringify({ clientId: state.selectedClient.id, type: "run_script", payload: { path: script.path } }) });
+    toast(`${script.name || script.path} queued with its saved variables`);
+  } catch (error) { toast(error.message || "Script could not be started"); }
+}
+
+function startScriptShortcutRecording(scriptId) {
+  state.settingsTab = "shortcuts";
+  state.recordingShortcut = `script:${scriptId}`;
+  state.shortcutError = "";
+  state.page = "settings";
+  render();
 }
 
 function exportAnalyticsCsv() {
@@ -3588,7 +3826,29 @@ function renderModal() {
   if (state.modal?.type === "hub-details") {
     return hubDetailsModal(state.modal.script, state.modal.installedPath);
   }
+  if (state.modal?.type === "script-settings") return scriptSettingsModal(state.modal);
   return "";
+}
+
+function scriptSettingsModal(modal) {
+  const script = modal.script;
+  const definitions = modal.definitions || [];
+  const values = modal.values || {};
+  const fields = definitions.map(definition => scriptSettingField(definition, values[definition.key])).join("");
+  return `<div class="modal-backdrop" data-modal-close><div class="modal-card modal-lg script-settings-modal" role="dialog" aria-modal="true" aria-labelledby="script-settings-title"><div class="card-header"><div><h3 id="script-settings-title"><i class="fa-solid fa-sliders"></i> Variables · ${escapeHtml(script.name || script.path)}</h3><p>${definitions.length} configurable variable${definitions.length === 1 ? "" : "s"}</p></div><button class="btn-icon" type="button" data-modal-close title="Close"><i class="fa-solid fa-xmark"></i></button></div>${modal.warnings?.length ? `<div class="script-setting-warnings">${modal.warnings.map(warning => `<p><i class="fa-solid fa-triangle-exclamation"></i>${escapeHtml(warning)}</p>`).join("")}</div>` : ""}${modal.issues?.length ? `<div class="script-setting-errors">${modal.issues.map(issue => `<p><strong>Line ${issue.line}:</strong> ${escapeHtml(issue.message)}</p>`).join("")}</div>` : ""}<form id="script-settings-form" class="script-settings-form">${fields}<div class="modal-actions"><button type="button" class="btn btn-secondary" data-script-settings-reset><i class="fa-solid fa-rotate-left"></i> Reset to Defaults</button><span class="modal-action-spacer"></span><button type="button" class="btn btn-secondary" data-modal-close>Cancel</button><button type="submit" class="btn btn-primary" ${modal.issues?.length ? "disabled" : ""}><i class="fa-solid fa-floppy-disk"></i> Save</button></div></form></div></div>`;
+}
+
+function scriptSettingField(definition, value) {
+  const id = `script-setting-${definition.key}`;
+  const description = definition.description ? `<small>${escapeHtml(definition.description)}</small>` : "";
+  const constraints = [definition.min !== undefined ? `min ${definition.min}` : "", definition.max !== undefined ? `max ${definition.max}` : "", definition.step !== undefined ? `step ${definition.step}` : ""].filter(Boolean).join(" · ");
+  let control;
+  if (definition.type === "boolean") control = `<label class="filter-toggle script-variable-toggle"><input id="${id}" name="${escapeAttr(definition.key)}" type="checkbox" ${value ? "checked" : ""}><span class="toggle"></span><span>${value ? "On" : "Off"}</span></label>`;
+  else if (definition.type === "select") control = `<select id="${id}" name="${escapeAttr(definition.key)}">${definition.options.map(option => `<option value="${escapeAttr(option)}" ${String(value) === option ? "selected" : ""}>${escapeHtml(option)}</option>`).join("")}</select>`;
+  else if (definition.type === "coordinates") control = `<div class="coordinate-inputs">${["x", "y", "z"].map(axis => `<label><span>${axis.toUpperCase()}</span><input type="number" step="any" name="${escapeAttr(definition.key)}.${axis}" value="${escapeAttr(value?.[axis] ?? 0)}"></label>`).join("")}</div>`;
+  else if (definition.type === "slider") control = `<div class="script-slider"><input id="${id}" name="${escapeAttr(definition.key)}" type="range" value="${escapeAttr(value)}" min="${definition.min ?? 0}" max="${definition.max ?? 100}" step="${definition.step ?? 1}"><output>${escapeHtml(value)}</output></div>`;
+  else control = `<input id="${id}" name="${escapeAttr(definition.key)}" type="${definition.type === "number" ? "number" : "text"}" value="${escapeAttr(value ?? "")}" ${definition.min !== undefined ? `min="${definition.min}"` : ""} ${definition.max !== undefined ? `max="${definition.max}"` : ""} ${definition.step !== undefined ? `step="${definition.step}"` : ""} ${definition.required ? "required" : ""} autocomplete="off">`;
+  return `<div class="script-setting-field" data-script-setting-field="${escapeAttr(definition.key)}"><label for="${id}"><strong>${escapeHtml(definition.label)}</strong>${definition.required ? `<span class="required">Required</span>` : ""}${description}</label>${control}${constraints ? `<small class="setting-constraints">${escapeHtml(constraints)}</small>` : ""}<div class="field-error" data-setting-error="${escapeAttr(definition.key)}"></div></div>`;
 }
 
 function publishScriptModal() {
