@@ -1,7 +1,0 @@
-
-> shulkr-backend@0.1.0 start
-> node src/server.js
-
-Shulkr Express backend running at http://127.0.0.1:50991
-Scripts: C:\Users\ryand\Desktop\ShulkrClient\run\minescript
-Data: C:\Users\ryand\Desktop\ShulkrClient\run\shulkr-backend
