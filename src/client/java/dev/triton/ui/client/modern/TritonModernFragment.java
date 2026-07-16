@@ -7700,8 +7700,7 @@ public final class TritonModernFragment extends Fragment {
 		LinearLayout itemRow = row(DOCK_ITEM_GAP);
 		int[] activeIndex = {-1};
 		int[] indicatorTargetIndex = {-1};
-		AnimatorSet[] positionAnimation = new AnimatorSet[1];
-		ValueAnimator[] widthAnimation = new ValueAnimator[1];
+		ValueAnimator[] positionAnimation = new ValueAnimator[1];
 		int itemIndex = 0;
 		for (String[] item : dockItems) {
 			int tabIndex = itemIndex;
@@ -7731,30 +7730,27 @@ public final class TritonModernFragment extends Fragment {
 			tab.setOnHoverListener((target, event) -> {
 				if (event.getAction() == MotionEvent.ACTION_HOVER_ENTER) {
 					indicatorTargetIndex[0] = tabIndex;
-					moveDockIndicator(indicator, tabIndex, positionAnimation, widthAnimation, true);
-					return true;
-				}
-				if (event.getAction() == MotionEvent.ACTION_HOVER_EXIT) {
+					moveDockIndicator(indicator, tabIndex, positionAnimation, true);
+				} else if (event.getAction() == MotionEvent.ACTION_HOVER_EXIT) {
 					dock.post(() -> {
 						if (indicatorTargetIndex[0] == tabIndex && activeIndex[0] >= 0) {
 							indicatorTargetIndex[0] = activeIndex[0];
-							moveDockIndicator(indicator, activeIndex[0], positionAnimation, widthAnimation, true);
+							moveDockIndicator(indicator, activeIndex[0], positionAnimation, true);
 						}
 					});
-					return true;
 				}
 				return false;
 			});
 			tab.setOnFocusChangeListener((target, hasFocus) -> {
 				if (hasFocus) {
 					indicatorTargetIndex[0] = tabIndex;
-					moveDockIndicator(indicator, tabIndex, positionAnimation, widthAnimation, true);
+					moveDockIndicator(indicator, tabIndex, positionAnimation, true);
 					return;
 				}
 				dock.post(() -> {
 					if (!dock.hasFocus() && activeIndex[0] >= 0) {
 						indicatorTargetIndex[0] = activeIndex[0];
-						moveDockIndicator(indicator, activeIndex[0], positionAnimation, widthAnimation, true);
+						moveDockIndicator(indicator, activeIndex[0], positionAnimation, true);
 					}
 				});
 			});
@@ -7788,93 +7784,60 @@ public final class TritonModernFragment extends Fragment {
 		dock.setOnHoverListener((target, event) -> {
 			if (event.getAction() == MotionEvent.ACTION_HOVER_EXIT && activeIndex[0] >= 0) {
 				indicatorTargetIndex[0] = activeIndex[0];
-				moveDockIndicator(indicator, activeIndex[0], positionAnimation, widthAnimation, true);
+				moveDockIndicator(indicator, activeIndex[0], positionAnimation, true);
 			}
 			return false;
 		});
 		track.addOnLayoutChangeListener((view, left, top, right, bottom, oldLeft, oldTop, oldRight, oldBottom) -> {
 			if (indicatorTargetIndex[0] >= 0 && (right - left != oldRight - oldLeft || bottom - top != oldBottom - oldTop)) {
-				moveDockIndicator(indicator, indicatorTargetIndex[0], positionAnimation, widthAnimation, false);
+				moveDockIndicator(indicator, indicatorTargetIndex[0], positionAnimation, false);
 			}
 		});
 		track.post(() -> {
 			if (activeIndex[0] >= 0) {
 				indicatorTargetIndex[0] = activeIndex[0];
-				moveDockIndicator(indicator, activeIndex[0], positionAnimation, widthAnimation, false);
+				moveDockIndicator(indicator, activeIndex[0], positionAnimation, false);
 			}
 		});
 		return dock;
 	}
 
-	private void moveDockIndicator(View indicator, int targetIndex, AnimatorSet[] positionAnimation,
-			ValueAnimator[] widthAnimation, boolean animate) {
+	private void moveDockIndicator(View indicator, int targetIndex, ValueAnimator[] positionAnimation, boolean animate) {
 		if (targetIndex < 0) {
 			return;
 		}
-		float targetX = targetIndex * (DOCK_ITEM_SIZE + DOCK_ITEM_GAP);
-		int targetWidth = DOCK_ITEM_SIZE;
+		int targetLeft = targetIndex * (DOCK_ITEM_SIZE + DOCK_ITEM_GAP);
 		boolean motionEnabled = animate && animatedHoverHighlight && ValueAnimator.areAnimatorsEnabled();
-		if (!motionEnabled) {
-			cancelDockIndicatorAnimations(positionAnimation, widthAnimation);
-			setDockIndicatorBounds(indicator, (int) targetX, targetWidth);
-			indicator.setTranslationX(0.0F);
+		cancelDockIndicatorAnimation(positionAnimation);
+		if (indicator.getWidth() <= 0) {
+			FrameLayout.LayoutParams params = (FrameLayout.LayoutParams) indicator.getLayoutParams();
+			params.leftMargin = targetLeft;
+			indicator.setLayoutParams(params);
 			indicator.setAlpha(1.0F);
 			return;
 		}
 
-		cancelDockIndicatorAnimations(positionAnimation, widthAnimation);
-		float currentVisualX = indicator.getLeft() + indicator.getTranslationX();
-		setDockIndicatorLeft(indicator, (int) targetX);
-		indicator.setTranslationX(currentVisualX - targetX);
-		ObjectAnimator translate = ObjectAnimator.ofFloat(indicator, View.TRANSLATION_X, indicator.getTranslationX(), 0.0F);
-		ObjectAnimator fade = ObjectAnimator.ofFloat(indicator, View.ALPHA, indicator.getAlpha(), 1.0F);
-		AnimatorSet position = new AnimatorSet();
-		position.playTogether(new Animator[]{translate, fade});
+		int currentLeft = indicator.getLeft();
+		if (!motionEnabled) {
+			indicator.offsetLeftAndRight(targetLeft - currentLeft);
+			indicator.setAlpha(1.0F);
+			return;
+		}
+
+		ValueAnimator position = ValueAnimator.ofInt(currentLeft, targetLeft);
+		position.addUpdateListener(animation -> {
+			int animatedLeft = (Integer) animation.getAnimatedValue();
+			indicator.offsetLeftAndRight(animatedLeft - indicator.getLeft());
+		});
 		position.setDuration(DOCK_INDICATOR_MS);
 		positionAnimation[0] = position;
-
-		int currentWidth = indicator.getLayoutParams() == null ? targetWidth : indicator.getLayoutParams().width;
-		ValueAnimator width = ValueAnimator.ofInt(currentWidth, targetWidth);
-		width.addUpdateListener(animation -> setDockIndicatorWidth(indicator, (Integer) animation.getAnimatedValue()));
-		width.setDuration(DOCK_INDICATOR_MS);
-		widthAnimation[0] = width;
 		position.start();
-		width.start();
 	}
 
-	private void cancelDockIndicatorAnimations(AnimatorSet[] positionAnimation, ValueAnimator[] widthAnimation) {
+	private void cancelDockIndicatorAnimation(ValueAnimator[] positionAnimation) {
 		if (positionAnimation[0] != null) {
 			positionAnimation[0].cancel();
 			positionAnimation[0] = null;
-		}
-		if (widthAnimation[0] != null) {
-			widthAnimation[0].cancel();
-			widthAnimation[0] = null;
-		}
-	}
-
-	private void setDockIndicatorWidth(View indicator, int width) {
-		ViewGroup.LayoutParams params = indicator.getLayoutParams();
-		if (params != null && params.width != width) {
-			params.width = width;
-			indicator.setLayoutParams(params);
-		}
-	}
-
-	private void setDockIndicatorLeft(View indicator, int left) {
-		FrameLayout.LayoutParams params = (FrameLayout.LayoutParams) indicator.getLayoutParams();
-		if (params != null && params.leftMargin != left) {
-			params.leftMargin = left;
-			indicator.setLayoutParams(params);
-		}
-	}
-
-	private void setDockIndicatorBounds(View indicator, int left, int width) {
-		FrameLayout.LayoutParams params = (FrameLayout.LayoutParams) indicator.getLayoutParams();
-		if (params != null && (params.leftMargin != left || params.width != width)) {
-			params.leftMargin = left;
-			params.width = width;
-			indicator.setLayoutParams(params);
 		}
 	}
 
