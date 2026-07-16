@@ -2,6 +2,7 @@
 /.codex-logs/
 /.github/workflows/
 /ShulkrnetWebsite/
+/skills-lock.json
 
 # Gradle / Java
 .gradle/
