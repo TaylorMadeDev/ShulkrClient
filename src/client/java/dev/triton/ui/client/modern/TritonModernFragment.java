@@ -123,7 +123,9 @@ public final class TritonModernFragment extends Fragment {
 	private static final long HOVER_IN_MS = 150L;
 	private static final long HOVER_OUT_MS = 190L;
 	private static final long MENU_IN_MS = 165L;
+	private static final long MENU_OUT_MS = 150L;
 	private static final long MODAL_IN_MS = 220L;
+	private static final long TOGGLE_COMMIT_DELAY_MS = 220L;
 	private static final long PRESS_IN_MS = 70L;
 	private static final long PRESS_OUT_MS = 120L;
 	private static final long PAGE_IN_MS = 210L;
@@ -163,6 +165,8 @@ public final class TritonModernFragment extends Fragment {
 	private TextView editorLineNumbers;
 	private EditText codeEditor;
 	private View currentPageFrame;
+	private View currentFloatingDropdown;
+	private ImageView currentDropdownArrow;
 	private Page lastAnimatedPage;
 	private String editorDraft;
 	private Path scriptDir;
@@ -181,6 +185,7 @@ public final class TritonModernFragment extends Fragment {
 	private final Map<Path, String> editorDrafts = new HashMap<>();
 	private final Map<Path, String> editorSavedContents = new HashMap<>();
 	private final Map<Path, List<String>> editorFunctionCache = new HashMap<>();
+	private final Map<String, Boolean> filterSwitchStates = new HashMap<>();
 	private List<String> localCompletionCache = List.of();
 	private final Set<Path> dirtyScripts = new HashSet<>();
 	private final Set<Path> selectedEditorItems = new LinkedHashSet<>();
@@ -191,6 +196,12 @@ public final class TritonModernFragment extends Fragment {
 	private String detectedPython = "";
 	private String completionRemainder = "";
 	private String openDropdownKey = "";
+	private boolean dropdownClosing;
+	private boolean strongerPanelTransparency = true;
+	private boolean animatedHoverHighlight = true;
+	private boolean keepBottomPillCentered = true;
+	private boolean createBackupsBeforeRun = true;
+	private boolean hidePlayerNamesInCaptures;
 	private String capturingShortcutAction = "";
 	private String windowSpyTab = "Live";
 	private String scriptFilter = "All";
@@ -346,6 +357,8 @@ public final class TritonModernFragment extends Fragment {
 	}
 
 	private void renderShell() {
+		currentFloatingDropdown = null;
+		currentDropdownArrow = null;
 		shell.removeAllViews();
 		LinearLayout root = new LinearLayout(requireContext());
 		root.setOrientation(LinearLayout.HORIZONTAL);
@@ -2204,7 +2217,7 @@ public final class TritonModernFragment extends Fragment {
 		title.addView(titleLine);
 		title.addView(label("Tune Shulkr visuals, script files, editor behavior, shortcuts, and safety defaults.", 14, MUTED));
 		header.addView(title, new LinearLayout.LayoutParams(0, wrap(), 1.0F));
-		header.addView(settingsStatus("Theme", settingsConfig.theme().replace(" glass", ""), "eye-dropper-solid.png"), new LinearLayout.LayoutParams(108, 60));
+		header.addView(settingsStatus("Theme", settingsConfig.theme().replace(" glass", ""), "eye-dropper-solid.png"), new LinearLayout.LayoutParams(148, 60));
 		header.addView(settingsStatus("Config", "Synced", "check-double-solid.png"), new LinearLayout.LayoutParams(120, 60));
 		header.addView(settingsStatus("User", currentProfile().displayName(), "user-solid.png"), new LinearLayout.LayoutParams(132, 60));
 		panel.addView(header, new LinearLayout.LayoutParams(match(), 74));
@@ -2321,8 +2334,14 @@ public final class TritonModernFragment extends Fragment {
 		card.addView(theme, new LinearLayout.LayoutParams(match(), 38));
 		View accent = accentDropdownRow();
 		card.addView(accent, new LinearLayout.LayoutParams(match(), 38));
-		card.addView(settingsSwitchRow("Stronger panel transparency", true, checked -> saveUiMessage("Panel transparency set to " + checked + ".")), new LinearLayout.LayoutParams(match(), 38));
-		card.addView(settingsSwitchRow("Animated hover highlight", true, checked -> saveUiMessage("Hover animation set to " + checked + ".")), new LinearLayout.LayoutParams(match(), 38));
+		card.addView(settingsSwitchRow("Stronger panel transparency", strongerPanelTransparency, checked -> {
+			strongerPanelTransparency = checked;
+			saveUiMessage("Panel transparency set to " + checked + ".");
+		}), new LinearLayout.LayoutParams(match(), 38));
+		card.addView(settingsSwitchRow("Animated hover highlight", animatedHoverHighlight, checked -> {
+			animatedHoverHighlight = checked;
+			saveUiMessage("Hover animation set to " + checked + ".");
+		}), new LinearLayout.LayoutParams(match(), 38));
 		card.addView(settingsSliderRow("Background visibility", "72%"), new LinearLayout.LayoutParams(match(), 46));
 		return card;
 	}
@@ -2333,7 +2352,10 @@ public final class TritonModernFragment extends Fragment {
 				value -> saveUiMessage("Density set to " + value + ".")), new LinearLayout.LayoutParams(match(), 38));
 		card.addView(settingsDropdownRow("sidebar-width", "Sidebar width", "300 px", SIDEBAR_WIDTH_OPTIONS,
 				value -> saveUiMessage("Sidebar width will apply on next restart: " + value + ".")), new LinearLayout.LayoutParams(match(), 38));
-		card.addView(settingsSwitchRow("Keep bottom pill centered", true, checked -> saveUiMessage("Bottom pill centering set to " + checked + ".")), new LinearLayout.LayoutParams(match(), 38));
+		card.addView(settingsSwitchRow("Keep bottom pill centered", keepBottomPillCentered, checked -> {
+			keepBottomPillCentered = checked;
+			saveUiMessage("Bottom pill centering set to " + checked + ".");
+		}), new LinearLayout.LayoutParams(match(), 38));
 		card.addView(settingsSwitchRow("Remember last page", settingsConfig.rememberLastPage(), checked -> {
 			settingsConfig.setRememberLastPage(checked);
 			if (checked) {
@@ -2381,7 +2403,10 @@ public final class TritonModernFragment extends Fragment {
 			FluxusAppState.get().setScriptModule(selectedRelative, checked);
 			saveUiMessage((checked ? "Marked " : "Unmarked ") + selectedScript.getFileName() + " as a module.");
 		}), new LinearLayout.LayoutParams(match(), 38));
-		card.addView(settingsSwitchRow("Create backups before run", true, checked -> saveUiMessage("Backups before run set to " + checked + ".")), new LinearLayout.LayoutParams(match(), 38));
+		card.addView(settingsSwitchRow("Create backups before run", createBackupsBeforeRun, checked -> {
+			createBackupsBeforeRun = checked;
+			saveUiMessage("Backups before run set to " + checked + ".");
+		}), new LinearLayout.LayoutParams(match(), 38));
 		View backup = settingsSliderRow("Backup history", settingsConfig.backupHistory() + " files");
 		backup.setOnClickListener(view -> {
 			settingsConfig.setBackupHistory(settingsConfig.backupHistory() == 25 ? 50 : 25);
@@ -2412,7 +2437,10 @@ public final class TritonModernFragment extends Fragment {
 
 	private View privacySettingsCard() {
 		LinearLayout card = settingsCard("Privacy & Safety", "circle-info-solid.png");
-		card.addView(settingsSwitchRow("Hide player names in captures", false, checked -> saveUiMessage("Capture privacy set to " + checked + ".")), new LinearLayout.LayoutParams(match(), 38));
+		card.addView(settingsSwitchRow("Hide player names in captures", hidePlayerNamesInCaptures, checked -> {
+			hidePlayerNamesInCaptures = checked;
+			saveUiMessage("Capture privacy set to " + checked + ".");
+		}), new LinearLayout.LayoutParams(match(), 38));
 		card.addView(settingsSwitchRow("Confirm destructive scripts", settingsConfig.confirmDestructiveScripts(), checked -> {
 			settingsConfig.setConfirmDestructiveScripts(checked);
 			saveSettingsConfig("Destructive script confirmation updated.");
@@ -2633,26 +2661,33 @@ public final class TritonModernFragment extends Fragment {
 	}
 
 	private View settingsStatus(String name, String value, String iconFile) {
-		LinearLayout status = row(9);
+		LinearLayout status = row(6);
 		status.setGravity(Gravity.CENTER_VERTICAL);
-		status.setPadding(12, 8, 10, 8);
+		status.setPadding(10, 8, 8, 8);
 		status.setBackground(round(Color.argb(104, 15, 21, 34), 10, Color.argb(70, 105, 116, 150)));
 		LinearLayout copy = column(2);
 		copy.addView(label(name, 11, MUTED));
-		copy.addView(label(value, 16, TEXT));
+		TextView valueLabel = label(value, 15, TEXT);
+		valueLabel.setSingleLine(true);
+		copy.addView(valueLabel);
 		status.addView(copy, new LinearLayout.LayoutParams(0, wrap(), 1.0F));
-		status.addView(iconBadge(iconFile, PURPLE, accentAlpha(70), 34, 9));
+		status.addView(iconBadge(iconFile, PURPLE, accentAlpha(70), 30, 8));
 		return status;
 	}
 
-	private View settingsSelectRow(String name, String value) {
+	private View settingsSelectRow(String key, String name, String value) {
 		LinearLayout row = row(10);
 		row.setGravity(Gravity.CENTER_VERTICAL);
 		row.addView(label(name, 12, MUTED), new LinearLayout.LayoutParams(116, wrap()));
 		TextView valueLabel = label(value, 12, TEXT);
 		valueLabel.setSingleLine(true);
 		row.addView(valueLabel, new LinearLayout.LayoutParams(0, wrap(), 1.0F));
-		row.addView(icon("chevron-down-solid.png", FAINT), new LinearLayout.LayoutParams(13, 13));
+		ImageView arrow = icon("chevron-down-solid.png", FAINT);
+		row.addView(arrow, new LinearLayout.LayoutParams(13, 13));
+		if (isDropdownOpen(key)) {
+			currentDropdownArrow = arrow;
+			animateDropdownArrow(arrow, true);
+		}
 		return row;
 	}
 
@@ -2668,10 +2703,9 @@ public final class TritonModernFragment extends Fragment {
 
 	private View settingsDropdownRow(String key, String name, String value, String[] options, Consumer<String> onSelected) {
 		LinearLayout box = column(6);
-		View select = settingsSelectRow(name, value);
+		View select = settingsSelectRow(key, name, value);
 		select.setOnClickListener(view -> {
 			toggleDropdown(key, view, Math.max(260, view.getWidth()));
-			renderShell();
 		});
 		box.addView(select, new LinearLayout.LayoutParams(match(), 38));
 		return box;
@@ -2679,10 +2713,9 @@ public final class TritonModernFragment extends Fragment {
 
 	private View accentDropdownRow() {
 		LinearLayout box = column(6);
-		View select = settingsSelectRow("Accent color", settingsConfig.accent());
+		View select = settingsSelectRow("accent", "Accent color", settingsConfig.accent());
 		select.setOnClickListener(view -> {
 			toggleDropdown("accent", view, Math.max(260, view.getWidth()));
-			renderShell();
 		});
 		box.addView(select, new LinearLayout.LayoutParams(match(), 38));
 		return box;
@@ -2691,7 +2724,7 @@ public final class TritonModernFragment extends Fragment {
 	private View dropdownMenu(String selected, String[] options, Consumer<String> onSelected, boolean swatches) {
 		LinearLayout menu = column(4);
 		menu.setPadding(6, 6, 6, 6);
-		menu.setBackground(glass(Color.argb(190, 12, 17, 30), Color.argb(170, 7, 12, 22), 10, STROKE_HOVER));
+		menu.setBackground(dropdownSurface(10));
 		for (String option : options) {
 			LinearLayout row = row(8);
 			row.setGravity(Gravity.CENTER_VERTICAL);
@@ -2710,7 +2743,7 @@ public final class TritonModernFragment extends Fragment {
 			if (active) {
 				row.addView(icon("check-solid.png", TEXT), new LinearLayout.LayoutParams(13, 13));
 			}
-			row.setOnClickListener(view -> onSelected.accept(option));
+			row.setOnClickListener(view -> closeFloatingDropdown(() -> onSelected.accept(option)));
 			menu.addView(row, new LinearLayout.LayoutParams(match(), 28));
 		}
 		return menu;
@@ -2732,19 +2765,8 @@ public final class TritonModernFragment extends Fragment {
 		LinearLayout row = row(10);
 		row.setGravity(Gravity.CENTER_VERTICAL);
 		row.addView(label(name, 12, MUTED), new LinearLayout.LayoutParams(0, wrap(), 1.0F));
-		Switch toggle = new Switch(requireContext());
-		toggle.setText("");
-		toggle.setChecked(checked);
-		toggle.setSwitchMinWidth(44);
-		toggle.setTrackTintList(switchTrackColors());
-		toggle.setThumbTintList(switchThumbColors());
-		if (onChanged != null) {
-			row.setOnClickListener(view -> {
-				toggle.setChecked(!toggle.isChecked());
-				onChanged.accept(toggle.isChecked());
-			});
-			toggle.setOnClickListener(view -> onChanged.accept(toggle.isChecked()));
-		}
+		Switch toggle = animatedSwitch(checked, 44, onChanged, true);
+		row.setOnClickListener(view -> toggle.setChecked(!toggle.isChecked()));
 		row.addView(toggle, new LinearLayout.LayoutParams(54, 36));
 		return row;
 	}
@@ -4606,7 +4628,6 @@ public final class TritonModernFragment extends Fragment {
 		addOpenEditorTab(script);
 		loadActiveDraftFromDisk();
 		toggleDropdown("editor-script-context", anchor, 232);
-		renderShell();
 	}
 
 	private void openEditorItemContext(Path path, View anchor) {
@@ -4625,7 +4646,6 @@ public final class TritonModernFragment extends Fragment {
 			selectedEditorItems.add(path);
 		}
 		toggleDropdown("editor-script-context", anchor, 232);
-		renderShell();
 	}
 
 	private void beginRename(Path path) {
@@ -6304,7 +6324,6 @@ public final class TritonModernFragment extends Fragment {
 		View actions = settingsActionRow("Script actions", "ellipsis-solid.png");
 		actions.setOnClickListener(view -> {
 			toggleDropdown("script-actions", view, 224);
-			renderShell();
 		});
 		panel.addView(actions, new LinearLayout.LayoutParams(match(), 42));
 		return panel;
@@ -6313,7 +6332,7 @@ public final class TritonModernFragment extends Fragment {
 	private View scriptInfoDropdown() {
 		LinearLayout menu = column(6);
 		menu.setPadding(8, 8, 8, 8);
-		menu.setBackground(glass(Color.argb(178, 12, 17, 30), Color.argb(150, 7, 12, 22), 10, STROKE_HOVER));
+		menu.setBackground(dropdownSurface(10));
 		View rename = dropdownAction("Rename script", "eye-dropper-solid.png", () -> {
 			openDropdownKey = "";
 			beginRename(selectedScript);
@@ -6351,7 +6370,7 @@ public final class TritonModernFragment extends Fragment {
 	private View smartInsertDropdown() {
 		LinearLayout menu = column(6);
 		menu.setPadding(8, 8, 8, 8);
-		menu.setBackground(glass(Color.argb(178, 12, 17, 30), Color.argb(150, 7, 12, 22), 10, STROKE_HOVER));
+		menu.setBackground(dropdownSurface(10));
 		menu.addView(dropdownAction("Minescript imports", "code-solid.png", () -> insertEditorSnippet("from system.lib import minescript as ms\n\n")), new LinearLayout.LayoutParams(match(), 30));
 		menu.addView(dropdownAction("Pyjinn import bridge", "route-solid.png", () -> insertEditorSnippet("from system.lib import java\n\npathfinder = java.import_pyjinn_script(\"pathfinding.pyj\")\n")), new LinearLayout.LayoutParams(match(), 30));
 		menu.addView(dropdownAction("Safe path wait loop", "route-solid.png", () -> insertEditorSnippet("future = pathfinder.get(\"goto\")(x, y, z)\ndeadline = time.time() + 30.0\nwhile not future.isDone():\n    if time.time() > deadline:\n        ms.echo(\"Path timed out\")\n        break\n    time.sleep(0.05)\n")), new LinearLayout.LayoutParams(match(), 30));
@@ -6377,7 +6396,6 @@ public final class TritonModernFragment extends Fragment {
 		View smartInsert = editorActionRow("plus-solid.png", "Smart Insert");
 		smartInsert.setOnClickListener(view -> {
 			toggleDropdown("smart-insert", view, 244);
-			renderShell();
 		});
 		panel.addView(smartInsert, new LinearLayout.LayoutParams(match(), 42));
 		View modules = editorActionRow("box-solid.png", "Open Libraries");
@@ -6402,12 +6420,10 @@ public final class TritonModernFragment extends Fragment {
 		outer.addView(frame, new FrameLayout.LayoutParams(match(), match()));
 		View dropdown = floatingDropdownForPage();
 		if (dropdown != null) {
+			currentFloatingDropdown = dropdown;
 			View clickAway = new View(requireContext());
 			clickAway.setBackground(round(Color.TRANSPARENT, 0, 0));
-			clickAway.setOnClickListener(view -> {
-				openDropdownKey = "";
-				renderShell();
-			});
+			clickAway.setOnClickListener(view -> closeFloatingDropdown(null));
 			outer.addView(clickAway, new FrameLayout.LayoutParams(match(), match()));
 			animateFloatingSurface(dropdown, openDropdownKey.equals("publish-modal"));
 			outer.addView(dropdown, floatingDropdownLayoutParams());
@@ -6492,9 +6508,10 @@ public final class TritonModernFragment extends Fragment {
 
 	private void toggleDropdown(String key, View anchor, int preferredWidth) {
 		if (openDropdownKey.equals(key)) {
-			openDropdownKey = "";
+			closeFloatingDropdown(null);
 			return;
 		}
+		dropdownClosing = false;
 		openDropdownKey = key;
 		dropdownAnchorWidth = Math.max(preferredWidth, anchor.getWidth());
 		int[] anchorLocation = new int[2];
@@ -6505,11 +6522,11 @@ public final class TritonModernFragment extends Fragment {
 		}
 		dropdownAnchorX = anchorLocation[0] - frameLocation[0];
 		dropdownAnchorY = anchorLocation[1] - frameLocation[1] + anchor.getHeight();
+		renderShell();
 	}
 
 	private void openCommandPalette(View anchor) {
 		toggleDropdown("command-palette", anchor, 360);
-		renderShell();
 	}
 
 	private int clampedDropdownX(int width) {
@@ -6524,7 +6541,7 @@ public final class TritonModernFragment extends Fragment {
 	private View newScriptDropdownMenu() {
 		LinearLayout menu = column(6);
 		menu.setPadding(8, 8, 8, 8);
-		menu.setBackground(glass(Color.argb(184, 12, 17, 30), Color.argb(154, 7, 12, 22), 10, STROKE_HOVER));
+		menu.setBackground(dropdownSurface(10));
 		menu.addView(dropdownAction("Python script", "code-solid.png", () -> {
 			openDropdownKey = "";
 			createNewScript("NewScript.py", "import minescript as ms\n\nms.echo(\"Hello from {name}!\")\n");
@@ -6543,7 +6560,7 @@ public final class TritonModernFragment extends Fragment {
 	private View libraryScriptDropdown() {
 		LinearLayout menu = column(6);
 		menu.setPadding(8, 8, 8, 8);
-		menu.setBackground(glass(Color.argb(184, 12, 17, 30), Color.argb(154, 7, 12, 22), 10, STROKE_HOVER));
+		menu.setBackground(dropdownSurface(10));
 		menu.addView(dropdownAction("Install locally", "download-solid.png", () -> {
 			openDropdownKey = "";
 			installPublishedScript(selectedLibraryScriptId);
@@ -6566,7 +6583,7 @@ public final class TritonModernFragment extends Fragment {
 	private View commandPaletteDropdown() {
 		LinearLayout menu = column(7);
 		menu.setPadding(10, 10, 10, 10);
-		menu.setBackground(glass(Color.argb(204, 12, 17, 30), Color.argb(174, 7, 12, 22), 12, STROKE_HOVER));
+		menu.setBackground(dropdownSurface(12));
 		menu.addView(label("COMMAND PALETTE", 12, PURPLE), new LinearLayout.LayoutParams(match(), 24));
 		menu.addView(dropdownAction("Open Editor", "code-solid.png", () -> {
 			openDropdownKey = "";
@@ -6747,7 +6764,7 @@ public final class TritonModernFragment extends Fragment {
 	private View editorScriptContextMenu() {
 		LinearLayout menu = column(6);
 		menu.setPadding(8, 8, 8, 8);
-		menu.setBackground(glass(Color.argb(188, 12, 17, 30), Color.argb(158, 7, 12, 22), 10, STROKE_HOVER));
+		menu.setBackground(dropdownSurface(10));
 		boolean folder = contextEditorItem != null && Files.isDirectory(contextEditorItem);
 		if (!folder) {
 			menu.addView(dropdownAction("Open script", "code-solid.png", () -> {
@@ -6914,7 +6931,6 @@ public final class TritonModernFragment extends Fragment {
 			View newButton = primaryButton("plus-solid.png", "New Script", "chevron-down-solid.png");
 			newButton.setOnClickListener(view -> {
 				toggleDropdown("new-script", view, 220);
-				renderShell();
 			});
 			top.addView(newButton, new LinearLayout.LayoutParams(156, 42));
 			View openButton = toolbarButton("folder-open-solid.png", "Open");
@@ -7048,7 +7064,6 @@ public final class TritonModernFragment extends Fragment {
 			selectedLibraryScriptId = script.id();
 			if (isControlDown()) {
 				toggleDropdown("library-script-actions", view, 236);
-				renderShell();
 			} else {
 				renderShell();
 			}
@@ -7091,7 +7106,6 @@ public final class TritonModernFragment extends Fragment {
 		manage.setOnClickListener(view -> {
 			selectedLibraryScriptId = script.id();
 			toggleDropdown("library-script-actions", view, 236);
-			renderShell();
 		});
 		actions.addView(manage, new LinearLayout.LayoutParams(44, 38));
 		card.addView(actions, new LinearLayout.LayoutParams(match(), 42));
@@ -7387,16 +7401,10 @@ public final class TritonModernFragment extends Fragment {
 				round(Color.argb(165, 24, 30, 48), 8, accentAlpha(95)));
 		row.addView(icon(data.icon(), PURPLE), new LinearLayout.LayoutParams(20, 20));
 		row.addView(label(data.name(), 13, TEXT), new LinearLayout.LayoutParams(0, wrap(), 1.0F));
-		Switch toggle = new Switch(requireContext());
-		toggle.setText("");
-		toggle.setChecked(data.installed());
-		toggle.setSwitchMinWidth(48);
-		toggle.setTrackTintList(switchTrackColors());
-		toggle.setThumbTintList(switchThumbColors());
-		toggle.setOnCheckedChangeListener((buttonView, checked) -> {
+		Switch toggle = animatedSwitch(data.installed(), 48, checked -> {
 			FluxusAppState.get().setModuleInstalled(data.id(), checked);
 			settingsMessage = data.name() + (checked ? " installed." : " disabled.");
-		});
+		}, false);
 		row.addView(toggle, new LinearLayout.LayoutParams(58, 40));
 		row.setOnClickListener(view -> {
 			selectedModuleId = data.id();
@@ -7502,7 +7510,12 @@ public final class TritonModernFragment extends Fragment {
 		addPressAnimation(button);
 		button.addView(icon(iconFile, TEXT), new LinearLayout.LayoutParams(16, 16));
 		button.addView(label(text, 13, TEXT));
-		button.addView(icon(trailingIcon, TEXT), new LinearLayout.LayoutParams(14, 14));
+		ImageView trailing = icon(trailingIcon, TEXT);
+		button.addView(trailing, new LinearLayout.LayoutParams(14, 14));
+		if (trailingIcon.equals("chevron-down-solid.png") && isDropdownOpen("new-script")) {
+			currentDropdownArrow = trailing;
+			animateDropdownArrow(trailing, true);
+		}
 		return button;
 	}
 
@@ -7871,7 +7884,7 @@ public final class TritonModernFragment extends Fragment {
 		addPressAnimation(row);
 		row.addView(icon(iconFile, PURPLE), new LinearLayout.LayoutParams(14, 14));
 		row.addView(label(text, 12, MUTED), new LinearLayout.LayoutParams(0, wrap(), 1.0F));
-		row.setOnClickListener(view -> action.run());
+		row.setOnClickListener(view -> closeFloatingDropdown(action));
 		return row;
 	}
 
@@ -7902,12 +7915,9 @@ public final class TritonModernFragment extends Fragment {
 		LinearLayout row = row(8);
 		row.setGravity(Gravity.CENTER_VERTICAL);
 		row.addView(label(text, 13, TEXT), new LinearLayout.LayoutParams(0, wrap(), 1.0F));
-		Switch toggle = new Switch(requireContext());
-		toggle.setText("");
-		toggle.setChecked(checked);
-		toggle.setSwitchMinWidth(44);
-		toggle.setTrackTintList(switchTrackColors());
-		toggle.setThumbTintList(switchThumbColors());
+		boolean current = filterSwitchStates.getOrDefault(text, checked);
+		Switch toggle = animatedSwitch(current, 44, nextChecked -> filterSwitchStates.put(text, nextChecked), false);
+		row.setOnClickListener(view -> toggle.setChecked(!toggle.isChecked()));
 		row.addView(toggle, new LinearLayout.LayoutParams(54, 36));
 		return row;
 	}
@@ -8035,6 +8045,10 @@ public final class TritonModernFragment extends Fragment {
 		);
 	}
 
+	private GradientDrawable dropdownSurface(float radius) {
+		return glass(Color.argb(248, 12, 17, 30), Color.argb(242, 7, 12, 22), radius, STROKE_HOVER);
+	}
+
 	private void makeHover(View view, GradientDrawable normal, GradientDrawable hover) {
 		view.setBackground(normal);
 		view.setClickable(true);
@@ -8086,6 +8100,80 @@ public final class TritonModernFragment extends Fragment {
 			set.setDuration(modal ? MODAL_IN_MS : MENU_IN_MS);
 			set.start();
 		});
+	}
+
+	private void closeFloatingDropdown(Runnable afterClose) {
+		if (dropdownClosing) {
+			return;
+		}
+		View dropdown = currentFloatingDropdown;
+		if (dropdown == null || openDropdownKey.isBlank()) {
+			openDropdownKey = "";
+			if (afterClose != null) {
+				afterClose.run();
+			}
+			renderShell();
+			return;
+		}
+		dropdownClosing = true;
+		animateDropdownArrow(currentDropdownArrow, false);
+		boolean modal = openDropdownKey.equals("publish-modal");
+		float endScale = modal ? 0.985F : 0.965F;
+		float endY = modal ? 10.0F : -5.0F;
+		AnimatorSet set = new AnimatorSet();
+		ObjectAnimator fade = ObjectAnimator.ofFloat(dropdown, View.ALPHA, dropdown.getAlpha(), 0.0F);
+		ObjectAnimator scaleX = ObjectAnimator.ofFloat(dropdown, View.SCALE_X, dropdown.getScaleX(), endScale);
+		ObjectAnimator scaleY = ObjectAnimator.ofFloat(dropdown, View.SCALE_Y, dropdown.getScaleY(), endScale);
+		ObjectAnimator slide = ObjectAnimator.ofFloat(dropdown, View.TRANSLATION_Y, dropdown.getTranslationY(), endY);
+		set.playTogether(new Animator[]{fade, scaleX, scaleY, slide});
+		long duration = modal ? MODAL_IN_MS : MENU_OUT_MS;
+		set.setDuration(duration);
+		set.start();
+		dropdown.postDelayed(() -> {
+			openDropdownKey = "";
+			dropdownClosing = false;
+			if (afterClose != null) {
+				afterClose.run();
+			}
+			renderShell();
+		}, duration);
+	}
+
+	private void animateDropdownArrow(ImageView arrow, boolean open) {
+		if (arrow == null) {
+			return;
+		}
+		float target = open ? 180.0F : 0.0F;
+		if (open) {
+			arrow.setRotation(0.0F);
+		}
+		arrow.post(() -> {
+			ObjectAnimator rotation = ObjectAnimator.ofFloat(arrow, View.ROTATION, arrow.getRotation(), target);
+			rotation.setDuration(open ? MENU_IN_MS : MENU_OUT_MS);
+			rotation.start();
+		});
+	}
+
+	private Switch animatedSwitch(boolean checked, int minWidth, Consumer<Boolean> onChanged, boolean deferCallback) {
+		Switch toggle = new Switch(requireContext());
+		toggle.setText("");
+		toggle.setChecked(checked);
+		toggle.setSwitchMinWidth(minWidth);
+		toggle.setTrackTintList(switchTrackColors());
+		toggle.setThumbTintList(switchThumbColors());
+		final AnimatorSet[] feedback = new AnimatorSet[1];
+		toggle.setOnCheckedChangeListener((buttonView, nextChecked) -> {
+			startScaleAnimation(feedback, toggle, 0.96F, PRESS_IN_MS);
+			toggle.postDelayed(() -> startScaleAnimation(feedback, toggle, 1.0F, PRESS_OUT_MS), PRESS_IN_MS);
+			if (onChanged != null) {
+				if (deferCallback) {
+					toggle.postDelayed(() -> onChanged.accept(nextChecked), TOGGLE_COMMIT_DELAY_MS);
+				} else {
+					onChanged.accept(nextChecked);
+				}
+			}
+		});
+		return toggle;
 	}
 
 	private void animatePageSwap(View view) {
