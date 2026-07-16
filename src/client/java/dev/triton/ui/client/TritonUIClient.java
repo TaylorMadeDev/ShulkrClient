@@ -5,11 +5,16 @@ import dev.triton.ui.client.app.FluxusAppState;
 import dev.triton.ui.client.config.FluxusConfig;
 import dev.triton.ui.client.module.ModuleManager;
 import dev.triton.ui.client.modern.TritonModernFragment;
+import dev.triton.ui.client.privacy.PrivacyService;
+import dev.triton.ui.client.privacy.PrivacyService.Assessment;
+import dev.triton.ui.client.privacy.PrivacyService.Decision;
+import dev.triton.ui.client.privacy.PrivacyService.Permission;
 import dev.triton.ui.client.script.ScriptSettingsRuntime;
 import dev.triton.ui.script.ShortcutBinding;
 import icyllis.modernui.mc.MuiModApi;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
+import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents;
 import net.fabricmc.fabric.api.client.keymapping.v1.KeyMappingHelper;
 import net.minescript.fabric.fluxus.ShulkrHudOverlay;
 import net.minescript.common.Minescript;
@@ -26,6 +31,11 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
+import java.nio.file.Path;
+import java.util.function.Consumer;
 
 public final class TritonUIClient implements ClientModInitializer {
 	public static final Logger LOGGER = LoggerFactory.getLogger("shulkr");
@@ -43,11 +53,22 @@ public final class TritonUIClient implements ClientModInitializer {
 	private static boolean wasInWorld;
 	private static boolean wasWindowActive = true;
 	private static boolean suspendedForWindowFocus;
+	private static boolean suspendedForMenu;
+	private static String lastServerIdentity = "";
+	private static boolean movementAutomationActive;
+	private static PrivacyService privacyService;
+	private static final ScheduledExecutorService SAFETY_TIMER = Executors.newSingleThreadScheduledExecutor(runnable -> {
+		Thread thread = new Thread(runnable, "shulkr-runtime-safety");
+		thread.setDaemon(true);
+		return thread;
+	});
 	private static final Set<String> runningShortcutScripts = new HashSet<>();
 
 	@Override
 	public void onInitializeClient() {
 		config = FluxusConfig.load();
+		privacyService = new PrivacyService();
+		privacyService.applyConfig(config);
 		appState = FluxusAppState.get();
 		appState.initialize();
 		applyAdvancedRuntimeConfig();
@@ -77,12 +98,16 @@ public final class TritonUIClient implements ClientModInitializer {
 			disableModernUiSearchConflict();
 			boolean inWorld = client.level != null && client.player != null;
 			if (wasInWorld && !inWorld && config.stopScriptsOnWorldLeave()) {
-				Minescript.runEditorCommandAsync("killjob -1", handled -> {
-					if (handled) LOGGER.info("Stopped Minescript jobs after leaving the world.");
-					else LOGGER.warn("Minescript did not handle the automatic stop command after leaving the world.");
-				});
+				emergencyStop(client, "Stopped scripts after leaving the world.");
 			}
 			wasInWorld = inWorld;
+			String serverIdentity = inWorld ? (client.getCurrentServer() == null ? "singleplayer" : client.getCurrentServer().ip) : "";
+			if (!serverIdentity.isBlank()) {
+				if (!lastServerIdentity.isBlank() && !lastServerIdentity.equals(serverIdentity) && config.stopScriptsOnServerChange()) {
+					emergencyStop(client, "Stopped scripts because the active server changed.");
+				}
+				lastServerIdentity = serverIdentity;
+			}
 			boolean windowActive = client.isWindowActive();
 			if (config.pauseBackgroundScriptsWhenUnfocused() && wasWindowActive && !windowActive && Minescript.activeJobCount() > 0) {
 				suspendedForWindowFocus = true;
@@ -92,6 +117,15 @@ public final class TritonUIClient implements ClientModInitializer {
 				Minescript.runEditorCommandAsync("resume", handled -> verboseLog("Resumed Minescript jobs after Minecraft regained focus: {}", handled));
 			}
 			wasWindowActive = windowActive;
+			boolean menuOpen = client.screen != null && activeModernFragment == null;
+			if (config.pauseAutomationWhenMenuOpen() && menuOpen && !suspendedForMenu && Minescript.activeJobCount() > 0) {
+				suspendedForMenu = true;
+				Minescript.runEditorCommandAsync("suspend", handled -> verboseLog("Paused automation while a menu is open: {}", handled));
+			} else if (suspendedForMenu && (!menuOpen || !config.pauseAutomationWhenMenuOpen())) {
+				suspendedForMenu = false;
+				Minescript.runEditorCommandAsync("resume", handled -> verboseLog("Resumed automation after closing the menu: {}", handled));
+			}
+			if (Minescript.activeJobCount() == 0) movementAutomationActive = false;
 			moduleManager.onClientTick(client);
 			if (++telemetryTicks >= 20) {
 				telemetryTicks = 0;
@@ -128,6 +162,9 @@ public final class TritonUIClient implements ClientModInitializer {
 				runStoredScript(client);
 			}
 		});
+		ClientLifecycleEvents.CLIENT_STOPPING.register(client -> {
+			if (config.stopScriptsWhenClientCloses()) Minescript.emergencyStop();
+		});
 	}
 
 	private static void disableModernUiSearchConflict() {
@@ -153,16 +190,21 @@ public final class TritonUIClient implements ClientModInitializer {
 	}
 
 	private static void updateRemoteTelemetry(Minecraft client) {
+		if (config.telemetryMode().equals("Off")) {
+			appState.updateClientTelemetry(Map.of());
+			return;
+		}
 		Map<String, Object> telemetry = new HashMap<>();
+		boolean anonymous = config.telemetryMode().equals("Anonymous diagnostics");
 		telemetry.put("fps", client.getFps());
 		telemetry.put("rendererActive", ShulkrHudOverlay.rendererActive());
 		telemetry.put("overlays", ShulkrHudOverlay.visibleNames());
 		telemetry.put("activeScript", remoteActiveScript);
 		moduleManager.appendTelemetry(telemetry);
 		if (client.player != null && client.level != null) {
-			telemetry.put("position", String.format("%.1f, %.1f, %.1f", client.player.getX(), client.player.getY(), client.player.getZ()));
+			telemetry.put("position", anonymous || config.hideCoordinatesInCaptures() ? "Hidden by privacy settings" : String.format("%.1f, %.1f, %.1f", client.player.getX(), client.player.getY(), client.player.getZ()));
 			telemetry.put("world", client.level.dimension().toString());
-			telemetry.put("server", client.getCurrentServer() == null ? "Singleplayer" : client.getCurrentServer().ip);
+			telemetry.put("server", anonymous || config.hideServerAddressesInCaptures() ? "Hidden by privacy settings" : client.getCurrentServer() == null ? "Singleplayer" : client.getCurrentServer().ip);
 		} else {
 			telemetry.put("position", "-");
 			telemetry.put("world", "Main menu");
@@ -176,6 +218,18 @@ public final class TritonUIClient implements ClientModInitializer {
 		switch (command.type()) {
 			case "run_script" -> {
 				String path = String.valueOf(payload.getOrDefault("path", ""));
+				Path scriptPath = ScriptSettingsRuntime.scriptDirectory().resolve(path).normalize();
+				if (!java.nio.file.Files.isRegularFile(scriptPath) && !path.toLowerCase(java.util.Locale.ROOT).endsWith(".py")) {
+					scriptPath = ScriptSettingsRuntime.scriptDirectory().resolve(path + ".py").normalize();
+				}
+				if (!scriptPath.startsWith(ScriptSettingsRuntime.scriptDirectory())) {
+					appState.acknowledgeRemoteCommand(command, false, "Blocked: script path is outside the Minescript directory");
+					break;
+				}
+				if (!java.nio.file.Files.isRegularFile(scriptPath)) {
+					appState.acknowledgeRemoteCommand(command, false, "Blocked: script file does not exist");
+					break;
+				}
 				String commandName = path.replace('\\', '/');
 				int dot = commandName.lastIndexOf('.');
 				if (dot > 0) commandName = commandName.substring(0, dot);
@@ -183,9 +237,9 @@ public final class TritonUIClient implements ClientModInitializer {
 					appState.acknowledgeRemoteCommand(command, false, "Blocked: maximum concurrent script limit reached");
 					break;
 				}
-				Minescript.runEditorCommandAsync(commandName, handled -> {
-					if (handled) rememberLastScript(path);
-					appState.acknowledgeRemoteCommand(command, handled, handled ? "Started " + path : "Failed to start " + path);
+				startAuthorizedScript(scriptPath, commandName, false, result -> {
+					if (result.started()) rememberLastScript(path);
+					appState.acknowledgeRemoteCommand(command, result.started(), result.started() ? "Started " + path : result.message());
 				});
 			}
 			case "stop_scripts" -> Minescript.runEditorCommandAsync("killjob -1", handled -> {
@@ -229,6 +283,7 @@ public final class TritonUIClient implements ClientModInitializer {
 
 	public static void reloadConfig() {
 		config = FluxusConfig.load();
+		if (privacyService != null) privacyService.applyConfig(config);
 		applySavedKeybindings();
 		applyAdvancedRuntimeConfig();
 	}
@@ -256,6 +311,58 @@ public final class TritonUIClient implements ClientModInitializer {
 		return appState;
 	}
 
+	public static PrivacyService privacyService() { return privacyService; }
+
+	public record ScriptStartResult(boolean started, Decision decision, String message, Assessment assessment) {}
+
+	public static Assessment assessScript(Path script) { return privacyService.assess(script, config); }
+
+	public static void startAuthorizedScript(Path script, String command, boolean userApproved, Consumer<ScriptStartResult> callback) {
+		Assessment assessment = privacyService.assess(script, config);
+		if (assessment.decision() == Decision.BLOCK || (assessment.decision() == Decision.ASK && !userApproved)) {
+			callback.accept(new ScriptStartResult(false, assessment.decision(), assessment.message(), assessment));
+			return;
+		}
+		if (userApproved && assessment.decision() == Decision.ASK) {
+			try { privacyService.approve(assessment, config); }
+			catch (Exception error) { LOGGER.error("Could not persist script permission approval", error); }
+		}
+		boolean movement = assessment.requested().contains(Permission.MOVEMENT) || assessment.requested().contains(Permission.WORLD_ACTION);
+		if (movement && config.oneMovementAutomationAtATime() && movementAutomationActive && Minescript.activeJobCount() > 0) {
+			callback.accept(new ScriptStartResult(false, Decision.BLOCK, "Blocked: another movement automation is already active.", assessment));
+			return;
+		}
+		Minescript.runEditorCommandAsync(command, handled -> {
+			privacyService.recordExecution(script, handled, config);
+			if (handled) {
+				privacyService.recordRecentScript(script, config);
+				movementAutomationActive |= movement;
+				scheduleSafetyTimeout();
+			}
+			callback.accept(new ScriptStartResult(handled, handled ? Decision.ALLOW : Decision.BLOCK,
+					handled ? "Script started." : "Minescript could not start the script.", assessment));
+		});
+	}
+
+	private static void scheduleSafetyTimeout() {
+		int configured = config.defaultScriptTimeoutSeconds();
+		int maximum = config.maximumScriptRuntimeSeconds();
+		int seconds = configured <= 0 ? maximum : maximum <= 0 ? configured : Math.min(configured, maximum);
+		if (seconds <= 0) return;
+		SAFETY_TIMER.schedule(() -> {
+			if (Minescript.activeJobCount() > 0) Minecraft.getInstance().execute(() -> emergencyStop(Minecraft.getInstance(), "Emergency stop: script runtime limit reached."));
+		}, seconds, TimeUnit.SECONDS);
+	}
+
+	public static void emergencyStop(Minecraft client, String message) {
+		int stopped = Minescript.emergencyStop();
+		movementAutomationActive = false;
+		suspendedForMenu = false;
+		suspendedForWindowFocus = false;
+		if (message != null && !message.isBlank()) notifyClient(client, message + " (" + stopped + " job(s))");
+		LOGGER.warn("{} Released all movement, camera, attack, and use inputs; stopped {} job(s).", message, stopped);
+	}
+
 	public static int shortcutKey(String action) {
 		return shortcutBinding(action).key();
 	}
@@ -267,6 +374,7 @@ public final class TritonUIClient implements ClientModInitializer {
 			case "open-ui" -> config.openMenuShortcut();
 			case "overlay-edit" -> config.overlayEditShortcut();
 			case "run-last-script" -> config.runLastScriptShortcut();
+			case "privacy-emergency-stop" -> config.emergencyStopShortcut();
 			default -> ShortcutBinding.unbound();
 		};
 	}
@@ -277,7 +385,7 @@ public final class TritonUIClient implements ClientModInitializer {
 
 	public static String shortcutConflict(String action, ShortcutBinding candidate) {
 		if (candidate == null || !candidate.bound()) return "";
-		for (String appAction : new String[]{"open-ui", "overlay-edit", "run-last-script"}) {
+		for (String appAction : new String[]{"open-ui", "overlay-edit", "run-last-script", "privacy-emergency-stop"}) {
 			if (!appAction.equals(action) && candidate.equals(shortcutBinding(appAction))) return appAction;
 		}
 		for (Map.Entry<String, ShortcutBinding> entry : config.scriptShortcuts().entrySet()) {
@@ -289,10 +397,11 @@ public final class TritonUIClient implements ClientModInitializer {
 
 	public static boolean setShortcutBinding(String action, ShortcutBinding binding) {
 		if (!shortcutConflict(action, binding).isBlank()) return false;
-		switch (String.valueOf(action)) {
+			switch (String.valueOf(action)) {
 			case "open-ui" -> config.setOpenMenuShortcut(binding);
 			case "overlay-edit" -> config.setOverlayEditShortcut(binding);
 			case "run-last-script" -> config.setRunLastScriptShortcut(binding);
+			case "privacy-emergency-stop" -> config.setEmergencyStopShortcut(binding);
 			default -> {
 				if (!String.valueOf(action).startsWith("script:")) return false;
 				Map<String, ShortcutBinding> scripts = config.scriptShortcuts();
@@ -329,11 +438,12 @@ public final class TritonUIClient implements ClientModInitializer {
 			commandName = commandName.substring(0, dot);
 		}
 		String scriptLabel = path;
-		Minescript.runEditorCommandAsync(commandName, handled -> {
-			if (handled) {
+		Path script = ScriptSettingsRuntime.scriptDirectory().resolve(path).normalize();
+		startAuthorizedScript(script, commandName, false, result -> {
+			if (result.started()) {
 				rememberLastScript(scriptLabel);
 			}
-			notifyClient(client, handled ? "Ran last script: " + scriptLabel : "Failed to run last script: " + scriptLabel);
+			notifyClient(client, result.started() ? "Ran last script: " + scriptLabel : result.message());
 		});
 	}
 
@@ -354,8 +464,12 @@ public final class TritonUIClient implements ClientModInitializer {
 	public static boolean handleGlobalKey(int key, int action, int modifiers) {
 		Minecraft client = Minecraft.getInstance();
 		TritonModernFragment fragment = activeModernFragment;
-		if (fragment != null && fragment.handleGlobalKey(key, action, modifiers)) return true;
 		if (action != 1) return false;
+		if (config.emergencyStopShortcut().matches(key, modifiers)) {
+			emergencyStop(client, "Emergency stop activated.");
+			return true;
+		}
+		if (fragment != null && fragment.handleGlobalKey(key, action, modifiers)) return true;
 		if (key == InputConstants.KEY_K && (modifiers & ShortcutBinding.CTRL) != 0) {
 			MuiModApi.openScreen(TritonModernFragment.forGlobalSearch());
 			return true;
@@ -413,10 +527,17 @@ public final class TritonUIClient implements ClientModInitializer {
 				LOGGER.error("Failed to prepare script shortcut {}", scriptId, error);
 				return;
 			}
-			Minescript.runEditorCommandAsync(prepared.commandPath(), handled -> client.execute(() -> {
+			Path authorizedScript;
+			try { authorizedScript = ScriptSettingsRuntime.resolveScript(scriptId); }
+			catch (Exception resolveError) {
 				runningShortcutScripts.remove(scriptId);
-				if (handled) rememberLastScript(prepared.commandPath() + ".py");
-				notifyClient(client, handled ? "Started script shortcut." : "Minescript could not start the assigned script.");
+				notifyClient(client, "Script shortcut failed: the assigned script could not be resolved.");
+				return;
+			}
+			startAuthorizedScript(authorizedScript, prepared.commandPath(), false, result -> client.execute(() -> {
+				runningShortcutScripts.remove(scriptId);
+				if (result.started()) rememberLastScript(ScriptSettingsRuntime.scriptDirectory().relativize(authorizedScript).toString());
+				notifyClient(client, result.started() ? "Started script shortcut." : result.message());
 			}));
 		}));
 	}

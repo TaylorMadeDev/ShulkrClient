@@ -16,6 +16,11 @@ import dev.triton.ui.client.app.FluxusAppState.ScriptSummary;
 import dev.triton.ui.client.app.FluxusAppState.TemplateItem;
 import dev.triton.ui.client.config.FluxusConfig;
 import dev.triton.ui.client.module.ModuleManager;
+import dev.triton.ui.client.privacy.PrivacyService;
+import dev.triton.ui.client.privacy.PrivacyService.Assessment;
+import dev.triton.ui.client.privacy.PrivacyService.Decision;
+import dev.triton.ui.client.privacy.PrivacyService.Permission;
+import dev.triton.ui.client.privacy.PrivacyService.SavedApproval;
 import dev.triton.ui.client.script.ScriptSettingsRuntime;
 import dev.triton.ui.script.ShortcutBinding;
 import icyllis.modernui.R;
@@ -167,6 +172,8 @@ public final class TritonModernFragment extends Fragment {
 	private static final String SHORTCUT_OPEN_UI = "open-ui";
 	private static final String SHORTCUT_OVERLAY_EDIT = "overlay-edit";
 	private static final String SHORTCUT_RUN_LAST = "run-last-script";
+	private static final String SHORTCUT_EMERGENCY_STOP = "privacy-emergency-stop";
+	private static final String[] PERMISSION_POLICY_OPTIONS = {"Ask every time", "Allow trusted scripts", "Always block"};
 	private int PURPLE = Color.argb(255, 163, 88, 255);
 	private int PURPLE_DARK = Color.argb(255, 104, 49, 205);
 	private int PURPLE_SOFT = Color.argb(150, 163, 88, 255);
@@ -234,6 +241,7 @@ public final class TritonModernFragment extends Fragment {
 	private boolean environmentDiagnosticRunning;
 	private String environmentDiagnosticText = "";
 	private AdvancedSettingsService advancedService;
+	private PrivacyService privacyService;
 	private StorageSnapshot advancedStorageSnapshot;
 	private List<Diagnostic> advancedDiagnostics = List.of();
 	private List<ConfigBackup> advancedConfigBackups = List.of();
@@ -249,7 +257,6 @@ public final class TritonModernFragment extends Fragment {
 	private boolean dropdownClosing;
 	private boolean rightPanelExpanded;
 	private boolean headerHidden;
-	private boolean hidePlayerNamesInCaptures;
 	private String capturingShortcutAction = "";
 	private String windowSpyTab = "Live";
 	private String scriptFilter = "All";
@@ -303,6 +310,12 @@ public final class TritonModernFragment extends Fragment {
 	private record ProcessResult(boolean started, boolean timedOut, int exitCode, String output, String error) {}
 	private boolean currentScriptRunning;
 	private long dangerousRunConfirmationExpiresAt;
+	private String pendingPrivacyAction = "";
+	private long pendingPrivacyActionExpiresAt;
+	private String pendingScriptApprovalId = "";
+	private long pendingScriptApprovalExpiresAt;
+	private String pendingDestructiveSignature = "";
+	private long pendingDestructiveExpiresAt;
 	private int runGeneration;
 	private boolean localCompletionDirty = true;
 	private long lastEditorClickAt;
@@ -405,6 +418,7 @@ public final class TritonModernFragment extends Fragment {
 		TritonUIClient.setActiveModernFragment(this);
 		ensureEditorScriptsReady();
 		advancedService = new AdvancedSettingsService(Minecraft.getInstance().gameDirectory.toPath(), FluxusConfig.configPath());
+		privacyService = TritonUIClient.privacyService();
 		if (initialGlobalSearch) {
 			globalSearchQuery = "";
 			openDropdownKey = "command-palette";
@@ -2559,8 +2573,18 @@ public final class TritonModernFragment extends Fragment {
 			right.addView(shortcutHelperCard(), new LinearLayout.LayoutParams(match(), 0, 1.0F));
 		} else if (settingsTab == SettingsTab.PRIVACY) {
 			body.addView(right, new LinearLayout.LayoutParams(0, match(), 1.0F));
-			left.addView(privacySettingsCard(), new LinearLayout.LayoutParams(match(), 270));
-			right.addView(safetyRuntimeCard(), new LinearLayout.LayoutParams(match(), 0, 1.0F));
+			ScrollView leftScroll = layoutScrollView();
+			LinearLayout leftCards = column(14);
+			leftCards.addView(privacyRedactionCard(), new LinearLayout.LayoutParams(match(), wrap()));
+			leftCards.addView(runtimeSafetyCard(), new LinearLayout.LayoutParams(match(), wrap()));
+			leftScroll.addView(leftCards, new ScrollView.LayoutParams(match(), wrap()));
+			left.addView(leftScroll, new LinearLayout.LayoutParams(match(), 0, 1.0F));
+			ScrollView rightScroll = layoutScrollView();
+			LinearLayout rightCards = column(14);
+			rightCards.addView(scriptPermissionsCard(), new LinearLayout.LayoutParams(match(), wrap()));
+			rightCards.addView(dataHistoryCard(), new LinearLayout.LayoutParams(match(), wrap()));
+			rightScroll.addView(rightCards, new ScrollView.LayoutParams(match(), wrap()));
+			right.addView(rightScroll, new LinearLayout.LayoutParams(match(), 0, 1.0F));
 		} else {
 			body.removeAllViews();
 			ScrollView leftScroll = layoutScrollView();
@@ -2608,8 +2632,10 @@ public final class TritonModernFragment extends Fragment {
 			content.addView(shortcutSettingsCard(), new LinearLayout.LayoutParams(match(), 300));
 			content.addView(shortcutHelperCard(), new LinearLayout.LayoutParams(match(), 340));
 		} else if (settingsTab == SettingsTab.PRIVACY) {
-			content.addView(privacySettingsCard(), new LinearLayout.LayoutParams(match(), 270));
-			content.addView(safetyRuntimeCard(), new LinearLayout.LayoutParams(match(), 300));
+			content.addView(privacyRedactionCard(), new LinearLayout.LayoutParams(match(), wrap()));
+			content.addView(scriptPermissionsCard(), new LinearLayout.LayoutParams(match(), wrap()));
+			content.addView(runtimeSafetyCard(), new LinearLayout.LayoutParams(match(), wrap()));
+			content.addView(dataHistoryCard(), new LinearLayout.LayoutParams(match(), wrap()));
 		} else {
 			content.addView(developerOptionsCard(), new LinearLayout.LayoutParams(match(), wrap()));
 			content.addView(runtimePerformanceCard(), new LinearLayout.LayoutParams(match(), wrap()));
@@ -2778,19 +2804,113 @@ public final class TritonModernFragment extends Fragment {
 		renderShell();
 	}
 
-	private View privacySettingsCard() {
-		LinearLayout card = settingsCard("Privacy & Safety", "circle-info-solid.png");
-		card.addView(settingsSwitchRow("Hide player names in captures", hidePlayerNamesInCaptures, checked -> {
-			hidePlayerNamesInCaptures = checked;
-			saveUiMessage("Capture privacy set to " + checked + ".");
-		}), new LinearLayout.LayoutParams(match(), 38));
-		card.addView(settingsSwitchRow("Block network by default", settingsConfig.blockNetworkByDefault(), checked -> {
-			settingsConfig.setBlockNetworkByDefault(checked);
-			saveSettingsConfig("Network blocking updated.");
-		}), new LinearLayout.LayoutParams(match(), 38));
-		card.addView(settingsDropdownRow("telemetry", "Telemetry", "Local only", new String[]{"Local only", "Off", "Diagnostics only"},
-				value -> saveUiMessage("Telemetry set to " + value + ".")), new LinearLayout.LayoutParams(match(), 38));
+	private View privacyRedactionCard() {
+		LinearLayout card = settingsCard("Privacy & Redaction", "eye-dropper-solid.png");
+		addPrivacyToggle(card, "Hide player names in screenshots and remote view", settingsConfig.hidePlayerNamesInCaptures(), settingsConfig::setHidePlayerNamesInCaptures);
+		addPrivacyToggle(card, "Hide server addresses in captures", settingsConfig.hideServerAddressesInCaptures(), settingsConfig::setHideServerAddressesInCaptures);
+		addPrivacyToggle(card, "Hide coordinates in captures", settingsConfig.hideCoordinatesInCaptures(), settingsConfig::setHideCoordinatesInCaptures);
+		addPrivacyToggle(card, "Redact Windows usernames and local paths from logs", settingsConfig.redactWindowsUsernamesAndPaths(), settingsConfig::setRedactWindowsUsernamesAndPaths);
+		addPrivacyToggle(card, "Redact account and device identifiers from diagnostics", settingsConfig.redactAccountAndDeviceIdentifiers(), settingsConfig::setRedactAccountAndDeviceIdentifiers);
+		card.addView(settingsDropdownRow("privacy-telemetry", "Telemetry", settingsConfig.telemetryMode(),
+				new String[]{"Off", "Local diagnostics only", "Anonymous diagnostics"}, value -> {}), rowParams());
+		int stateColor = settingsConfig.telemetryMode().equals("Off") ? FAINT : GREEN;
+		card.addView(label(settingsConfig.telemetryMode().equals("Off") ? "Telemetry is blocked. Remote telemetry payloads are empty."
+				: "Telemetry is active with capture redaction applied immediately.", 11, stateColor));
 		return card;
+	}
+
+	private View scriptPermissionsCard() {
+		LinearLayout card = settingsCard("Script Permissions", "check-double-solid.png");
+		for (Permission permission : Permission.values()) {
+			String key = "privacy-permission-" + permission.name().toLowerCase(Locale.ROOT).replace('_', '-');
+			card.addView(settingsDropdownRow(key, permission.label(), settingsConfig.permissionPolicy(permission.name()), PERMISSION_POLICY_OPTIONS, value -> {}), rowParams());
+		}
+		addPrivacyToggle(card, "Remember permissions per script", settingsConfig.rememberScriptPermissions(), settingsConfig::setRememberScriptPermissions);
+		int saved = privacyService.savedApprovals().size();
+		card.addView(label(saved == 0 ? "No saved approvals. Ask and blocked policies remain active."
+				: saved + " saved approval set(s). Permission changes in updated scripts require approval again.", 11, saved == 0 ? FAINT : GREEN));
+		View review = settingsActionRow("Review saved script permissions", "clipboard-solid.png");
+		review.setOnClickListener(view -> { openDropdownKey = "saved-permissions-modal"; renderShell(); });
+		card.addView(review, new LinearLayout.LayoutParams(match(), 42));
+		card.addView(confirmPrivacyAction("revoke-permissions", "Revoke all saved permissions", privacyService::revokeAllPermissions), new LinearLayout.LayoutParams(match(), 42));
+		return card;
+	}
+
+	private View runtimeSafetyCard() {
+		LinearLayout card = settingsCard("Runtime Safety", "check-double-solid.png");
+		addPrivacyToggle(card, "Confirm before running untrusted scripts", settingsConfig.confirmUntrustedScripts(), settingsConfig::setConfirmUntrustedScripts);
+		addPrivacyToggle(card, "Confirm destructive actions", settingsConfig.confirmDestructiveActions(), settingsConfig::setConfirmDestructiveActions);
+		addPrivacyToggle(card, "Only allow one movement automation at a time", settingsConfig.oneMovementAutomationAtATime(), settingsConfig::setOneMovementAutomationAtATime);
+		addPrivacyToggle(card, "Stop scripts when leaving a world", settingsConfig.stopScriptsOnWorldLeave(), settingsConfig::setStopScriptsOnWorldLeave);
+		addPrivacyToggle(card, "Stop scripts when changing servers", settingsConfig.stopScriptsOnServerChange(), settingsConfig::setStopScriptsOnServerChange);
+		addPrivacyToggle(card, "Stop scripts when the Minecraft window closes", settingsConfig.stopScriptsWhenClientCloses(), settingsConfig::setStopScriptsWhenClientCloses);
+		addPrivacyToggle(card, "Pause automation when a menu is open", settingsConfig.pauseAutomationWhenMenuOpen(), settingsConfig::setPauseAutomationWhenMenuOpen);
+		card.addView(settingsIntSliderRow("Default script timeout", 0, 3600, settingsConfig.defaultScriptTimeoutSeconds(), "s",
+				value -> updatePrivacySetting("Default script timeout", () -> settingsConfig.setDefaultScriptTimeoutSeconds(value))), rowParams());
+		card.addView(settingsIntSliderRow("Maximum runtime limit", 0, 86400, settingsConfig.maximumScriptRuntimeSeconds(), "s",
+				value -> updatePrivacySetting("Maximum runtime limit", () -> settingsConfig.setMaximumScriptRuntimeSeconds(value))), rowParams());
+		card.addView(settingsKeyRow("Emergency-stop shortcut", SHORTCUT_EMERGENCY_STOP,
+				"Immediately releases movement, camera, attack, and use"), new LinearLayout.LayoutParams(match(), 40));
+		card.addView(label("Emergency stop is always handled before text fields, menus, and other Shulkr shortcuts.", 11, Color.argb(255, 255, 190, 92)));
+		return card;
+	}
+
+	private View dataHistoryCard() {
+		LinearLayout card = settingsCard("Data & History", "clock-rotate-left-solid.png");
+		addPrivacyToggle(card, "Save script execution history", settingsConfig.saveScriptExecutionHistory(), settingsConfig::setSaveScriptExecutionHistory);
+		addPrivacyToggle(card, "Save runtime logs", settingsConfig.saveRuntimeLogs(), settingsConfig::setSaveRuntimeLogs);
+		card.addView(settingsDropdownRow("privacy-log-retention", "Log retention", settingsConfig.logRetention(),
+				new String[]{"Session only", "1 day", "7 days", "30 days"}, value -> {}), rowParams());
+		addPrivacyToggle(card, "Save recently opened scripts", settingsConfig.saveRecentlyOpenedScripts(), settingsConfig::setSaveRecentlyOpenedScripts);
+		addPrivacyToggle(card, "Save search history", settingsConfig.saveSearchHistory(), settingsConfig::setSaveSearchHistory);
+		addPrivacyToggle(card, "Include local paths in diagnostic exports", settingsConfig.includeLocalPathsInDiagnostics(), settingsConfig::setIncludeLocalPathsInDiagnostics);
+		card.addView(confirmPrivacyAction("clear-execution-history", "Clear execution history", privacyService::clearExecutionHistory), new LinearLayout.LayoutParams(match(), 42));
+		card.addView(confirmPrivacyAction("clear-runtime-logs", "Clear runtime logs", privacyService::clearRuntimeLogs), new LinearLayout.LayoutParams(match(), 42));
+		card.addView(confirmPrivacyAction("clear-recent-scripts", "Clear recent scripts", privacyService::clearRecentScripts), new LinearLayout.LayoutParams(match(), 42));
+		card.addView(confirmPrivacyAction("clear-search-history", "Clear search history", privacyService::clearSearchHistory), new LinearLayout.LayoutParams(match(), 42));
+		card.addView(confirmPrivacyAction("clear-all-saved-permissions", "Clear all saved permissions", privacyService::revokeAllPermissions), new LinearLayout.LayoutParams(match(), 42));
+		card.addView(confirmPrivacyAction("clear-all-privacy-data", "Clear all local privacy data", privacyService::clearAllLocalPrivacyData), new LinearLayout.LayoutParams(match(), 42));
+		return card;
+	}
+
+	private void addPrivacyToggle(LinearLayout card, String name, boolean value, Consumer<Boolean> setter) {
+		card.addView(settingsSwitchRow(name, value, checked -> updatePrivacySetting(name, () -> setter.accept(checked))), rowParams());
+	}
+
+	private void updatePrivacySetting(String name, Runnable update) {
+		update.run();
+		settingsConfig.save();
+		TritonUIClient.reloadConfig();
+		settingsConfig = TritonUIClient.config();
+		settingsMessage = name + " updated and applied.";
+		renderShell();
+	}
+
+	private View confirmPrivacyAction(String key, String label, Callable<PrivacyService.ClearResult> action) {
+		boolean armed = key.equals(pendingPrivacyAction) && System.currentTimeMillis() <= pendingPrivacyActionExpiresAt;
+		View row = settingsActionRow(armed ? "Confirm: " + label : label, armed ? "circle-info-solid.png" : "broom-solid.png");
+		row.setOnClickListener(view -> {
+			if (!armed) {
+				pendingPrivacyAction = key;
+				pendingPrivacyActionExpiresAt = System.currentTimeMillis() + 10_000L;
+				settingsMessage = "Click again within 10 seconds to confirm: " + label + ".";
+				renderShell();
+				return;
+			}
+			pendingPrivacyAction = "";
+			settingsMessage = label + "…";
+			renderShell();
+			lintExecutor.execute(() -> {
+				try {
+					PrivacyService.ClearResult result = action.call();
+					if (shell != null) shell.post(() -> { settingsMessage = result.message(); renderShell(); });
+				} catch (Exception error) {
+					TritonUI.LOGGER.error("Privacy data action failed: {}", label, error);
+					if (shell != null) shell.post(() -> { settingsMessage = label + " failed: " + safeErrorMessage(error); renderShell(); });
+				}
+			});
+		});
+		return row;
 	}
 
 	private View pythonInstallSettingsCard() {
@@ -3117,12 +3237,6 @@ public final class TritonModernFragment extends Fragment {
 		return card;
 	}
 
-	private View safetyRuntimeCard() {
-		LinearLayout card = settingsCard("Runtime Safety", "check-double-solid.png");
-		card.addView(label("These settings are persisted and ready for script-approval checks. Minescript itself still executes local scripts when you press Run.", 12, MUTED));
-		return card;
-	}
-
 	private View developerOptionsCard() {
 		LinearLayout card = settingsCard("Developer Options", "code-solid.png");
 		card.addView(settingsSwitchRow("Developer mode", settingsConfig.developerMode(), value -> updateAdvancedSetting("Developer mode", () -> settingsConfig.setDeveloperMode(value))), rowParams());
@@ -3427,7 +3541,7 @@ public final class TritonModernFragment extends Fragment {
 		StringBuilder report = new StringBuilder("Shulkr Advanced Diagnostics\n");
 		for (Diagnostic item : advancedDiagnostics) report.append(item.state()).append(" | ").append(item.name()).append(" | ").append(item.detail()).append('\n');
 		if (advancedDiagnostics.isEmpty()) report.append("No diagnostic run has completed yet.\n");
-		copyToClipboard(advancedService.redact(report.toString()));
+		copyToClipboard(advancedService.redact(report.toString(), settingsConfig));
 		settingsMessage = "Copied redacted diagnostic information.";
 		renderShell();
 	}
@@ -4031,6 +4145,7 @@ public final class TritonModernFragment extends Fragment {
 			case SHORTCUT_OPEN_UI -> "Open Shulkr";
 			case SHORTCUT_OVERLAY_EDIT -> "Overlay edit mode";
 			case SHORTCUT_RUN_LAST -> "Run last script";
+			case SHORTCUT_EMERGENCY_STOP -> "Emergency stop";
 			default -> "Shortcut";
 		};
 	}
@@ -5284,6 +5399,7 @@ public final class TritonModernFragment extends Fragment {
 		loadActiveDraftFromDisk();
 		currentScriptRunning = false;
 		appendEditorLog("Opened " + script.getFileName() + ".");
+		privacyService.recordRecentScript(script, settingsConfig);
 		renderShell();
 	}
 
@@ -5345,6 +5461,7 @@ public final class TritonModernFragment extends Fragment {
 				}
 				ScriptSummary summary = FluxusAppState.get().importScript(source, false);
 				Path target = scriptDir.resolve(summary.path()).normalize();
+				privacyService.markUntrusted(target, "Imported file");
 				if (shell != null) {
 					shell.post(() -> {
 						refreshEditorScripts();
@@ -5480,6 +5597,7 @@ public final class TritonModernFragment extends Fragment {
 		try {
 			FluxusAppState.ScriptSummary summary = FluxusAppState.get().installLibraryScript(id);
 			Path installed = scriptDir.resolve(summary.path()).normalize();
+			privacyService.markUntrusted(installed, "Script Hub");
 			refreshEditorScripts();
 			if (Files.exists(installed)) {
 				selectEditorScript(installed);
@@ -5732,6 +5850,26 @@ public final class TritonModernFragment extends Fragment {
 			refreshConsoleLogList();
 			return;
 		}
+		Assessment permissionAssessment = TritonUIClient.assessScript(selectedScript);
+		if (permissionAssessment.decision() == Decision.BLOCK) {
+			handleRunError(fileName, permissionAssessment.message());
+			return;
+		}
+		boolean permissionApproved = permissionAssessment.decision() != Decision.ASK;
+		if (!permissionApproved) {
+			boolean confirmed = permissionAssessment.scriptId().equals(pendingScriptApprovalId)
+					&& System.currentTimeMillis() <= pendingScriptApprovalExpiresAt;
+			if (!confirmed) {
+				pendingScriptApprovalId = permissionAssessment.scriptId();
+				pendingScriptApprovalExpiresAt = System.currentTimeMillis() + 15_000L;
+				appendEditorLog(permissionAssessment.message() + " Press Run again within 15 seconds to approve this permission set.");
+				consoleTab = "Errors";
+				refreshConsoleLogList();
+				return;
+			}
+			permissionApproved = true;
+			pendingScriptApprovalId = "";
+		}
 		boolean dangerous = !scriptRunSafetyLabel().equals("ready") && !scriptRunSafetyLabel().equals("-");
 		if (dangerous && settingsConfig.confirmDangerousScripts() && System.currentTimeMillis() > dangerousRunConfirmationExpiresAt) {
 			dangerousRunConfirmationExpiresAt = System.currentTimeMillis() + 10_000L;
@@ -5751,7 +5889,8 @@ public final class TritonModernFragment extends Fragment {
 		int generation = ++runGeneration;
 		appendEditorLog("Preparing " + fileName + "...");
 		renderShell();
-		Runnable start = () -> prepareAndStartScript(scriptToRun, workingDirectory, fileName, generation);
+		boolean approvedForStart = permissionApproved;
+		Runnable start = () -> prepareAndStartScript(scriptToRun, workingDirectory, fileName, generation, approvedForStart);
 		if (settingsConfig.stopPreviousBeforeRunning()) {
 			Minescript.runEditorCommandAsync("killjob -1", handled -> {
 				if (shell != null) shell.post(() -> {
@@ -5774,7 +5913,7 @@ public final class TritonModernFragment extends Fragment {
 		return directory;
 	}
 
-	private void prepareAndStartScript(Path scriptToRun, Path workingDirectory, String fileName, int generation) {
+	private void prepareAndStartScript(Path scriptToRun, Path workingDirectory, String fileName, int generation, boolean userApproved) {
 		CompletableFuture.supplyAsync(() -> {
 			try { return ScriptSettingsRuntime.prepare(scriptToRun, workingDirectory); }
 			catch (IOException error) { throw new RuntimeException(error); }
@@ -5789,14 +5928,14 @@ public final class TritonModernFragment extends Fragment {
 					return;
 				}
 				appendEditorLog("Queued " + fileName + (prepared.configured() ? " with " + prepared.settingCount() + " configured variable(s)." : "."));
-				Minescript.runEditorCommandAsync(prepared.commandPath(), handled -> {
+				TritonUIClient.startAuthorizedScript(scriptToRun, prepared.commandPath(), userApproved, result -> {
 					if (shell != null) shell.post(() -> {
 						if (generation != runGeneration) return;
-						currentScriptRunning = handled;
-						if (handled) TritonUIClient.rememberLastScript(prepared.commandPath() + ".py");
-						appendEditorLog((handled ? "Started " : "Failed to start ") + fileName + ".");
-						if (!handled && settingsConfig.focusOutputOnError()) consoleTab = "Errors";
-						if (handled) scheduleEditorRunTimeout(fileName, generation);
+						currentScriptRunning = result.started();
+						if (result.started()) TritonUIClient.rememberLastScript(scriptDir.relativize(scriptToRun).toString());
+						appendEditorLog(result.started() ? "Started " + fileName + "." : "Blocked " + fileName + ": " + result.message());
+						if (!result.started() && settingsConfig.focusOutputOnError()) consoleTab = "Errors";
+						if (result.started()) scheduleEditorRunTimeout(fileName, generation);
 						renderShell();
 					});
 				});
@@ -5961,6 +6100,7 @@ public final class TritonModernFragment extends Fragment {
 			refreshConsoleLogList();
 			return;
 		}
+		if (!confirmDestructive("delete:" + script.toAbsolutePath().normalize(), "Delete " + script.getFileName())) return;
 		Path deleted = script;
 		try {
 			boolean deletedOk = deleted.startsWith(scriptDir)
@@ -5997,6 +6137,8 @@ public final class TritonModernFragment extends Fragment {
 			refreshConsoleLogList();
 			return;
 		}
+		String signature = "delete-many:" + targets.stream().map(path -> path.toAbsolutePath().normalize().toString()).sorted().toList();
+		if (!confirmDestructive(signature, "Delete " + targets.size() + " selected item(s)")) return;
 		int deletedCount = 0;
 		for (Path target : targets.stream()
 				.sorted(Comparator.comparingInt((Path path) -> path.getNameCount()).reversed())
@@ -6040,6 +6182,19 @@ public final class TritonModernFragment extends Fragment {
 		loadActiveDraftFromDisk();
 		appendEditorLog("Deleted " + deletedCount + " item" + (deletedCount == 1 ? "" : "s") + ".");
 		renderShell();
+	}
+
+	private boolean confirmDestructive(String signature, String label) {
+		if (!settingsConfig.confirmDestructiveActions()) return true;
+		if (!signature.equals(pendingDestructiveSignature) || System.currentTimeMillis() > pendingDestructiveExpiresAt) {
+			pendingDestructiveSignature = signature;
+			pendingDestructiveExpiresAt = System.currentTimeMillis() + 10_000L;
+			appendEditorLog(label + " is destructive. Repeat the action within 10 seconds to confirm.");
+			refreshConsoleLogList();
+			return false;
+		}
+		pendingDestructiveSignature = "";
+		return true;
 	}
 
 	private void removeEditorPathReferences(Path target) {
@@ -6511,7 +6666,8 @@ public final class TritonModernFragment extends Fragment {
 
 	private void appendEditorLog(String message) {
 		String timestamp = java.time.LocalTime.now().withNano(0).toString();
-		editorLogs.add("[" + timestamp + "] " + message);
+		String safeMessage = privacyService == null || settingsConfig == null ? message : privacyService.redact(message, settingsConfig);
+		editorLogs.add("[" + timestamp + "] " + safeMessage);
 		int maxEntries = settingsConfig == null ? 500 : settingsConfig.maximumRuntimeLogEntries();
 		int maxCharacters = (settingsConfig == null ? 1024 : settingsConfig.runtimeLogBufferSizeKb()) * 1024;
 		while (editorLogs.size() > maxEntries || editorLogs.stream().mapToInt(String::length).sum() > maxCharacters) {
@@ -8279,6 +8435,7 @@ public final class TritonModernFragment extends Fragment {
 			return publishScriptModal();
 		}
 		if (openDropdownKey.equals("raw-config-modal")) return rawConfigModal();
+		if (openDropdownKey.equals("saved-permissions-modal")) return savedPermissionsModal();
 		if (openDropdownKey.equals("new-script") && (page == Page.SCRIPTS || page == Page.EDITOR)) {
 			return newScriptDropdownMenu();
 		}
@@ -8434,6 +8591,7 @@ public final class TritonModernFragment extends Fragment {
 			public void onTextChanged(CharSequence value, int start, int before, int count) {
 				if (value.toString().equals(globalSearchQuery)) return;
 				globalSearchQuery = value.toString();
+				privacyService.recordSearch(globalSearchQuery, settingsConfig);
 				input.post(() -> renderShell());
 			}
 			public void afterTextChanged(Editable value) {}
@@ -8618,6 +8776,61 @@ public final class TritonModernFragment extends Fragment {
 		return modal;
 	}
 
+	private View savedPermissionsModal() {
+		LinearLayout modal = column(12);
+		modal.setPadding(22, 20, 22, 20);
+		modal.setBackground(glass(Color.argb(235, 12, 17, 30), Color.argb(220, 7, 12, 22), 18, STROKE_HOVER));
+		LinearLayout title = row(12);
+		title.setGravity(Gravity.CENTER_VERTICAL);
+		title.addView(iconBadge("check-double-solid.png", PURPLE, accentDarkAlpha(118), 46, 11));
+		LinearLayout copy = column(3);
+		copy.addView(label("Saved Script Permissions", 21, TEXT));
+		copy.addView(label("Approvals are tied to a stable script ID and the exact requested-permission set.", 12, MUTED));
+		title.addView(copy, new LinearLayout.LayoutParams(0, wrap(), 1.0F));
+		View close = iconButton("ellipsis-solid.png", MUTED);
+		close.setOnClickListener(view -> closeFloatingDropdown(null));
+		title.addView(close, new LinearLayout.LayoutParams(38, 38));
+		modal.addView(title, new LinearLayout.LayoutParams(match(), 54));
+
+		ScrollView scroll = layoutScrollView();
+		LinearLayout rows = column(8);
+		List<SavedApproval> approvals = privacyService.savedApprovals();
+		if (approvals.isEmpty()) {
+			rows.addView(label("No script permissions have been saved. Scripts governed by Ask every time will request approval before they start.", 13, FAINT));
+		} else {
+			for (SavedApproval approval : approvals) {
+				LinearLayout row = column(4);
+				row.setPadding(12, 10, 12, 10);
+				row.setBackground(round(Color.argb(110, 15, 21, 34), 10, STROKE));
+				row.addView(label(approval.scriptName() + "  •  " + approval.source(), 13, TEXT));
+				String permissions = approval.permissions().isEmpty() ? "No sensitive permissions" : String.join(", ", approval.permissions().stream().map(Permission::label).toList());
+				row.addView(label(permissions, 11, MUTED));
+				row.addView(label("ID " + approval.scriptId().substring(0, Math.min(12, approval.scriptId().length())) + "  •  " + approval.approvedAt(), 10, FAINT));
+				rows.addView(row, new LinearLayout.LayoutParams(match(), wrap()));
+			}
+		}
+		scroll.addView(rows, new ScrollView.LayoutParams(match(), wrap()));
+		modal.addView(scroll, new LinearLayout.LayoutParams(match(), 0, 1.0F));
+
+		LinearLayout actions = row(10);
+		actions.setGravity(Gravity.RIGHT | Gravity.CENTER_VERTICAL);
+		View done = textButton("Close");
+		done.setOnClickListener(view -> closeFloatingDropdown(null));
+		actions.addView(done, new LinearLayout.LayoutParams(100, 40));
+		View revoke = primaryActionButton("broom-solid.png", "Revoke All");
+		revoke.setOnClickListener(view -> {
+			closeFloatingDropdown(() -> {
+				pendingPrivacyAction = "revoke-permissions";
+				pendingPrivacyActionExpiresAt = System.currentTimeMillis() + 10_000L;
+				settingsMessage = "Use Revoke all saved permissions again within 10 seconds to confirm.";
+				renderShell();
+			});
+		});
+		actions.addView(revoke, new LinearLayout.LayoutParams(130, 40));
+		modal.addView(actions, new LinearLayout.LayoutParams(match(), 44));
+		return modal;
+	}
+
 	private void validateRawConfigDraft() {
 		List<String> errors = FluxusConfig.validateJson(rawConfigDraft);
 		rawConfigError = errors.isEmpty() ? "JSON is valid. Apply Changes will ask for confirmation." : String.join(" ", errors);
@@ -8765,7 +8978,8 @@ public final class TritonModernFragment extends Fragment {
 				|| key.equals("corner-radius") || key.equals("border-strength") || key.equals("animation-speed")
 				|| key.equals("editor-tab-size") || key.equals("editor-cursor-style")
 				|| key.equals("editor-autosave") || key.equals("editor-working-directory") || key.equals("telemetry")
-				|| key.equals("advanced-thread-priority");
+				|| key.equals("advanced-thread-priority") || key.equals("privacy-telemetry")
+				|| key.equals("privacy-log-retention") || key.startsWith("privacy-permission-");
 	}
 
 	private View settingsFloatingDropdown() {
@@ -8776,6 +8990,10 @@ public final class TritonModernFragment extends Fragment {
 			openDropdownKey = "";
 			applySettingsDropdownSelection(key, option);
 		}, key.equals("accent"));
+	}
+
+	private String permissionNameForKey(String key) {
+		return key.substring("privacy-permission-".length()).replace('-', '_').toUpperCase(Locale.ROOT);
 	}
 
 	private String settingsDropdownSelected(String key) {
@@ -8820,9 +9038,9 @@ public final class TritonModernFragment extends Fragment {
 		if (key.equals("editor-autosave")) return settingsConfig.autosaveMode();
 		if (key.equals("editor-working-directory")) return settingsConfig.workingDirectoryMode();
 		if (key.equals("advanced-thread-priority")) return settingsConfig.executionThreadPriority();
-		if (key.equals("telemetry")) {
-			return "Local only";
-		}
+		if (key.equals("privacy-telemetry")) return settingsConfig.telemetryMode();
+		if (key.equals("privacy-log-retention")) return settingsConfig.logRetention();
+		if (key.startsWith("privacy-permission-")) return settingsConfig.permissionPolicy(permissionNameForKey(key));
 		return "";
 	}
 
@@ -8868,13 +9086,26 @@ public final class TritonModernFragment extends Fragment {
 		if (key.equals("editor-autosave")) return new String[]{"Off", "After Delay", "On Focus Change"};
 		if (key.equals("editor-working-directory")) return new String[]{"Script Folder", "Minescript Folder", "Custom"};
 		if (key.equals("advanced-thread-priority")) return new String[]{"Low", "Normal", "High"};
-		if (key.equals("telemetry")) {
-			return new String[]{"Local only", "Off", "Diagnostics only"};
-		}
+		if (key.equals("privacy-telemetry")) return new String[]{"Off", "Local diagnostics only", "Anonymous diagnostics"};
+		if (key.equals("privacy-log-retention")) return new String[]{"Session only", "1 day", "7 days", "30 days"};
+		if (key.startsWith("privacy-permission-")) return PERMISSION_POLICY_OPTIONS;
 		return new String[0];
 	}
 
 	private void applySettingsDropdownSelection(String key, String option) {
+		if (key.equals("privacy-telemetry")) {
+			updatePrivacySetting("Telemetry", () -> settingsConfig.setTelemetryMode(option));
+			return;
+		}
+		if (key.equals("privacy-log-retention")) {
+			updatePrivacySetting("Log retention", () -> settingsConfig.setLogRetention(option));
+			return;
+		}
+		if (key.startsWith("privacy-permission-")) {
+			String permission = permissionNameForKey(key);
+			updatePrivacySetting(Permission.valueOf(permission).label(), () -> settingsConfig.setPermissionPolicy(permission, option));
+			return;
+		}
 		if (key.equals("theme")) {
 			settingsConfig.setTheme(option);
 			saveSettingsConfig("Theme set to " + option + ".");
@@ -9640,6 +9871,7 @@ public final class TritonModernFragment extends Fragment {
 				String next = value.toString();
 				if (next.equals(pageSearchQueries.getOrDefault(searchPage, ""))) return;
 				pageSearchQueries.put(searchPage, next);
+				privacyService.recordSearch(next, settingsConfig);
 				if (searchPage == Page.SETTINGS && !next.isBlank()) settingsTab = settingsTabForSearch(next);
 				restorePageSearchFocus = searchPage;
 				input.post(() -> renderShell());
@@ -9827,6 +10059,7 @@ public final class TritonModernFragment extends Fragment {
 				String next = value.toString();
 				if (next.equals(pageSearchQueries.getOrDefault(Page.EDITOR, ""))) return;
 				pageSearchQueries.put(Page.EDITOR, next);
+				privacyService.recordSearch(next, settingsConfig);
 				restorePageSearchFocus = Page.EDITOR;
 				input.post(() -> renderShell());
 			}
@@ -10329,7 +10562,8 @@ public final class TritonModernFragment extends Fragment {
 	}
 
 	private boolean isModalSurface() {
-		return openDropdownKey.equals("publish-modal") || openDropdownKey.equals("raw-config-modal");
+		return openDropdownKey.equals("publish-modal") || openDropdownKey.equals("raw-config-modal")
+				|| openDropdownKey.equals("saved-permissions-modal");
 	}
 
 	private void closeFloatingDropdown(Runnable afterClose) {

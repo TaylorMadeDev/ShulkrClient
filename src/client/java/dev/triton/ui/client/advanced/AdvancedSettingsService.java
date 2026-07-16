@@ -2,6 +2,7 @@ package dev.triton.ui.client.advanced;
 
 import dev.triton.ui.client.app.FluxusAppState;
 import dev.triton.ui.client.config.FluxusConfig;
+import dev.triton.ui.client.privacy.PrivacyService;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonParser;
@@ -312,7 +313,7 @@ public final class AdvancedSettingsService {
 		report.append("\nRuntime settings\nWorker limit: ").append(config.scriptWorkerLimit())
 				.append("\nConcurrent scripts: ").append(config.maximumConcurrentScripts())
 				.append("\nThread priority: ").append(config.executionThreadPriority()).append('\n');
-		String redacted = redact(report.toString());
+		String redacted = redact(report.toString(), config);
 		Path destination = exportDir.resolve("shulkr-diagnostic-" + FILE_TIME.format(Instant.now()) + ".txt");
 		Files.writeString(destination, redacted, StandardCharsets.UTF_8);
 		return destination;
@@ -329,6 +330,11 @@ public final class AdvancedSettingsService {
 		redacted = redacted.replaceAll("(?i)(device|hardware|account|license)(Id)?\\s*[:=]\\s*[^\\s]+", "$1$2=<redacted>");
 		redacted = redacted.replaceAll("(?i)[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}", "<identifier>");
 		return redacted;
+	}
+
+	public String redact(String text, FluxusConfig config) {
+		if (config == null) return redact(text);
+		return new PrivacyService().redact(text, config);
 	}
 
 	public Path configFile() { return configFile; }

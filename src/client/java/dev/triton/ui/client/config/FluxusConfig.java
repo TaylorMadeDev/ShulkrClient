@@ -104,6 +104,37 @@ public final class FluxusConfig {
 	private int clientBridgeReconnectDelaySeconds = 5;
 	private boolean autoReconnectDashboard = true;
 	private boolean reduceUiUpdatesWhileScriptRunning = true;
+	private boolean hidePlayerNamesInCaptures = true;
+	private boolean hideServerAddressesInCaptures = true;
+	private boolean hideCoordinatesInCaptures = true;
+	private boolean redactWindowsUsernamesAndPaths = true;
+	private boolean redactAccountAndDeviceIdentifiers = true;
+	private String telemetryMode = "Local diagnostics only";
+	private String networkPermissionPolicy = "Ask every time";
+	private String fileReadPermissionPolicy = "Allow trusted scripts";
+	private String fileWritePermissionPolicy = "Ask every time";
+	private String clipboardPermissionPolicy = "Ask every time";
+	private String externalProcessPermissionPolicy = "Always block";
+	private String chatPermissionPolicy = "Ask every time";
+	private String movementPermissionPolicy = "Ask every time";
+	private String worldActionPermissionPolicy = "Ask every time";
+	private boolean rememberScriptPermissions = true;
+	private boolean confirmUntrustedScripts = true;
+	private boolean confirmDestructiveActions = true;
+	private boolean oneMovementAutomationAtATime = true;
+	private boolean stopScriptsOnServerChange = true;
+	private boolean stopScriptsWhenClientCloses = true;
+	private boolean pauseAutomationWhenMenuOpen;
+	private int defaultScriptTimeoutSeconds;
+	private int maximumScriptRuntimeSeconds;
+	private int emergencyStopKey = 259;
+	private String emergencyStopShortcut = new ShortcutBinding(259, ShortcutBinding.CTRL | ShortcutBinding.SHIFT).serialize();
+	private boolean saveScriptExecutionHistory = true;
+	private boolean saveRuntimeLogs = true;
+	private String logRetention = "7 days";
+	private boolean saveRecentlyOpenedScripts = true;
+	private boolean saveSearchHistory = true;
+	private boolean includeLocalPathsInDiagnostics;
 	private boolean blockNetworkByDefault = true;
 	private int openMenuKey = 85;
 	private int overlayEditKey = -1;
@@ -214,7 +245,43 @@ public final class FluxusConfig {
 			config.clientBridgeReconnectDelaySeconds = clamp(readInt(json, "clientBridgeReconnectDelaySeconds", config.clientBridgeReconnectDelaySeconds), 1, 60);
 			config.autoReconnectDashboard = readBoolean(json, "autoReconnectDashboard", config.autoReconnectDashboard);
 			config.reduceUiUpdatesWhileScriptRunning = readBoolean(json, "reduceUiUpdatesWhileScriptRunning", config.reduceUiUpdatesWhileScriptRunning);
+			config.hidePlayerNamesInCaptures = readBoolean(json, "hidePlayerNamesInCaptures", config.hidePlayerNamesInCaptures);
+			config.hideServerAddressesInCaptures = readBoolean(json, "hideServerAddressesInCaptures", config.hideServerAddressesInCaptures);
+			config.hideCoordinatesInCaptures = readBoolean(json, "hideCoordinatesInCaptures", config.hideCoordinatesInCaptures);
+			config.redactWindowsUsernamesAndPaths = readBoolean(json, "redactWindowsUsernamesAndPaths", config.redactWindowsUsernamesAndPaths);
+			config.redactAccountAndDeviceIdentifiers = readBoolean(json, "redactAccountAndDeviceIdentifiers", config.redactAccountAndDeviceIdentifiers);
+			config.telemetryMode = choice(readString(json, "telemetryMode", config.telemetryMode), config.telemetryMode,
+					"Off", "Local diagnostics only", "Anonymous diagnostics");
+			config.networkPermissionPolicy = permissionPolicy(json, "networkPermissionPolicy", config.networkPermissionPolicy);
+			config.fileReadPermissionPolicy = permissionPolicy(json, "fileReadPermissionPolicy", config.fileReadPermissionPolicy);
+			config.fileWritePermissionPolicy = permissionPolicy(json, "fileWritePermissionPolicy", config.fileWritePermissionPolicy);
+			config.clipboardPermissionPolicy = permissionPolicy(json, "clipboardPermissionPolicy", config.clipboardPermissionPolicy);
+			config.externalProcessPermissionPolicy = permissionPolicy(json, "externalProcessPermissionPolicy", config.externalProcessPermissionPolicy);
+			config.chatPermissionPolicy = permissionPolicy(json, "chatPermissionPolicy", config.chatPermissionPolicy);
+			config.movementPermissionPolicy = permissionPolicy(json, "movementPermissionPolicy", config.movementPermissionPolicy);
+			config.worldActionPermissionPolicy = permissionPolicy(json, "worldActionPermissionPolicy", config.worldActionPermissionPolicy);
+			config.rememberScriptPermissions = readBoolean(json, "rememberScriptPermissions", config.rememberScriptPermissions);
+			config.confirmUntrustedScripts = readBoolean(json, "confirmUntrustedScripts", config.confirmUntrustedScripts);
+			config.confirmDestructiveActions = readBoolean(json, "confirmDestructiveActions", config.confirmDestructiveActions);
+			config.oneMovementAutomationAtATime = readBoolean(json, "oneMovementAutomationAtATime", config.oneMovementAutomationAtATime);
+			config.stopScriptsOnServerChange = readBoolean(json, "stopScriptsOnServerChange", config.stopScriptsOnServerChange);
+			config.stopScriptsWhenClientCloses = readBoolean(json, "stopScriptsWhenClientCloses", config.stopScriptsWhenClientCloses);
+			config.pauseAutomationWhenMenuOpen = readBoolean(json, "pauseAutomationWhenMenuOpen", config.pauseAutomationWhenMenuOpen);
+			config.defaultScriptTimeoutSeconds = clamp(readInt(json, "defaultScriptTimeoutSeconds", config.defaultScriptTimeoutSeconds), 0, 3600);
+			config.maximumScriptRuntimeSeconds = clamp(readInt(json, "maximumScriptRuntimeSeconds", config.maximumScriptRuntimeSeconds), 0, 86400);
+			config.emergencyStopKey = readInt(json, "emergencyStopKey", config.emergencyStopKey);
+			config.emergencyStopShortcut = readString(json, "emergencyStopShortcut", config.emergencyStopShortcut);
+			config.saveScriptExecutionHistory = readBoolean(json, "saveScriptExecutionHistory", config.saveScriptExecutionHistory);
+			config.saveRuntimeLogs = readBoolean(json, "saveRuntimeLogs", config.saveRuntimeLogs);
+			config.logRetention = choice(readString(json, "logRetention", config.logRetention), config.logRetention,
+					"Session only", "1 day", "7 days", "30 days");
+			config.saveRecentlyOpenedScripts = readBoolean(json, "saveRecentlyOpenedScripts", config.saveRecentlyOpenedScripts);
+			config.saveSearchHistory = readBoolean(json, "saveSearchHistory", config.saveSearchHistory);
+			config.includeLocalPathsInDiagnostics = readBoolean(json, "includeLocalPathsInDiagnostics", config.includeLocalPathsInDiagnostics);
 			config.blockNetworkByDefault = readBoolean(json, "blockNetworkByDefault", config.blockNetworkByDefault);
+			if (!json.contains("\"networkPermissionPolicy\"")) {
+				config.networkPermissionPolicy = config.blockNetworkByDefault ? "Always block" : "Ask every time";
+			}
 			config.openMenuKey = readInt(json, "openMenuKey", config.openMenuKey);
 			config.overlayEditKey = readInt(json, "overlayEditKey", config.overlayEditKey);
 			config.runLastScriptKey = readInt(json, "runLastScriptKey", config.runLastScriptKey);
@@ -383,6 +450,41 @@ public final class FluxusConfig {
 	public int clientBridgeReconnectDelaySeconds() { return clientBridgeReconnectDelaySeconds; }
 	public boolean autoReconnectDashboard() { return autoReconnectDashboard; }
 	public boolean reduceUiUpdatesWhileScriptRunning() { return reduceUiUpdatesWhileScriptRunning; }
+	public boolean hidePlayerNamesInCaptures() { return hidePlayerNamesInCaptures; }
+	public boolean hideServerAddressesInCaptures() { return hideServerAddressesInCaptures; }
+	public boolean hideCoordinatesInCaptures() { return hideCoordinatesInCaptures; }
+	public boolean redactWindowsUsernamesAndPaths() { return redactWindowsUsernamesAndPaths; }
+	public boolean redactAccountAndDeviceIdentifiers() { return redactAccountAndDeviceIdentifiers; }
+	public String telemetryMode() { return telemetryMode; }
+	public boolean rememberScriptPermissions() { return rememberScriptPermissions; }
+	public boolean confirmUntrustedScripts() { return confirmUntrustedScripts; }
+	public boolean confirmDestructiveActions() { return confirmDestructiveActions; }
+	public boolean oneMovementAutomationAtATime() { return oneMovementAutomationAtATime; }
+	public boolean stopScriptsOnServerChange() { return stopScriptsOnServerChange; }
+	public boolean stopScriptsWhenClientCloses() { return stopScriptsWhenClientCloses; }
+	public boolean pauseAutomationWhenMenuOpen() { return pauseAutomationWhenMenuOpen; }
+	public int defaultScriptTimeoutSeconds() { return defaultScriptTimeoutSeconds; }
+	public int maximumScriptRuntimeSeconds() { return maximumScriptRuntimeSeconds; }
+	public boolean saveScriptExecutionHistory() { return saveScriptExecutionHistory; }
+	public boolean saveRuntimeLogs() { return saveRuntimeLogs; }
+	public String logRetention() { return logRetention; }
+	public boolean saveRecentlyOpenedScripts() { return saveRecentlyOpenedScripts; }
+	public boolean saveSearchHistory() { return saveSearchHistory; }
+	public boolean includeLocalPathsInDiagnostics() { return includeLocalPathsInDiagnostics; }
+	public ShortcutBinding emergencyStopShortcut() { return ShortcutBinding.parse(emergencyStopShortcut, new ShortcutBinding(emergencyStopKey, ShortcutBinding.CTRL | ShortcutBinding.SHIFT)); }
+	public String permissionPolicy(String permissionName) {
+		return switch (permissionName) {
+			case "NETWORK" -> networkPermissionPolicy;
+			case "FILE_READ" -> fileReadPermissionPolicy;
+			case "FILE_WRITE" -> fileWritePermissionPolicy;
+			case "CLIPBOARD" -> clipboardPermissionPolicy;
+			case "EXTERNAL_PROCESS" -> externalProcessPermissionPolicy;
+			case "CHAT" -> chatPermissionPolicy;
+			case "MOVEMENT" -> movementPermissionPolicy;
+			case "WORLD_ACTION" -> worldActionPermissionPolicy;
+			default -> "Ask every time";
+		};
+	}
 
 	public boolean blockNetworkByDefault() {
 		return blockNetworkByDefault;
@@ -576,6 +678,44 @@ public final class FluxusConfig {
 	public void setClientBridgeReconnectDelaySeconds(int value) { clientBridgeReconnectDelaySeconds = clamp(value, 1, 60); }
 	public void setAutoReconnectDashboard(boolean value) { autoReconnectDashboard = value; }
 	public void setReduceUiUpdatesWhileScriptRunning(boolean value) { reduceUiUpdatesWhileScriptRunning = value; }
+	public void setHidePlayerNamesInCaptures(boolean value) { hidePlayerNamesInCaptures = value; }
+	public void setHideServerAddressesInCaptures(boolean value) { hideServerAddressesInCaptures = value; }
+	public void setHideCoordinatesInCaptures(boolean value) { hideCoordinatesInCaptures = value; }
+	public void setRedactWindowsUsernamesAndPaths(boolean value) { redactWindowsUsernamesAndPaths = value; }
+	public void setRedactAccountAndDeviceIdentifiers(boolean value) { redactAccountAndDeviceIdentifiers = value; }
+	public void setTelemetryMode(String value) { telemetryMode = choice(value, telemetryMode, "Off", "Local diagnostics only", "Anonymous diagnostics"); }
+	public void setRememberScriptPermissions(boolean value) { rememberScriptPermissions = value; }
+	public void setConfirmUntrustedScripts(boolean value) { confirmUntrustedScripts = value; }
+	public void setConfirmDestructiveActions(boolean value) { confirmDestructiveActions = value; }
+	public void setOneMovementAutomationAtATime(boolean value) { oneMovementAutomationAtATime = value; }
+	public void setStopScriptsOnServerChange(boolean value) { stopScriptsOnServerChange = value; }
+	public void setStopScriptsWhenClientCloses(boolean value) { stopScriptsWhenClientCloses = value; }
+	public void setPauseAutomationWhenMenuOpen(boolean value) { pauseAutomationWhenMenuOpen = value; }
+	public void setDefaultScriptTimeoutSeconds(int value) { defaultScriptTimeoutSeconds = clamp(value, 0, 3600); }
+	public void setMaximumScriptRuntimeSeconds(int value) { maximumScriptRuntimeSeconds = clamp(value, 0, 86400); }
+	public void setSaveScriptExecutionHistory(boolean value) { saveScriptExecutionHistory = value; }
+	public void setSaveRuntimeLogs(boolean value) { saveRuntimeLogs = value; }
+	public void setLogRetention(String value) { logRetention = choice(value, logRetention, "Session only", "1 day", "7 days", "30 days"); }
+	public void setSaveRecentlyOpenedScripts(boolean value) { saveRecentlyOpenedScripts = value; }
+	public void setSaveSearchHistory(boolean value) { saveSearchHistory = value; }
+	public void setIncludeLocalPathsInDiagnostics(boolean value) { includeLocalPathsInDiagnostics = value; }
+	public void setEmergencyStopShortcut(ShortcutBinding binding) {
+		emergencyStopShortcut = binding == null ? "" : binding.serialize();
+		emergencyStopKey = binding == null ? -1 : binding.key();
+	}
+	public void setPermissionPolicy(String permissionName, String value) {
+		String policy = choice(value, "Ask every time", "Ask every time", "Allow trusted scripts", "Always block");
+		switch (permissionName) {
+			case "NETWORK" -> networkPermissionPolicy = policy;
+			case "FILE_READ" -> fileReadPermissionPolicy = policy;
+			case "FILE_WRITE" -> fileWritePermissionPolicy = policy;
+			case "CLIPBOARD" -> clipboardPermissionPolicy = policy;
+			case "EXTERNAL_PROCESS" -> externalProcessPermissionPolicy = policy;
+			case "CHAT" -> chatPermissionPolicy = policy;
+			case "MOVEMENT" -> movementPermissionPolicy = policy;
+			case "WORLD_ACTION" -> worldActionPermissionPolicy = policy;
+		}
+	}
 
 	public void setBlockNetworkByDefault(boolean blockNetworkByDefault) {
 		this.blockNetworkByDefault = blockNetworkByDefault;
@@ -703,6 +843,37 @@ public final class FluxusConfig {
 				+ "  \"clientBridgeReconnectDelaySeconds\": " + clientBridgeReconnectDelaySeconds + ",\n"
 				+ "  \"autoReconnectDashboard\": " + autoReconnectDashboard + ",\n"
 				+ "  \"reduceUiUpdatesWhileScriptRunning\": " + reduceUiUpdatesWhileScriptRunning + ",\n"
+				+ "  \"hidePlayerNamesInCaptures\": " + hidePlayerNamesInCaptures + ",\n"
+				+ "  \"hideServerAddressesInCaptures\": " + hideServerAddressesInCaptures + ",\n"
+				+ "  \"hideCoordinatesInCaptures\": " + hideCoordinatesInCaptures + ",\n"
+				+ "  \"redactWindowsUsernamesAndPaths\": " + redactWindowsUsernamesAndPaths + ",\n"
+				+ "  \"redactAccountAndDeviceIdentifiers\": " + redactAccountAndDeviceIdentifiers + ",\n"
+				+ "  \"telemetryMode\": \"" + escape(telemetryMode) + "\",\n"
+				+ "  \"networkPermissionPolicy\": \"" + escape(networkPermissionPolicy) + "\",\n"
+				+ "  \"fileReadPermissionPolicy\": \"" + escape(fileReadPermissionPolicy) + "\",\n"
+				+ "  \"fileWritePermissionPolicy\": \"" + escape(fileWritePermissionPolicy) + "\",\n"
+				+ "  \"clipboardPermissionPolicy\": \"" + escape(clipboardPermissionPolicy) + "\",\n"
+				+ "  \"externalProcessPermissionPolicy\": \"" + escape(externalProcessPermissionPolicy) + "\",\n"
+				+ "  \"chatPermissionPolicy\": \"" + escape(chatPermissionPolicy) + "\",\n"
+				+ "  \"movementPermissionPolicy\": \"" + escape(movementPermissionPolicy) + "\",\n"
+				+ "  \"worldActionPermissionPolicy\": \"" + escape(worldActionPermissionPolicy) + "\",\n"
+				+ "  \"rememberScriptPermissions\": " + rememberScriptPermissions + ",\n"
+				+ "  \"confirmUntrustedScripts\": " + confirmUntrustedScripts + ",\n"
+				+ "  \"confirmDestructiveActions\": " + confirmDestructiveActions + ",\n"
+				+ "  \"oneMovementAutomationAtATime\": " + oneMovementAutomationAtATime + ",\n"
+				+ "  \"stopScriptsOnServerChange\": " + stopScriptsOnServerChange + ",\n"
+				+ "  \"stopScriptsWhenClientCloses\": " + stopScriptsWhenClientCloses + ",\n"
+				+ "  \"pauseAutomationWhenMenuOpen\": " + pauseAutomationWhenMenuOpen + ",\n"
+				+ "  \"defaultScriptTimeoutSeconds\": " + defaultScriptTimeoutSeconds + ",\n"
+				+ "  \"maximumScriptRuntimeSeconds\": " + maximumScriptRuntimeSeconds + ",\n"
+				+ "  \"emergencyStopKey\": " + emergencyStopKey + ",\n"
+				+ "  \"emergencyStopShortcut\": \"" + escape(emergencyStopShortcut) + "\",\n"
+				+ "  \"saveScriptExecutionHistory\": " + saveScriptExecutionHistory + ",\n"
+				+ "  \"saveRuntimeLogs\": " + saveRuntimeLogs + ",\n"
+				+ "  \"logRetention\": \"" + escape(logRetention) + "\",\n"
+				+ "  \"saveRecentlyOpenedScripts\": " + saveRecentlyOpenedScripts + ",\n"
+				+ "  \"saveSearchHistory\": " + saveSearchHistory + ",\n"
+				+ "  \"includeLocalPathsInDiagnostics\": " + includeLocalPathsInDiagnostics + ",\n"
 				+ "  \"blockNetworkByDefault\": " + blockNetworkByDefault + ",\n"
 				+ "  \"openMenuKey\": " + openMenuKey + ",\n"
 				+ "  \"overlayEditKey\": " + overlayEditKey + ",\n"
@@ -730,9 +901,21 @@ public final class FluxusConfig {
 			validateInt(json, object, "runtimeLogBufferSizeKb", 64, 8192, errors);
 			validateInt(json, object, "scriptStartupTimeoutSeconds", 1, 120, errors);
 			validateInt(json, object, "clientBridgeReconnectDelaySeconds", 1, 60, errors);
+			validateInt(json, object, "defaultScriptTimeoutSeconds", 0, 3600, errors);
+			validateInt(json, object, "maximumScriptRuntimeSeconds", 0, 86400, errors);
 			for (String key : List.of("developerMode", "showInternalScriptIds", "showAdvancedRuntimeDetails", "showDebugTooltips",
 					"verboseClientLogging", "verboseMinescriptLogging", "backgroundScriptThrottling", "pauseBackgroundScriptsWhenUnfocused",
-					"autoReconnectDashboard", "reduceUiUpdatesWhileScriptRunning")) validateBoolean(json, object, key, errors);
+					"autoReconnectDashboard", "reduceUiUpdatesWhileScriptRunning", "hidePlayerNamesInCaptures", "hideServerAddressesInCaptures",
+					"hideCoordinatesInCaptures", "redactWindowsUsernamesAndPaths", "redactAccountAndDeviceIdentifiers", "rememberScriptPermissions",
+					"confirmUntrustedScripts", "confirmDestructiveActions", "oneMovementAutomationAtATime", "stopScriptsOnServerChange",
+					"stopScriptsWhenClientCloses", "pauseAutomationWhenMenuOpen", "saveScriptExecutionHistory", "saveRuntimeLogs",
+					"saveRecentlyOpenedScripts", "saveSearchHistory", "includeLocalPathsInDiagnostics")) validateBoolean(json, object, key, errors);
+			validateChoice(json, object, "telemetryMode", errors, "Off", "Local diagnostics only", "Anonymous diagnostics");
+			validateChoice(json, object, "logRetention", errors, "Session only", "1 day", "7 days", "30 days");
+			for (String key : List.of("networkPermissionPolicy", "fileReadPermissionPolicy", "fileWritePermissionPolicy", "clipboardPermissionPolicy",
+					"externalProcessPermissionPolicy", "chatPermissionPolicy", "movementPermissionPolicy", "worldActionPermissionPolicy")) {
+				validateChoice(json, object, key, errors, "Ask every time", "Allow trusted scripts", "Always block");
+			}
 			if (object.has("executionThreadPriority") && !validChoice(object.get("executionThreadPriority").getAsString(), "Low", "Normal", "High")) {
 				errors.add("Line " + lineForKey(json, "executionThreadPriority") + ": executionThreadPriority must be Low, Normal, or High.");
 			}
@@ -759,6 +942,16 @@ public final class FluxusConfig {
 		}
 	}
 
+	private static void validateChoice(String json, JsonObject object, String key, List<String> errors, String... choices) {
+		if (!object.has(key)) return;
+		try {
+			String value = object.get(key).getAsString();
+			if (!validChoice(value, choices)) errors.add("Line " + lineForKey(json, key) + ": " + key + " must be one of " + String.join(", ", choices) + ".");
+		} catch (RuntimeException error) {
+			errors.add("Line " + lineForKey(json, key) + ": " + key + " must be text.");
+		}
+	}
+
 	private static int lineForKey(String json, String key) {
 		int index = json.indexOf('"' + key + '"');
 		if (index < 0) return 1;
@@ -771,6 +964,14 @@ public final class FluxusConfig {
 		if (value == null) return false;
 		for (String choice : choices) if (choice.equals(value)) return true;
 		return false;
+	}
+
+	private static String choice(String value, String fallback, String... choices) {
+		return validChoice(value, choices) ? value : fallback;
+	}
+
+	private static String permissionPolicy(String json, String field, String fallback) {
+		return choice(readString(json, field, fallback), fallback, "Ask every time", "Allow trusted scripts", "Always block");
 	}
 
 	private static String readString(String json, String field, String fallback) {

@@ -2028,6 +2028,16 @@ public class Minescript {
     return jobs.getMap().size();
   }
 
+  /** Immediately stops every script and releases every Minecraft key mapping. */
+  public static int emergencyStop() {
+    int stopped = jobs.getMap().size();
+    killJob(-1);
+    KeyMapping.releaseAll();
+    keyBinds.values().forEach(key -> KeyMapping.set(key, false));
+    customNickname = null;
+    return stopped;
+  }
+
   private static class ServerBlockList {
     private final Path serverBlockListPath;
     private boolean lastCheckedValue = true;
