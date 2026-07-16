@@ -7689,21 +7689,22 @@ public final class TritonModernFragment extends Fragment {
 		int trackWidth = dockItems.length * DOCK_ITEM_SIZE + (dockItems.length - 1) * DOCK_ITEM_GAP;
 		FrameLayout track = new FrameLayout(requireContext());
 		View indicator = new View(requireContext());
-		indicator.setBackground(round(PURPLE, 16, 0));
-		indicator.setAlpha(0.0F);
+		indicator.setBackground(glass(PURPLE, PURPLE_DARK, 16, PURPLE_SOFT));
+		indicator.setAlpha(1.0F);
 		indicator.setClickable(false);
 		indicator.setFocusable(false);
 		FrameLayout.LayoutParams indicatorParams = new FrameLayout.LayoutParams(DOCK_ITEM_SIZE, DOCK_ITEM_SIZE);
-		indicatorParams.gravity = Gravity.TOP | Gravity.START;
+		indicatorParams.gravity = Gravity.TOP | Gravity.LEFT;
 		track.addView(indicator, indicatorParams);
 
 		LinearLayout itemRow = row(DOCK_ITEM_GAP);
-		View[] activeTab = new View[1];
-		View[] indicatorTarget = new View[1];
+		int[] activeIndex = {-1};
+		int[] indicatorTargetIndex = {-1};
 		AnimatorSet[] positionAnimation = new AnimatorSet[1];
 		ValueAnimator[] widthAnimation = new ValueAnimator[1];
 		int itemIndex = 0;
 		for (String[] item : dockItems) {
+			int tabIndex = itemIndex;
 			boolean active = (page == Page.DASHBOARD && item[1].equals("dashboard"))
 					|| (page == Page.SCRIPTS && item[1].equals("scripts"))
 					|| (page == Page.MODULES && item[1].equals("libraries"))
@@ -7720,37 +7721,42 @@ public final class TritonModernFragment extends Fragment {
 			tab.setFocusable(true);
 			tab.setFocusableInTouchMode(true);
 			if (active) {
-				activeTab[0] = tab;
-				indicatorTarget[0] = tab;
-				indicator.setTranslationX(itemIndex * (DOCK_ITEM_SIZE + DOCK_ITEM_GAP));
+				activeIndex[0] = tabIndex;
+				indicatorTargetIndex[0] = tabIndex;
+				indicatorParams.leftMargin = tabIndex * (DOCK_ITEM_SIZE + DOCK_ITEM_GAP);
+				indicator.setLayoutParams(indicatorParams);
+				indicator.setTranslationX(0.0F);
 				indicator.setAlpha(1.0F);
 			}
 			tab.setOnHoverListener((target, event) -> {
 				if (event.getAction() == MotionEvent.ACTION_HOVER_ENTER) {
-					indicatorTarget[0] = target;
-					moveDockIndicator(indicator, target, positionAnimation, widthAnimation, true);
+					indicatorTargetIndex[0] = tabIndex;
+					moveDockIndicator(indicator, tabIndex, positionAnimation, widthAnimation, true);
+					return true;
+				}
+				if (event.getAction() == MotionEvent.ACTION_HOVER_EXIT) {
+					dock.post(() -> {
+						if (indicatorTargetIndex[0] == tabIndex && activeIndex[0] >= 0) {
+							indicatorTargetIndex[0] = activeIndex[0];
+							moveDockIndicator(indicator, activeIndex[0], positionAnimation, widthAnimation, true);
+						}
+					});
 					return true;
 				}
 				return false;
 			});
 			tab.setOnFocusChangeListener((target, hasFocus) -> {
 				if (hasFocus) {
-					indicatorTarget[0] = target;
-					moveDockIndicator(indicator, target, positionAnimation, widthAnimation, true);
+					indicatorTargetIndex[0] = tabIndex;
+					moveDockIndicator(indicator, tabIndex, positionAnimation, widthAnimation, true);
 					return;
 				}
 				dock.post(() -> {
-					if (!dock.hasFocus() && activeTab[0] != null) {
-						indicatorTarget[0] = activeTab[0];
-						moveDockIndicator(indicator, activeTab[0], positionAnimation, widthAnimation, true);
+					if (!dock.hasFocus() && activeIndex[0] >= 0) {
+						indicatorTargetIndex[0] = activeIndex[0];
+						moveDockIndicator(indicator, activeIndex[0], positionAnimation, widthAnimation, true);
 					}
 				});
-			});
-			tab.addOnLayoutChangeListener((target, left, top, right, bottom, oldLeft, oldTop, oldRight, oldBottom) -> {
-				if (indicatorTarget[0] == target && right - left > 0
-						&& (right - left != oldRight - oldLeft || left != oldLeft)) {
-					moveDockIndicator(indicator, target, positionAnimation, widthAnimation, false);
-				}
 			});
 			addPressAnimation(tab);
 			if (item[1].equals("dashboard")) {
@@ -7780,44 +7786,47 @@ public final class TritonModernFragment extends Fragment {
 		track.addView(itemRow, new FrameLayout.LayoutParams(trackWidth, DOCK_ITEM_SIZE));
 		dock.addView(track, new LinearLayout.LayoutParams(trackWidth, DOCK_ITEM_SIZE));
 		dock.setOnHoverListener((target, event) -> {
-			if (event.getAction() == MotionEvent.ACTION_HOVER_EXIT && !dock.hasFocus() && activeTab[0] != null) {
-				indicatorTarget[0] = activeTab[0];
-				moveDockIndicator(indicator, activeTab[0], positionAnimation, widthAnimation, true);
+			if (event.getAction() == MotionEvent.ACTION_HOVER_EXIT && activeIndex[0] >= 0) {
+				indicatorTargetIndex[0] = activeIndex[0];
+				moveDockIndicator(indicator, activeIndex[0], positionAnimation, widthAnimation, true);
 			}
 			return false;
 		});
 		track.addOnLayoutChangeListener((view, left, top, right, bottom, oldLeft, oldTop, oldRight, oldBottom) -> {
-			if (indicatorTarget[0] != null && (right - left != oldRight - oldLeft || bottom - top != oldBottom - oldTop)) {
-				moveDockIndicator(indicator, indicatorTarget[0], positionAnimation, widthAnimation, false);
+			if (indicatorTargetIndex[0] >= 0 && (right - left != oldRight - oldLeft || bottom - top != oldBottom - oldTop)) {
+				moveDockIndicator(indicator, indicatorTargetIndex[0], positionAnimation, widthAnimation, false);
 			}
 		});
 		track.post(() -> {
-			if (activeTab[0] != null) {
-				indicatorTarget[0] = activeTab[0];
-				moveDockIndicator(indicator, activeTab[0], positionAnimation, widthAnimation, false);
+			if (activeIndex[0] >= 0) {
+				indicatorTargetIndex[0] = activeIndex[0];
+				moveDockIndicator(indicator, activeIndex[0], positionAnimation, widthAnimation, false);
 			}
 		});
 		return dock;
 	}
 
-	private void moveDockIndicator(View indicator, View target, AnimatorSet[] positionAnimation,
+	private void moveDockIndicator(View indicator, int targetIndex, AnimatorSet[] positionAnimation,
 			ValueAnimator[] widthAnimation, boolean animate) {
-		if (target.getWidth() <= 0) {
+		if (targetIndex < 0) {
 			return;
 		}
-		float targetX = target.getLeft();
-		int targetWidth = target.getWidth();
+		float targetX = targetIndex * (DOCK_ITEM_SIZE + DOCK_ITEM_GAP);
+		int targetWidth = DOCK_ITEM_SIZE;
 		boolean motionEnabled = animate && animatedHoverHighlight && ValueAnimator.areAnimatorsEnabled();
 		if (!motionEnabled) {
 			cancelDockIndicatorAnimations(positionAnimation, widthAnimation);
-			indicator.setTranslationX(targetX);
-			setDockIndicatorWidth(indicator, targetWidth);
+			setDockIndicatorBounds(indicator, (int) targetX, targetWidth);
+			indicator.setTranslationX(0.0F);
 			indicator.setAlpha(1.0F);
 			return;
 		}
 
 		cancelDockIndicatorAnimations(positionAnimation, widthAnimation);
-		ObjectAnimator translate = ObjectAnimator.ofFloat(indicator, View.TRANSLATION_X, indicator.getTranslationX(), targetX);
+		float currentVisualX = indicator.getLeft() + indicator.getTranslationX();
+		setDockIndicatorLeft(indicator, (int) targetX);
+		indicator.setTranslationX(currentVisualX - targetX);
+		ObjectAnimator translate = ObjectAnimator.ofFloat(indicator, View.TRANSLATION_X, indicator.getTranslationX(), 0.0F);
 		ObjectAnimator fade = ObjectAnimator.ofFloat(indicator, View.ALPHA, indicator.getAlpha(), 1.0F);
 		AnimatorSet position = new AnimatorSet();
 		position.playTogether(new Animator[]{translate, fade});
@@ -7847,6 +7856,23 @@ public final class TritonModernFragment extends Fragment {
 	private void setDockIndicatorWidth(View indicator, int width) {
 		ViewGroup.LayoutParams params = indicator.getLayoutParams();
 		if (params != null && params.width != width) {
+			params.width = width;
+			indicator.setLayoutParams(params);
+		}
+	}
+
+	private void setDockIndicatorLeft(View indicator, int left) {
+		FrameLayout.LayoutParams params = (FrameLayout.LayoutParams) indicator.getLayoutParams();
+		if (params != null && params.leftMargin != left) {
+			params.leftMargin = left;
+			indicator.setLayoutParams(params);
+		}
+	}
+
+	private void setDockIndicatorBounds(View indicator, int left, int width) {
+		FrameLayout.LayoutParams params = (FrameLayout.LayoutParams) indicator.getLayoutParams();
+		if (params != null && (params.leftMargin != left || params.width != width)) {
+			params.leftMargin = left;
 			params.width = width;
 			indicator.setLayoutParams(params);
 		}
