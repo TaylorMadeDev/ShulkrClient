@@ -5,7 +5,10 @@
   "type": "commonjs",
   "scripts": {
     "start": "node src/server.js",
-    "dev": "node --watch src/server.js"
+    "dev": "node --watch src/server.js",
+    "test": "node --test",
+    "lint": "node --check src/server.js",
+    "typecheck": "npm run lint"
   },
   "dependencies": {
     "cors": "^2.8.5",
@@ -14,6 +17,7 @@
     "express-session": "^1.18.0",
     "jsonwebtoken": "^9.0.2",
     "passport": "^0.7.0",
-    "passport-google-oauth20": "^2.0.0"
+    "passport-google-oauth20": "^2.0.0",
+    "stripe": "^22.3.0"
   }
 }

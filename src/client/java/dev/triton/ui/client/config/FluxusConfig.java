@@ -26,6 +26,10 @@ public final class FluxusConfig {
 	private boolean confirmDestructiveScripts = true;
 	private boolean blockNetworkByDefault = true;
 	private int backupHistory = 25;
+	private int openMenuKey = 85;
+	private int overlayEditKey = -1;
+	private int runLastScriptKey = 117;
+	private String lastScriptPath = "";
 
 	public static FluxusConfig load() {
 		FluxusConfig config = new FluxusConfig();
@@ -55,6 +59,10 @@ public final class FluxusConfig {
 			config.confirmDestructiveScripts = readBoolean(json, "confirmDestructiveScripts", config.confirmDestructiveScripts);
 			config.blockNetworkByDefault = readBoolean(json, "blockNetworkByDefault", config.blockNetworkByDefault);
 			config.backupHistory = readInt(json, "backupHistory", config.backupHistory);
+			config.openMenuKey = readInt(json, "openMenuKey", config.openMenuKey);
+			config.overlayEditKey = readInt(json, "overlayEditKey", config.overlayEditKey);
+			config.runLastScriptKey = readInt(json, "runLastScriptKey", config.runLastScriptKey);
+			config.lastScriptPath = readString(json, "lastScriptPath", config.lastScriptPath);
 		} catch (IOException ignored) {
 			config.save();
 		}
@@ -113,6 +121,22 @@ public final class FluxusConfig {
 		return backupHistory;
 	}
 
+	public int openMenuKey() {
+		return openMenuKey;
+	}
+
+	public int overlayEditKey() {
+		return overlayEditKey;
+	}
+
+	public int runLastScriptKey() {
+		return runLastScriptKey;
+	}
+
+	public String lastScriptPath() {
+		return lastScriptPath;
+	}
+
 	public void setTheme(String theme) {
 		this.theme = theme;
 	}
@@ -153,6 +177,22 @@ public final class FluxusConfig {
 		this.backupHistory = backupHistory;
 	}
 
+	public void setOpenMenuKey(int openMenuKey) {
+		this.openMenuKey = openMenuKey;
+	}
+
+	public void setOverlayEditKey(int overlayEditKey) {
+		this.overlayEditKey = overlayEditKey;
+	}
+
+	public void setRunLastScriptKey(int runLastScriptKey) {
+		this.runLastScriptKey = runLastScriptKey;
+	}
+
+	public void setLastScriptPath(String lastScriptPath) {
+		this.lastScriptPath = lastScriptPath == null ? "" : lastScriptPath;
+	}
+
 	private String toJson() {
 		return "{\n"
 				+ "  \"theme\": \"" + escape(theme) + "\",\n"
@@ -164,7 +204,11 @@ public final class FluxusConfig {
 				+ "  \"inlineAutocomplete\": " + inlineAutocomplete + ",\n"
 				+ "  \"confirmDestructiveScripts\": " + confirmDestructiveScripts + ",\n"
 				+ "  \"blockNetworkByDefault\": " + blockNetworkByDefault + ",\n"
-				+ "  \"backupHistory\": " + backupHistory + "\n"
+				+ "  \"backupHistory\": " + backupHistory + ",\n"
+				+ "  \"openMenuKey\": " + openMenuKey + ",\n"
+				+ "  \"overlayEditKey\": " + overlayEditKey + ",\n"
+				+ "  \"runLastScriptKey\": " + runLastScriptKey + ",\n"
+				+ "  \"lastScriptPath\": \"" + escape(lastScriptPath) + "\"\n"
 				+ "}\n";
 	}
 

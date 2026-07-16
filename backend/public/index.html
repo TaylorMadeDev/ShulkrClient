@@ -163,7 +163,7 @@
     </div>
   </div>
 </main>
-<script>
+<script type="text/plain" data-legacy-inline-source>
 const $ = (id) => document.getElementById(id);
 async function get(path) {
   const response = await fetch(path);
@@ -279,5 +279,6 @@ document.addEventListener("click", async (event) => {
 });
 load().catch((error) => { document.body.insertAdjacentHTML("afterbegin", `<pre>${escapeHtml(error.message)}</pre>`); });
 </script>
+<script src="/admin/admin.js"></script>
 </body>
 </html>

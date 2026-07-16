@@ -1,6 +1,7 @@
 package dev.triton.ui.client.screen;
 
 import com.mojang.blaze3d.platform.InputConstants;
+import dev.triton.ui.TritonUI;
 import dev.triton.ui.client.layout.Rect;
 import dev.triton.ui.client.modern.TritonModernFragment;
 import dev.triton.ui.client.render.TritonDraw;
@@ -17,6 +18,8 @@ import net.minecraft.client.gui.screens.worldselection.SelectWorldScreen;
 import net.minecraft.client.input.KeyEvent;
 import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.network.chat.Component;
+import net.minecraft.client.renderer.RenderPipelines;
+import net.minecraft.resources.Identifier;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -31,11 +34,9 @@ public final class ShulkrTitleScreen extends Screen {
 	private static final int PANEL_HOVER = Color.rgba(23, 27, 48, 224);
 	private static final int STROKE = Color.rgba(116, 126, 168, 108);
 	private static final int STROKE_HOT = Color.rgba(181, 112, 255, 180);
-	private static final String CLIENT_VERSION = FabricLoader.getInstance()
-			.getModContainer("triton-ui")
-			.map(container -> container.getMetadata().getVersion().getFriendlyString())
-			.orElse("1.0.0");
-
+	private static final Identifier MENU_LOGO = TritonUI.id("textures/icons/shulkr-icons.png");
+	private static final int MENU_LOGO_WIDTH = 1280;
+	private static final int MENU_LOGO_HEIGHT = 720;
 	private final List<MenuButton> buttons = new ArrayList<>();
 	private int ticks;
 
@@ -247,14 +248,27 @@ public final class ShulkrTitleScreen extends Screen {
 		}
 	}
 
+	private void drawMenuLogo(GuiGraphicsExtractor graphics, Rect bounds, int maxWidth, float time) {
+		int logoWidth = Math.min(maxWidth, bounds.width());
+		if (logoWidth <= 0) {
+			return;
+		}
+		int logoHeight = Math.max(1, logoWidth * MENU_LOGO_HEIGHT / MENU_LOGO_WIDTH);
+		int x = bounds.centerX() - logoWidth / 2;
+		int y = bounds.y() + (bounds.height() - logoHeight) / 2;
+		int glowAlpha = 24 + (int) ((Math.sin(time * 0.05F) + 1.0F) * 12.0F);
+		graphics.fillGradient(x - 18, y + logoHeight / 3, x + logoWidth + 18, y + logoHeight + 8,
+				Color.rgba(140, 78, 255, glowAlpha), Color.rgba(0, 0, 0, 0));
+		graphics.blit(RenderPipelines.GUI_TEXTURED, MENU_LOGO, x, y, 0, 0, logoWidth, logoHeight,
+				MENU_LOGO_WIDTH, MENU_LOGO_HEIGHT, MENU_LOGO_WIDTH, MENU_LOGO_HEIGHT);
+	}
+
 	private void drawHeader(GuiGraphicsExtractor graphics, Font font, TitleLayout layout) {
 		Rect panel = layout.panel();
 		Rect header = new Rect(panel.x() + layout.padding(), panel.y() + layout.padding(),
 				panel.width() - layout.padding() * 2, layout.headerHeight());
 		graphics.fill(header.x(), header.bottom() - 1, header.right(), header.bottom(), Color.rgba(132, 142, 182, 76));
-		String title = "Shulkr Client v" + CLIENT_VERSION;
-		graphics.text(font, title, header.centerX() - font.width(title) / 2,
-				header.y() + Math.max(0, (header.height() - font.lineHeight) / 2), TEXT, false);
+		drawMenuLogo(graphics, header, Math.min(header.width() - 24, layout.compact() ? 240 : 340), ticks);
 	}
 
 	private void drawNebulaGlow(GuiGraphicsExtractor graphics, Rect panel, float time) {
@@ -300,18 +314,18 @@ public final class ShulkrTitleScreen extends Screen {
 	private TitleLayout layout() {
 		int horizontalMargin = Math.max(6, Math.min(36, width / 12));
 		int verticalMargin = Math.max(6, Math.min(28, height / 12));
-		int panelWidth = Math.max(1, Math.min(620, width - horizontalMargin * 2));
-		int panelHeight = Math.max(1, Math.min(330, height - verticalMargin * 2));
+		int panelWidth = Math.max(1, Math.min(540, width - horizontalMargin * 2));
+		int panelHeight = Math.max(1, Math.min(286, height - verticalMargin * 2));
 		int panelX = (width - panelWidth) / 2;
 		int panelY = (height - panelHeight) / 2;
 		boolean compact = panelHeight < 250 || panelWidth < 440;
-		int padding = Math.max(5, Math.min(compact ? 12 : 24, panelWidth / 6));
-		int headerHeight = compact ? 26 : 34;
-		int startY = panelY + padding + headerHeight + (compact ? 6 : 14);
+		int padding = Math.max(5, Math.min(compact ? 12 : 20, panelWidth / 7));
+		int headerHeight = compact ? 44 : 52;
+		int startY = panelY + padding + headerHeight + (compact ? 4 : 10);
 		int contentHeight = Math.max(4, panelY + panelHeight - padding - startY);
-		int buttonGap = compact ? 5 : 9;
-		int rowHeight = Math.max(1, Math.min(42, (contentHeight - buttonGap * 3) / 4));
-		int buttonWidth = Math.max(1, Math.min(420, panelWidth - padding * 2));
+		int buttonGap = compact ? 5 : 7;
+		int rowHeight = Math.max(1, Math.min(36, (contentHeight - buttonGap * 3) / 4));
+		int buttonWidth = Math.max(1, Math.min(360, panelWidth - padding * 2));
 		int buttonX = panelX + (panelWidth - buttonWidth) / 2;
 		int utilityGap = Math.max(4, Math.min(10, buttonWidth / 12));
 		return new TitleLayout(

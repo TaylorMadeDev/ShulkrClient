@@ -1,6 +1,33 @@
 ﻿import "./styles.css";
 
-const API_BASE = localStorage.getItem("shulkr_api_base") || localStorage.getItem("shulk_api_base") || "http://127.0.0.1:50991";
+import { flowStore } from "./flow/store.js";
+
+let flowEditorModule = null;
+let flowEditorPromise = null;
+let flowEditorWatching = false;
+
+async function ensureFlowEditorModule() {
+  if (!flowEditorPromise) flowEditorPromise = import("./flow/editor.js");
+  flowEditorModule = await flowEditorPromise;
+  if (!flowEditorWatching) {
+    flowEditorWatching = true;
+    flowEditorModule.watchFlowBuilder(render, toast);
+  }
+  if (state.page === "flow" && document.querySelector("[data-flow-loading]")) render();
+  return flowEditorModule;
+}
+
+function safeApiBase(value) {
+  try {
+    const parsed = new URL(String(value || "http://127.0.0.1:50991"));
+    if (!["http:", "https:"].includes(parsed.protocol) || !["127.0.0.1", "localhost", "::1", "[::1]"].includes(parsed.hostname)) throw new Error("Backend must use a local loopback address");
+    return parsed.origin;
+  } catch {
+    return "http://127.0.0.1:50991";
+  }
+}
+
+const API_BASE = safeApiBase(localStorage.getItem("shulkr_api_base") || localStorage.getItem("shulk_api_base"));
 
 const state = {
   page: "profile",
@@ -12,6 +39,9 @@ const state = {
   stats: null,
   clients: [],
   scripts: [],
+  scriptFolders: [],
+  scriptSearch: "",
+  scriptFolder: "all",
   libraries: [],
   clientModules: [],
   templates: [],
@@ -20,6 +50,8 @@ const state = {
   selectedClient: null,
   modal: null,
   toast: "",
+  notificationsOpen: false,
+  notificationRead: loadNotificationRead(),
   search: "",
   timeFilter: "30d",
   metricTab: "time",
@@ -34,21 +66,41 @@ const state = {
   hubFilters: { python: true, pyjinn: true, farming: true, combat: true, world: true, utility: true, other: true },
   statsHistory: [],
   statsSummary: null,
+  statsClients: [],
+  statsScripts: [],
+  statsClientFilter: "all",
+  statsScriptFilter: "all",
+  stream: null,
+  entitlements: null,
+  adminOverview: null,
+  billingStatus: null,
+  remoteChatMessage: "",
+  remoteDraftName: "QuickRemoteScript.py",
+  remoteDraftCode: "# Quick remote script\nimport minescript as ms\n\nms.echo(\"Remote script online\")\n",
+  settingsTab: "customization",
+  theme: localStorage.getItem("shulkr_theme") || "nova",
+  density: localStorage.getItem("shulkr_density") || "comfortable",
   auth: loadAuth()
 };
 
+let lightRefreshTimer = null;
+let keybindingsBound = false;
+window.addEventListener("beforeunload", event => { if (flowStore.snapshot().dirty) { event.preventDefault(); event.returnValue = ""; } });
+
 const nav = [
-  ["profile", "Profile", "fa-solid fa-user", "Profile"],
-  ["scripts", "Scripts", "fa-solid fa-file-code", "Scripts"],
+  ["profile", "Dashboard", "fa-solid fa-house", "Dashboard"],
+  ["scripts", "Scripts", "fa-solid fa-file-code", "Local scripts"],
+  ["library", "Library", "fa-solid fa-cubes", "Script library"],
+  ["statistics", "Statistics", "fa-solid fa-chart-line", "Statistics"],
   ["editor", "Editor", "fa-solid fa-code", "Editor"],
-  ["statistics", "Analytics", "fa-solid fa-chart-pie", "Analytics"],
-  ["accounts", "Accounts", "fa-solid fa-users", "Accounts"],
+  ["flow", "Flow Builder", "fa-solid fa-diagram-project", "Visual automation builder"],
   ["remote", "Remote", "fa-solid fa-satellite-dish", "Remote"],
   ["settings", "Settings", "fa-solid fa-sliders", "Settings"]
 ];
 
 const app = document.querySelector("#app");
 
+applyDashboardTheme(state.theme, state.density);
 init();
 
 function loadAuth() {
@@ -60,21 +112,12 @@ function loadAuth() {
       window.history.replaceState({}, document.title, window.location.pathname + (cleanSearch ? `?${cleanSearch}` : ""));
       setTimeout(() => toast("Google sign-in failed. Please try again."), 100);
     }
-    const urlToken = params.get("token");
-    if (urlToken) {
-      localStorage.setItem("shulkr_token", urlToken);
+    if (params.has("token")) {
       params.delete("token");
       params.delete("name");
       params.delete("email");
       const cleanSearch = params.toString();
       window.history.replaceState({}, document.title, window.location.pathname + (cleanSearch ? `?${cleanSearch}` : ""));
-    }
-    const token = localStorage.getItem("shulkr_token");
-    if (token) {
-      const payload = JSON.parse(atob(token.split(".")[1]));
-      if (payload.exp * 1000 > Date.now()) {
-        return { loggedIn: true, view: "dashboard", user: { id: payload.id, displayName: payload.displayName, email: payload.email }, token };
-      }
     }
   } catch (error) {
     console.error("loadAuth error", error);
@@ -83,18 +126,33 @@ function loadAuth() {
   return { loggedIn: false, view: "landing", user: null, token: null };
 }
 
-function saveAuth(user, token) {
-  localStorage.setItem("shulkr_token", token);
-  state.auth = { loggedIn: true, view: "dashboard", user, token };
+function saveAuth(user) {
+  localStorage.removeItem("shulkr_token");
+  state.auth = { loggedIn: true, view: "dashboard", user, token: null };
 }
 
 function clearAuth() {
   localStorage.removeItem("shulkr_token");
+  flowStore.configure({ api: null, userId: "anonymous" });
+  state.adminOverview = null;
+  state.entitlements = null;
+  state.billingStatus = null;
   state.auth = { loggedIn: false, view: "landing", user: null, token: null };
+}
+
+function loadNotificationRead() {
+  try { return JSON.parse(localStorage.getItem("shulkr_notification_read") || "{}"); } catch { return {}; }
+}
+
+function hasFeature(feature) {
+  const features = state.entitlements?.features || state.auth.user?.features || [];
+  return state.auth.user?.isAdmin || features.includes(feature);
 }
 
 async function init() {
   render();
+  bindGlobalShortcuts();
+  handleBillingQueryState();
   try {
     const health = await api("/api/health");
     state.online = Boolean(health.ok);
@@ -102,17 +160,45 @@ async function init() {
     state.online = false;
   }
   render();
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const authCode = params.get("auth_code");
+    if (authCode) {
+      params.delete("auth_code");
+      window.history.replaceState({}, document.title, window.location.pathname + (params.toString() ? `?${params}` : ""));
+      const exchanged = await api("/api/auth/exchange", { method: "POST", body: JSON.stringify({ code: authCode }) });
+      saveAuth(exchanged.user);
+    }
+    const me = await api("/api/auth/me");
+    state.auth.loggedIn = true;
+    state.auth.view = "dashboard";
+    state.auth.user = {
+        id: me.id,
+        displayName: me.displayName,
+        email: me.email,
+        username: me.username,
+        tier: me.tier,
+        avatar: me.avatar,
+        isAdmin: Boolean(me.isAdmin),
+        features: Array.isArray(me.features) ? me.features : []
+      };
+    flowStore.configure({ api, userId: state.auth.user.id });
+  } catch {
+    clearAuth();
+    render();
+    return;
+  }
   if (state.auth.loggedIn) {
-    try {
-      const me = await api("/api/auth/me");
-      state.auth.user = { id: me.id, displayName: me.displayName, email: me.email, username: me.username, tier: me.tier, avatar: me.avatar };
-    } catch {
-      clearAuth();
-      render();
-      return;
+    if (sessionStorage.getItem("shulkr_billing_sync") === "1") {
+      try {
+        state.billingStatus = await api("/api/billing/sync", { method: "POST", body: JSON.stringify({}) });
+      } catch {
+      } finally {
+        sessionStorage.removeItem("shulkr_billing_sync");
+      }
     }
     await refreshAll();
-    setInterval(refreshLight, 10000);
+    ensureLightRefresh();
   }
 }
 
@@ -121,30 +207,49 @@ async function refreshAll() {
   state.error = "";
   render();
   try {
-    const [health, snapshot, library, libraries, clientModules, clients, statsHistory, statsSummary] = await Promise.all([
+    const analyticsPath = statsAnalyticsPath();
+    const requests = [
       api("/api/health"),
       api("/api/snapshot"),
-      api("/api/library/scripts"),
-      api("/api/libraries"),
-      api("/api/client-modules"),
+      apiOptional("/api/library/scripts", []),
+      apiOptional("/api/libraries", []),
+      apiOptional("/api/client-modules", []),
       api("/api/clients"),
-      api("/api/stats/history"),
-      api("/api/stats/summary")
-    ]);
+      apiOptional("/api/scripts/folders", []),
+      apiOptional(analyticsPath, { history: [], summary: null, clients: [], scripts: [] }),
+      apiOptional("/api/stream/status", null),
+      apiOptional("/api/billing/status", null)
+    ];
+    if (state.auth.user?.isAdmin) {
+      requests.push(apiOptional("/api/admin/overview", null));
+    }
+    const [health, snapshot, library, libraries, clientModules, clients, scriptFolders, analytics, stream, billingStatus, adminOverview] = await Promise.all(requests);
     state.online = Boolean(health.ok);
     state.health = health;
     state.profile = snapshot.profile;
     state.stats = snapshot.stats;
+    state.entitlements = snapshot.entitlements || null;
     state.clients = clients || [];
     state.scripts = snapshot.scripts || [];
+    state.scriptFolders = Array.isArray(scriptFolders) ? scriptFolders : [];
     state.libraries = libraries || [];
     state.clientModules = clientModules || [];
     state.templates = snapshot.templates || [];
     state.library = library || [];
-    state.statsHistory = Array.isArray(statsHistory) ? statsHistory : [];
-    state.statsSummary = statsSummary || null;
-    state.selectedScript = state.scripts[0] || null;
-    state.selectedClient = state.clients[0] || null;
+    state.statsHistory = Array.isArray(analytics?.history) ? analytics.history : [];
+    state.statsSummary = analytics?.summary || null;
+    state.statsClients = Array.isArray(analytics?.clients) ? analytics.clients : [];
+    state.statsScripts = Array.isArray(analytics?.scripts) ? analytics.scripts : [];
+    state.stream = stream || null;
+    state.billingStatus = billingStatus || null;
+    state.adminOverview = adminOverview || null;
+    const currentScriptPath = state.selectedScript?.path;
+    const currentClientId = state.selectedClient?.id;
+    state.selectedScript = state.scripts.find((script) => script.path === currentScriptPath) || state.scripts[0] || null;
+    state.selectedClient = state.clients.find((client) => client.id === currentClientId) || state.clients[0] || null;
+    if (state.page === "remote") {
+      await ensureRemoteStream();
+    }
   } catch (error) {
     state.online = false;
     state.health = null;
@@ -159,8 +264,22 @@ async function refreshLight() {
   try {
     const health = await api("/api/health");
     state.online = Boolean(health.ok);
-    if (state.online && state.error) await refreshAll();
-    else render();
+    if (!state.online) {
+      state.error = "Server is offline";
+      render();
+      return;
+    }
+    if (state.error) {
+      await refreshAll();
+      return;
+    }
+    await refreshLiveState();
+    if (state.page === "flow") {
+      const connectedClient = state.clients.find((client) => client.connected !== false);
+      flowStore.setClientConnection(Boolean(connectedClient), true, connectedClient?.id || "");
+    } else {
+      render();
+    }
   } catch {
     state.online = false;
     state.error = "Server is offline";
@@ -168,28 +287,147 @@ async function refreshLight() {
   }
 }
 
+async function refreshLiveState() {
+  const requests = [
+    api("/api/clients"),
+    api("/api/scripts"),
+    apiOptional("/api/stream/status", null),
+    apiOptional("/api/scripts/folders", [])
+  ];
+  if (state.page === "statistics") {
+    requests.push(apiOptional(statsAnalyticsPath(), { history: [], summary: null, clients: [], scripts: [] }));
+  }
+  const [clients, scripts, stream, scriptFolders, analytics] = await Promise.all(requests);
+  state.clients = Array.isArray(clients) ? clients : [];
+  state.scripts = Array.isArray(scripts) ? scripts : [];
+  state.stream = stream || null;
+  state.scriptFolders = Array.isArray(scriptFolders) ? scriptFolders : [];
+  if (analytics) {
+    state.statsHistory = Array.isArray(analytics.history) ? analytics.history : [];
+    state.statsSummary = analytics.summary || null;
+    state.statsClients = Array.isArray(analytics.clients) ? analytics.clients : [];
+    state.statsScripts = Array.isArray(analytics.scripts) ? analytics.scripts : [];
+  }
+  const currentClientId = state.selectedClient?.id;
+  const currentScriptPath = state.selectedScript?.path;
+  state.selectedClient = state.clients.find((client) => client.id === currentClientId) || state.clients[0] || null;
+  state.selectedScript = state.scripts.find((script) => script.path === currentScriptPath) || state.scripts[0] || null;
+  if (state.page === "remote") {
+    await ensureRemoteStream();
+  }
+}
+
+const refreshRemoteState = refreshLiveState;
+
+function statsAnalyticsPath() {
+  const query = new URLSearchParams();
+  if (state.timeFilter) query.set("range", state.timeFilter);
+  if (state.statsClientFilter && state.statsClientFilter !== "all") query.set("clientId", state.statsClientFilter);
+  if (state.statsScriptFilter && state.statsScriptFilter !== "all") query.set("scriptPath", state.statsScriptFilter);
+  return `/api/stats/analytics?${query.toString()}`;
+}
+
+function ensureLightRefresh() {
+  if (lightRefreshTimer) return;
+  lightRefreshTimer = setInterval(refreshLight, 10000);
+}
+
 async function api(path, options = {}) {
-  const headers = { "Content-Type": "application/json", ...(options.headers || {}) };
+  const headers = { "Content-Type": "application/json", "X-Shulkr-Request": "dashboard", ...(options.headers || {}) };
   if (state.auth.token) headers.Authorization = `Bearer ${state.auth.token}`;
   const response = await fetch(API_BASE + path, {
+    ...options,
     headers,
-    ...options
+    credentials: "include"
   });
   const text = await response.text();
   let body = null;
   try {
     body = text ? JSON.parse(text) : null;
   } catch {
-    body = { error: text || "Backend returned invalid JSON" };
+    body = null;
   }
-  if (!response.ok) throw new Error(body?.error || response.statusText || "Backend error");
+  if (response.status === 401 && state.auth.loggedIn) {
+    clearAuth();
+    render();
+  }
+  if (!response.ok) {
+    const routeUnavailable = response.status === 404 && /Cannot (?:GET|POST|PUT|PATCH|DELETE) \/api\//i.test(text);
+    const message = body?.error || (routeUnavailable
+      ? "Flow Builder persistence is unavailable. Restart the Shulkr backend and retry."
+      : response.statusText || "Backend request failed");
+    const error = new Error(message);
+    error.status = response.status;
+    throw error;
+  }
+  if (text && body === null) throw new Error("Backend returned an invalid response");
   return body;
 }
 
+async function apiOptional(path, fallback = null) {
+  try {
+    return await api(path);
+  } catch (error) {
+    if (error?.status === 403 || error?.status === 404 || error?.status === 503) {
+      return fallback;
+    }
+    throw error;
+  }
+}
+
+function handleBillingQueryState() {
+  const params = new URLSearchParams(window.location.search);
+  let message = "";
+  if (params.get("checkout") === "success") {
+    message = "Stripe checkout completed. Refreshing your tier...";
+    sessionStorage.setItem("shulkr_billing_sync", "1");
+  } else if (params.get("checkout") === "cancelled") {
+    message = "Stripe checkout was cancelled.";
+  } else if (params.get("billing") === "portal") {
+    message = "Returned from the billing portal.";
+    sessionStorage.setItem("shulkr_billing_sync", "1");
+  }
+  if (!message) return;
+  params.delete("checkout");
+  params.delete("tier");
+  params.delete("billing");
+  const cleanSearch = params.toString();
+  window.history.replaceState({}, document.title, window.location.pathname + (cleanSearch ? `?${cleanSearch}` : ""));
+  setTimeout(() => toast(message), 100);
+}
+
+function navItems() {
+  const items = nav.filter(([id]) => {
+    if (id === "editor") return hasFeature("scripts.write");
+    if (id === "statistics") return hasFeature("stats.read");
+    if (id === "remote") return hasFeature("remote.control");
+    if (id === "billing") return stripeEnabled();
+    return true;
+  });
+  return state.auth.user?.isAdmin
+    ? [...items, ["admin", "Admin", "fa-solid fa-shield-halved", "Admin"]]
+    : items;
+}
+
+function stripeEnabled() {
+  return Boolean(state.billingStatus?.enabled || state.health?.billing?.stripe);
+}
+
 function render() {
-  if (!state.auth.loggedIn) {
+  if (!state.auth.loggedIn || state.auth.view !== "dashboard") {
+    const viewMap = {
+      signin: signInPage(),
+      signup: signUpPage(),
+      faq: faqPage(),
+      changelog: changelogPage(),
+      purchase: purchasePage(),
+      terms: termsPage(),
+      cookies: cookiePolicyPage(),
+      features: featuresPage(),
+      default: landingPage()
+    };
     app.innerHTML = `
-      ${state.auth.view === "signin" ? signInPage() : state.auth.view === "signup" ? signUpPage() : landingPage()}
+      ${viewMap[state.auth.view] || viewMap.default}
       ${state.toast ? `<div class="toast">${escapeHtml(state.toast)}</div>` : ""}
     `;
     bindLanding();
@@ -200,31 +438,66 @@ function render() {
       ${sidebar()}
       <main class="main">
         ${state.error ? offlineState() : page()}
+        ${state.error ? "" : authenticatedFooter()}
       </main>
     </div>
+    ${state.modal ? renderModal() : ""}
     ${state.toast ? `<div class="toast">${escapeHtml(state.toast)}</div>` : ""}
   `;
   bind();
 }
 
 function sidebar() {
-  const user = state.auth.user || state.profile || { displayName: "EnderUser" };
+  const user = state.auth.user || state.profile || { displayName: "EnderUser", tier: "Premium" };
+  const items = navItems();
+  const grouped = [
+    ["Workspace", ["profile", "scripts", "library", "statistics", "editor", "flow", "remote", "settings"]]
+  ].map(([title, ids]) => [title, ids.map((id) => items.find(([itemId]) => itemId === id)).filter(Boolean)]);
   return `
     <aside class="sidebar">
-      <a href="#" class="brand-icon" data-landing title="Back to landing page">S</a>
-      <nav class="nav-rail">
-        ${nav.map(([id, label, icon, tip]) => `
-          <button class="nav-item ${state.page === id ? "active" : ""}" data-page="${id}" data-testid="nav-${id}" aria-label="${label}">
-            <i class="${icon}"></i>
-            <span class="nav-tooltip">${tip}</span>
-          </button>
-        `).join("")}
-      </nav>
-      <div class="sidebar-footer">
-        <button class="btn-icon" title="Notifications"><i class="fa-solid fa-bell"></i></button>
-        <button class="user-avatar" data-action="logout" title="Log out">${escapeHtml((user.displayName || "U").slice(0, 1))}</button>
+      <div class="sidebar-shell">
+        <a href="#" class="sidebar-brand" data-landing title="Back to landing page">
+          <div class="sidebar-brand-mark">
+            <img src="/shulkr-icons.png" alt="Shulkr logo">
+          </div>
+          <div class="sidebar-brand-copy">
+            <strong>Shulkr</strong>
+            <span>Control Center</span>
+          </div>
+        </a>
+
+        <nav class="sidebar-nav">
+          ${grouped.map(([title, sectionItems]) => sidebarSection(title, sectionItems)).join("")}
+        </nav>
+        <div class="sidebar-user-card">
+          <span class="sidebar-account-avatar">${escapeHtml((user.displayName || "U").slice(0, 1))}</span>
+          <span class="sidebar-user-copy">
+            <strong>${escapeHtml(user.displayName || "EnderUser")}</strong>
+            <span>${escapeHtml(user.tier || "Premium")}</span>
+          </span>
+        </div>
       </div>
     </aside>
+  `;
+}
+
+function authenticatedFooter() {
+  return `
+    <footer class="app-footer">
+      <div class="app-footer-copy">
+        <span>Shulkr dashboard</span>
+        <span>•</span>
+        <span>${escapeHtml(state.auth.user?.tier || state.profile?.tier || "Premium")}</span>
+        <span>•</span>
+        <span>${state.online ? "Client linked" : "Waiting for client"}</span>
+      </div>
+      <div class="app-footer-links">
+        <button class="btn-link" data-page="profile">Home</button>
+        <button class="btn-link" data-page="remote">Remote</button>
+        <button class="btn-link" data-page="settings">Settings</button>
+        <button class="btn-link" data-landing>Website</button>
+      </div>
+    </footer>
   `;
 }
 
@@ -245,6 +518,8 @@ function landingPage() {
             <li><a href="#showcase">DASHBOARD</a></li>
             <li><a href="#community">COMMUNITY</a></li>
             <li><a href="#download">DOWNLOAD</a></li>
+            <li><a data-view="faq">FAQ</a></li>
+            <li><a data-view="features">SHOWCASE</a></li>
           </ul>
           <div class="landing-nav-actions">
             <button class="btn btn-secondary" data-auth="signin">SIGN IN</button>
@@ -298,10 +573,10 @@ function landingPage() {
         <div class="hero-footer">
           <p class="footer-tag"><span class="footer-line"></span><span>NOT JUST A CLIENT.</span><span class="footer-accent">IT'S YOUR WORKBENCH</span></p>
           <div class="social-icons">
-            <a href="#" class="social-icon" aria-label="Discord"><i class="fa-brands fa-discord"></i></a>
-            <a href="#" class="social-icon" aria-label="X / Twitter"><i class="fa-brands fa-x-twitter"></i></a>
-            <a href="#" class="social-icon" aria-label="YouTube"><i class="fa-brands fa-youtube"></i></a>
-            <a href="#" class="social-icon add-icon" aria-label="More"><i class="fa-solid fa-plus"></i></a>
+            <a href="#community" class="social-icon" aria-label="Discord"><i class="fa-brands fa-discord"></i></a>
+            <a href="#community" class="social-icon" aria-label="X / Twitter"><i class="fa-brands fa-x-twitter"></i></a>
+            <a href="#community" class="social-icon" aria-label="YouTube"><i class="fa-brands fa-youtube"></i></a>
+            <a href="#community" class="social-icon add-icon" aria-label="More"><i class="fa-solid fa-plus"></i></a>
           </div>
         </div>
       </section>
@@ -374,7 +649,7 @@ function landingPage() {
             <p class="download-desc">Get the latest Shulkr build for Windows 10/11. Install the Fabric mod, sign in, and start scripting inside Minecraft.</p>
             <div class="download-actions">
               <button class="btn btn-primary" data-auth="signup"><i class="fa-solid fa-download"></i><span>DOWNLOAD FOR WINDOWS</span></button>
-              <button class="btn btn-secondary" data-auth="signup"><span>VIEW CHANGELOG</span><i class="fa-solid fa-arrow-right"></i></button>
+              <button class="btn btn-secondary" data-view="changelog"><span>VIEW CHANGELOG</span><i class="fa-solid fa-arrow-right"></i></button>
             </div>
             <p class="download-meta">v2.0 Obsidian · Fabric 1.20+ · 64-bit · ~180 MB</p>
           </div>
@@ -403,12 +678,12 @@ function landingPage() {
           </div>
           <div class="showcase-stage">
             <div class="showcase-frame">
-              <img src="/main.png" alt="Shulkr Client Interface" class="showcase-image" onerror="this.style.display='none'">
+              <img src="/main.png" alt="Shulkr Client Interface" class="showcase-image" data-hide-on-error>
               <div class="showcase-glow"></div>
             </div>
             <div class="floating-icons">
-              <img src="/shulkr-icons.png" alt="Shulkr Icons" class="icons-cluster icons-cluster-1" onerror="this.style.display='none'">
-              <img src="/shulkr-icons.png" alt="Shulkr Icons" class="icons-cluster icons-cluster-2" onerror="this.style.display='none'">
+              <img src="/shulkr-icons.png" alt="Shulkr Icons" class="icons-cluster icons-cluster-1" data-hide-on-error>
+              <img src="/shulkr-icons.png" alt="Shulkr Icons" class="icons-cluster icons-cluster-2" data-hide-on-error>
             </div>
           </div>
         </div>
@@ -437,7 +712,7 @@ function landingPage() {
             <div class="section-tag"><span class="tag-line"></span><span>READY TO ELEVATE?</span></div>
             <h2 class="section-title"><span class="title-line">JOIN THE</span><span class="title-line title-accent">SHULKR COMMUNITY</span></h2>
             <p class="community-desc">Share scripts, get help, show off your automations, and connect with other Minecraft scripters.</p>
-            <button class="btn btn-primary" data-auth="signup"><span>JOIN OUR DISCORD</span><i class="fa-solid fa-arrow-right"></i></button>
+            <a href="#community" class="btn btn-primary"><span>JOIN OUR DISCORD</span><i class="fa-solid fa-arrow-right"></i></a>
           </div>
           <div class="community-visual">
             <div class="discord-card">
@@ -521,16 +796,16 @@ function authPage(title, mode, subtitle, switchText, switchMode, switchLabel) {
         <h1>${escapeHtml(title)}</h1>
         <p class="auth-subtitle">${escapeHtml(subtitle)}</p>
         <form class="auth-form" data-auth-form="${mode}">
-          ${mode === "signup" ? `<div class="form-group"><label>Display name</label><input type="text" id="auth-name" placeholder="Your name" required value="Admin" /></div>` : ""}
+          ${mode === "signup" ? `<div class="form-group"><label>Display name</label><input type="text" id="auth-name" placeholder="Your name" maxlength="80" autocomplete="name" required /></div>` : ""}
           <div class="form-group">
-            <label>Email</label>
-            <input type="email" id="auth-email" placeholder="you@example.com" required value="admin@shulkr.local" />
+            <label>${mode === "signin" ? "Username or Email" : "Email"}</label>
+            <input type="${mode === "signin" ? "text" : "email"}" id="auth-email" placeholder="${mode === "signin" ? "Username or email" : "you@example.com"}" maxlength="254" autocomplete="username" required />
           </div>
           <div class="form-group">
             <label>Password</label>
-            <input type="password" id="auth-password" placeholder="••••••••" required value="admin" />
+            <input type="password" id="auth-password" placeholder="••••••••••" minlength="${mode === "signup" ? "10" : "1"}" autocomplete="${mode === "signup" ? "new-password" : "current-password"}" required />
           </div>
-          ${mode === "signup" ? `<div class="form-group"><label>Confirm Password</label><input type="password" id="auth-password2" placeholder="••••••••" required value="admin" /></div>` : ""}
+          ${mode === "signup" ? `<div class="form-group"><label>Confirm Password</label><input type="password" id="auth-password2" placeholder="••••••••••" minlength="10" autocomplete="new-password" required /></div>` : ""}
           <button type="submit" class="btn btn-primary" style="width: 100%;">${mode === "signin" ? "Sign In" : "Create Account"}</button>
         </form>
         <div class="auth-divider"><span>or</span></div>
@@ -545,110 +820,810 @@ function authPage(title, mode, subtitle, switchText, switchMode, switchLabel) {
   `;
 }
 
+function faqPage() {
+  return `
+    <div class="landing">
+      <div class="noise-overlay"></div>
+      <div class="grid-bg"></div>
+      <nav class="landing-navbar">
+        <div class="nav-container">
+          <a href="#" class="logo" data-landing>
+            <img class="logo-icon" src="/shulkr-icons.png" alt="Shulkr logo">
+            <span>SHULKR</span>
+          </a>
+          <ul class="landing-nav-links">
+            <li><a href="#features">FEATURES</a></li>
+            <li><a href="#scripts">SCRIPTS</a></li>
+            <li><a href="#showcase">DASHBOARD</a></li>
+            <li><a href="#community">COMMUNITY</a></li>
+            <li><a href="#download">DOWNLOAD</a></li>
+            <li><a data-view="faq">FAQ</a></li>
+            <li><a data-view="features">SHOWCASE</a></li>
+          </ul>
+          <div class="landing-nav-actions">
+            <button class="btn btn-secondary" data-auth="signin">SIGN IN</button>
+            <button class="btn btn-primary" data-auth="signup">GET STARTED</button>
+          </div>
+        </div>
+      </nav>
+
+      <section class="hero" style="padding: 100px 0 40px;">
+        <div class="hero-content">
+          <div class="hero-left">
+            <div class="hero-tag"><span class="tag-line"></span><span>QUESTIONS ANSWERED</span></div>
+            <h1 class="hero-title">
+              <span class="title-line">FREQUENTLY ASKED</span>
+              <span class="title-line title-accent">QUESTIONS</span>
+            </h1>
+            <p class="hero-subtitle"><span class="slash">/</span> FIND ANSWERS TO COMMON QUESTIONS ABOUT SHULKR.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="landing-section" style="padding: 60px 0;">
+        <div class="container">
+          <div class="faq-grid">
+            <div class="faq-item">
+              <h3>What is Shulkr?</h3>
+              <p>Shulkr is a Minecraft Fabric mod that lets you write Python scripts to automate gameplay. It includes a web dashboard for remote management, script templates, modules, and overlay tools.</p>
+            </div>
+            <div class="faq-item">
+              <h3>Is Shulkr free?</h3>
+              <p>Shulkr has a free tier with essential features. Premium tiers unlock additional templates, modules, and extended API access. Check our pricing for details.</p>
+            </div>
+            <div class="faq-item">
+              <h3>What Minecraft versions does Shulkr support?</h3>
+              <p>Shulkr supports Minecraft 1.20 and later with Fabric mod loader. We regularly update to support the latest stable versions.</p>
+            </div>
+            <div class="faq-item">
+              <h3>Do I need to know Python?</h3>
+              <p>Yes, Shulkr uses Python for scripting. If you're new to Python, we provide templates and documentation to help you get started.</p>
+            </div>
+            <div class="faq-item">
+              <h3>Can I share my scripts with others?</h3>
+              <p>Absolutely! Shulkr includes a community hub where you can publish, share, and discover scripts from other players.</p>
+            </div>
+            <div class="faq-item">
+              <h3>Is it safe to use?</h3>
+              <p>Shulkr runs locally on your machine first. Your scripts and data are encrypted when stored or synced. We never access your Minecraft accounts without permission.</p>
+            </div>
+            <div class="faq-item">
+              <h3>Can I create custom overlays?</h3>
+              <p>Yes! With WindowSpy and overlay tools, you can render custom HUDs, notifications, and info panels directly in Minecraft.</p>
+            </div>
+            <div class="faq-item">
+              <h3>How do I get support?</h3>
+              <p>Join our Discord community for help, documentation, and to connect with other scripters. We're always here to help you build amazing automations.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="landing-section community-section">
+        <div class="container community-grid">
+          <div class="community-text">
+            <h2 class="section-title"><span class="title-line">STILL HAVE</span><span class="title-line title-accent">QUESTIONS?</span></h2>
+            <p class="community-desc">Join our Discord and connect with the Shulkr community. Get real-time support and share your creations.</p>
+            <a href="#community" class="btn btn-primary"><span>JOIN OUR DISCORD</span><i class="fa-solid fa-arrow-right"></i></a>
+          </div>
+        </div>
+      </section>
+
+      <footer class="landing-footer">
+        <div class="container footer-content">
+          <div class="footer-brand">
+            <a href="#" class="logo" data-landing>
+              <img class="logo-icon" src="/shulkr-icons.png" alt="Shulkr logo">
+              <span>SHULKR</span>
+            </a>
+            <p>A Minecraft scripting platform and web dashboard.</p>
+          </div>
+          <div class="footer-links">
+            <a data-view="features">Features</a>
+            <a data-view="faq">FAQ</a>
+            <a data-landing>Home</a>
+            <a data-view="terms">Terms</a>
+            <a data-view="cookies">Privacy</a>
+          </div>
+          <p class="footer-copy">© 2026 Shulkr. All rights reserved.</p>
+        </div>
+      </footer>
+    </div>
+  `;
+}
+
+function featuresPage() {
+  return `
+    <div class="landing">
+      <div class="noise-overlay"></div>
+      <div class="grid-bg"></div>
+      <nav class="landing-navbar">
+        <div class="nav-container">
+          <a href="#" class="logo" data-landing>
+            <img class="logo-icon" src="/shulkr-icons.png" alt="Shulkr logo">
+            <span>SHULKR</span>
+          </a>
+          <ul class="landing-nav-links">
+            <li><a href="#features">FEATURES</a></li>
+            <li><a href="#scripts">SCRIPTS</a></li>
+            <li><a href="#showcase">DASHBOARD</a></li>
+            <li><a href="#community">COMMUNITY</a></li>
+            <li><a href="#download">DOWNLOAD</a></li>
+            <li><a data-view="faq">FAQ</a></li>
+            <li><a data-view="features">SHOWCASE</a></li>
+          </ul>
+          <div class="landing-nav-actions">
+            <button class="btn btn-secondary" data-auth="signin">SIGN IN</button>
+            <button class="btn btn-primary" data-auth="signup">GET STARTED</button>
+          </div>
+        </div>
+      </nav>
+
+      <section class="hero" style="padding: 100px 0 40px;">
+        <div class="hero-content">
+          <div class="hero-left">
+            <div class="hero-tag"><span class="tag-line"></span><span>SHOWCASE</span></div>
+            <h1 class="hero-title">
+              <span class="title-line">EXPLORE</span>
+              <span class="title-line title-accent">THE FEATURES</span>
+            </h1>
+            <p class="hero-subtitle"><span class="slash">/</span> DISCOVER EVERYTHING SHULKR CAN DO FOR YOUR MINECRAFT AUTOMATION.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="landing-section features-section" style="padding: 60px 0;">
+        <div class="container">
+          <div class="features-grid">
+            <div class="feature-card">
+              <div class="feature-icon"><i class="fa-solid fa-code"></i></div>
+              <h3>PYTHON SCRIPTING</h3>
+              <p>Write powerful automation scripts in Python with the bundled Minescript runtime and comprehensive API access.</p>
+            </div>
+            <div class="feature-card">
+              <div class="feature-icon"><i class="fa-solid fa-file-code"></i></div>
+              <h3>SCRIPT TEMPLATES</h3>
+              <p>Start quickly with pre-built templates for farms, builders, combat helpers, and more. Customize for your needs.</p>
+            </div>
+            <div class="feature-card">
+              <div class="feature-icon"><i class="fa-solid fa-cubes"></i></div>
+              <h3>MODULES</h3>
+              <p>Extend functionality with client modules and reusable libraries. Share and discover community modules.</p>
+            </div>
+            <div class="feature-card">
+              <div class="feature-icon"><i class="fa-solid fa-desktop"></i></div>
+              <h3>WINDOWSPY</h3>
+              <p>Inspect Minecraft windows and UI elements to build advanced overlays and precision automation tools.</p>
+            </div>
+            <div class="feature-card">
+              <div class="feature-icon"><i class="fa-solid fa-eye"></i></div>
+              <h3>CUSTOM OVERLAYS</h3>
+              <p>Render HUDs, notifications, and info panels directly in-game with overlay tools and WindowSpy integration.</p>
+            </div>
+            <div class="feature-card">
+              <div class="feature-icon"><i class="fa-solid fa-satellite-dish"></i></div>
+              <h3>REMOTE DASHBOARD</h3>
+              <p>Manage accounts, launch scripts, and browse your library from any browser, anywhere in the world.</p>
+            </div>
+            <div class="feature-card">
+              <div class="feature-icon"><i class="fa-solid fa-users"></i></div>
+              <h3>COMMUNITY HUB</h3>
+              <p>Share scripts, get help, and connect with thousands of other Minecraft scripters and automation enthusiasts.</p>
+            </div>
+            <div class="feature-card">
+              <div class="feature-icon"><i class="fa-solid fa-lock"></i></div>
+              <h3>SECURE ACCOUNTS</h3>
+              <p>Securely manage multiple Minecraft accounts with encrypted storage and industry-standard security practices.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <footer class="landing-footer">
+        <div class="container footer-content">
+          <div class="footer-brand">
+            <a href="#" class="logo" data-landing>
+              <img class="logo-icon" src="/shulkr-icons.png" alt="Shulkr logo">
+              <span>SHULKR</span>
+            </a>
+            <p>A Minecraft scripting platform and web dashboard.</p>
+          </div>
+          <div class="footer-links">
+            <a data-view="features">Features</a>
+            <a data-view="faq">FAQ</a>
+            <a data-landing>Home</a>
+            <a data-view="terms">Terms</a>
+            <a data-view="cookies">Privacy</a>
+          </div>
+          <p class="footer-copy">© 2026 Shulkr. All rights reserved.</p>
+        </div>
+      </footer>
+    </div>
+  `;
+}
+
+function purchasePage() {
+  return `
+    <div class="landing">
+      <div class="noise-overlay"></div>
+      <div class="grid-bg"></div>
+      <nav class="landing-navbar">
+        <div class="nav-container">
+          <a href="#" class="logo" data-landing>
+            <img class="logo-icon" src="/shulkr-icons.png" alt="Shulkr logo">
+            <span>SHULKR</span>
+          </a>
+          <ul class="landing-nav-links">
+            <li><a href="#features">FEATURES</a></li>
+            <li><a href="#scripts">SCRIPTS</a></li>
+            <li><a href="#showcase">DASHBOARD</a></li>
+            <li><a href="#community">COMMUNITY</a></li>
+            <li><a href="#download">DOWNLOAD</a></li>
+            <li><a data-view="faq">FAQ</a></li>
+            <li><a data-view="features">SHOWCASE</a></li>
+          </ul>
+          <div class="landing-nav-actions">
+            <button class="btn btn-secondary" data-auth="signin">SIGN IN</button>
+            <button class="btn btn-primary" data-auth="signup">GET STARTED</button>
+          </div>
+        </div>
+      </nav>
+
+      <section class="hero" style="padding: 100px 0 40px;">
+        <div class="hero-content">
+          <div class="hero-left">
+            <div class="hero-tag"><span class="tag-line"></span><span>PRICING</span></div>
+            <h1 class="hero-title">
+              <span class="title-line">CHOOSE YOUR</span>
+              <span class="title-line title-accent">PLAN</span>
+            </h1>
+            <p class="hero-subtitle"><span class="slash">/</span> UPGRADE YOUR SHULKR EXPERIENCE WITH PREMIUM FEATURES.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="landing-section" style="padding: 60px 0;">
+        <div class="container">
+          <div class="pricing-grid">
+            <div class="pricing-card">
+              <div class="pricing-header">
+                <h3>FREE</h3>
+                <div class="pricing-price"><span class="price-amount">$0</span><span class="price-period">/month</span></div>
+              </div>
+              <ul class="pricing-features">
+                <li><i class="fa-solid fa-check"></i> Python Scripting</li>
+                <li><i class="fa-solid fa-check"></i> 5 Script Limit</li>
+                <li><i class="fa-solid fa-check"></i> Remote Dashboard</li>
+                <li><i class="fa-solid fa-check"></i> Community Access</li>
+                <li class="disabled"><i class="fa-solid fa-x"></i> Premium Templates</li>
+                <li class="disabled"><i class="fa-solid fa-x"></i> Client Modules</li>
+                <li class="disabled"><i class="fa-solid fa-x"></i> Priority Support</li>
+              </ul>
+              <button class="btn btn-secondary" data-auth="signup">GET STARTED</button>
+            </div>
+
+            <div class="pricing-card featured">
+              <div class="featured-badge">RECOMMENDED</div>
+              <div class="pricing-header">
+                <h3>PRO</h3>
+                <div class="pricing-price"><span class="price-amount">$9.99</span><span class="price-period">/month</span></div>
+              </div>
+              <ul class="pricing-features">
+                <li><i class="fa-solid fa-check"></i> Python Scripting</li>
+                <li><i class="fa-solid fa-check"></i> Unlimited Scripts</li>
+                <li><i class="fa-solid fa-check"></i> Remote Dashboard</li>
+                <li><i class="fa-solid fa-check"></i> Community Access</li>
+                <li><i class="fa-solid fa-check"></i> Premium Templates</li>
+                <li><i class="fa-solid fa-check"></i> Client Modules</li>
+                <li class="disabled"><i class="fa-solid fa-x"></i> Priority Support</li>
+              </ul>
+              <button class="btn btn-primary" data-auth="signin">SIGN IN TO UPGRADE</button>
+            </div>
+
+            <div class="pricing-card">
+              <div class="pricing-header">
+                <h3>PREMIUM</h3>
+                <div class="pricing-price"><span class="price-amount">$19.99</span><span class="price-period">/month</span></div>
+              </div>
+              <ul class="pricing-features">
+                <li><i class="fa-solid fa-check"></i> Python Scripting</li>
+                <li><i class="fa-solid fa-check"></i> Unlimited Scripts</li>
+                <li><i class="fa-solid fa-check"></i> Remote Dashboard</li>
+                <li><i class="fa-solid fa-check"></i> Community Access</li>
+                <li><i class="fa-solid fa-check"></i> Premium Templates</li>
+                <li><i class="fa-solid fa-check"></i> Client Modules</li>
+                <li><i class="fa-solid fa-check"></i> Priority Support</li>
+              </ul>
+              <button class="btn btn-secondary" data-auth="signin">SIGN IN TO UPGRADE</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <footer class="landing-footer">
+        <div class="container footer-content">
+          <div class="footer-brand">
+            <a href="#" class="logo" data-landing>
+              <img class="logo-icon" src="/shulkr-icons.png" alt="Shulkr logo">
+              <span>SHULKR</span>
+            </a>
+            <p>A Minecraft scripting platform and web dashboard.</p>
+          </div>
+          <div class="footer-links">
+            <a data-view="features">Features</a>
+            <a data-view="faq">FAQ</a>
+            <a data-landing>Home</a>
+            <a data-view="terms">Terms</a>
+            <a data-view="cookies">Privacy</a>
+          </div>
+          <p class="footer-copy">© 2026 Shulkr. All rights reserved.</p>
+        </div>
+      </footer>
+    </div>
+  `;
+}
+
+function termsPage() {
+  return `
+    <div class="landing">
+      <div class="noise-overlay"></div>
+      <div class="grid-bg"></div>
+      <nav class="landing-navbar">
+        <div class="nav-container">
+          <a href="#" class="logo" data-landing>
+            <img class="logo-icon" src="/shulkr-icons.png" alt="Shulkr logo">
+            <span>SHULKR</span>
+          </a>
+          <ul class="landing-nav-links">
+            <li><a href="#features">FEATURES</a></li>
+            <li><a href="#scripts">SCRIPTS</a></li>
+            <li><a href="#showcase">DASHBOARD</a></li>
+            <li><a href="#community">COMMUNITY</a></li>
+            <li><a href="#download">DOWNLOAD</a></li>
+            <li><a data-view="faq">FAQ</a></li>
+            <li><a data-view="features">SHOWCASE</a></li>
+          </ul>
+          <div class="landing-nav-actions">
+            <button class="btn btn-secondary" data-auth="signin">SIGN IN</button>
+            <button class="btn btn-primary" data-auth="signup">GET STARTED</button>
+          </div>
+        </div>
+      </nav>
+
+      <section class="hero" style="padding: 100px 0 40px;">
+        <div class="hero-content">
+          <div class="hero-left">
+            <h1 class="hero-title">
+              <span class="title-line">TERMS OF</span>
+              <span class="title-line title-accent">SERVICE</span>
+            </h1>
+            <p class="hero-subtitle"><span class="slash">/</span> Please read these terms carefully before using Shulkr.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="landing-section legal-section" style="padding: 60px 0;">
+        <div class="container legal-content">
+          <h2>1. Acceptance of Terms</h2>
+          <p>By accessing and using Shulkr, you accept and agree to be bound by the terms and provision of this agreement. If you do not agree to abide by the above, please do not use this service.</p>
+
+          <h2>2. Use License</h2>
+          <p>Shulkr grants you a limited, non-exclusive, non-transferable license to use the software in accordance with these terms. You agree not to:</p>
+          <ul>
+            <li>Use the software for any illegal purpose or in violation of Minecraft's End User License Agreement</li>
+            <li>Attempt to gain unauthorized access to the platform or its systems</li>
+            <li>Distribute or transmit malicious code through Shulkr</li>
+            <li>Reverse engineer or decompile the software without permission</li>
+          </ul>
+
+          <h2>3. Disclaimer of Warranties</h2>
+          <p>Shulkr is provided on an "as is" and "as available" basis. We make no warranties, expressed or implied, regarding the software or any content provided through it. We disclaim all warranties including, but not limited to, warranties of merchantability and fitness for a particular purpose.</p>
+
+          <h2>4. Limitation of Liability</h2>
+          <p>In no event shall Shulkr or its suppliers be liable for any damages (including, without limitation, lost profits, lost data, or business interruption) arising out of the use or inability to use the software, even if we have been advised of the possibility of such damages.</p>
+
+          <h2>5. Governing Law</h2>
+          <p>These terms and conditions are governed by and construed in accordance with the laws of the jurisdiction in which Shulkr operates, and you irrevocably submit to the exclusive jurisdiction of the courts in that location.</p>
+
+          <h2>6. Changes to Terms</h2>
+          <p>Shulkr reserves the right to modify these terms at any time. Your continued use of the software after such modifications constitutes your acceptance of the updated terms.</p>
+
+          <p class="legal-date">Last updated: July 2026</p>
+        </div>
+      </section>
+
+      <footer class="landing-footer">
+        <div class="container footer-content">
+          <div class="footer-brand">
+            <a href="#" class="logo" data-landing>
+              <img class="logo-icon" src="/shulkr-icons.png" alt="Shulkr logo">
+              <span>SHULKR</span>
+            </a>
+            <p>A Minecraft scripting platform and web dashboard.</p>
+          </div>
+          <div class="footer-links">
+            <a data-view="features">Features</a>
+            <a data-view="faq">FAQ</a>
+            <a data-landing>Home</a>
+            <a data-view="terms">Terms</a>
+            <a data-view="cookies">Privacy</a>
+          </div>
+          <p class="footer-copy">© 2026 Shulkr. All rights reserved.</p>
+        </div>
+      </footer>
+    </div>
+  `;
+}
+
+function cookiePolicyPage() {
+  return `
+    <div class="landing">
+      <div class="noise-overlay"></div>
+      <div class="grid-bg"></div>
+      <nav class="landing-navbar">
+        <div class="nav-container">
+          <a href="#" class="logo" data-landing>
+            <img class="logo-icon" src="/shulkr-icons.png" alt="Shulkr logo">
+            <span>SHULKR</span>
+          </a>
+          <ul class="landing-nav-links">
+            <li><a href="#features">FEATURES</a></li>
+            <li><a href="#scripts">SCRIPTS</a></li>
+            <li><a href="#showcase">DASHBOARD</a></li>
+            <li><a href="#community">COMMUNITY</a></li>
+            <li><a href="#download">DOWNLOAD</a></li>
+            <li><a data-view="faq">FAQ</a></li>
+            <li><a data-view="features">SHOWCASE</a></li>
+          </ul>
+          <div class="landing-nav-actions">
+            <button class="btn btn-secondary" data-auth="signin">SIGN IN</button>
+            <button class="btn btn-primary" data-auth="signup">GET STARTED</button>
+          </div>
+        </div>
+      </nav>
+
+      <section class="hero" style="padding: 100px 0 40px;">
+        <div class="hero-content">
+          <div class="hero-left">
+            <h1 class="hero-title">
+              <span class="title-line">PRIVACY &</span>
+              <span class="title-line title-accent">COOKIE POLICY</span>
+            </h1>
+            <p class="hero-subtitle"><span class="slash">/</span> Understanding how we protect your data and use cookies.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="landing-section legal-section" style="padding: 60px 0;">
+        <div class="container legal-content">
+          <h2>1. Privacy Policy</h2>
+          <p>At Shulkr, we are committed to protecting your privacy. This policy outlines how we collect, use, and protect your personal information.</p>
+
+          <h2>2. Information We Collect</h2>
+          <p>We may collect the following information:</p>
+          <ul>
+            <li>Account information (email, username, display name)</li>
+            <li>Minecraft account credentials (encrypted and stored securely)</li>
+            <li>Script and automation data</li>
+            <li>Usage analytics and telemetry (anonymized)</li>
+            <li>IP address and browser information</li>
+          </ul>
+
+          <h2>3. How We Use Your Information</h2>
+          <p>Your information is used to:</p>
+          <ul>
+            <li>Provide and improve Shulkr services</li>
+            <li>Authenticate your account and secure your data</li>
+            <li>Send important updates and security notices</li>
+            <li>Analyze usage patterns to improve performance</li>
+            <li>Comply with legal obligations</li>
+          </ul>
+
+          <h2>4. Cookie Usage</h2>
+          <p>Shulkr uses cookies to:</p>
+          <ul>
+            <li><strong>Session Management:</strong> Keep you logged in and maintain your preferences</li>
+            <li><strong>Analytics:</strong> Understand how users interact with our platform (anonymized)</li>
+            <li><strong>Security:</strong> Detect and prevent fraudulent activity</li>
+            <li><strong>Personalization:</strong> Remember your settings and preferences</li>
+          </ul>
+
+          <h2>5. Data Security</h2>
+          <p>We implement industry-standard security measures including encryption, secure sockets layer (SSL), and regular security audits. Your Minecraft account credentials are encrypted and never transmitted unencrypted.</p>
+
+          <h2>6. Data Sharing</h2>
+          <p>We do not sell your personal data to third parties. We may share information with:</p>
+          <ul>
+            <li>Service providers who assist in platform operations</li>
+            <li>Law enforcement when required by law</li>
+            <li>Other users when sharing scripts or community content (only information you choose to share)</li>
+          </ul>
+
+          <h2>7. Your Rights</h2>
+          <p>You have the right to:</p>
+          <ul>
+            <li>Access your personal data</li>
+            <li>Request correction of inaccurate data</li>
+            <li>Request deletion of your account and data</li>
+            <li>Opt-out of analytics and promotional communications</li>
+          </ul>
+
+          <h2>8. Contact Us</h2>
+          <p>If you have questions about our privacy practices or cookies, please contact us through our support channels or Discord community.</p>
+
+          <p class="legal-date">Last updated: July 2026</p>
+        </div>
+      </section>
+
+      <footer class="landing-footer">
+        <div class="container footer-content">
+          <div class="footer-brand">
+            <a href="#" class="logo" data-landing>
+              <img class="logo-icon" src="/shulkr-icons.png" alt="Shulkr logo">
+              <span>SHULKR</span>
+            </a>
+            <p>A Minecraft scripting platform and web dashboard.</p>
+          </div>
+          <div class="footer-links">
+            <a data-view="features">Features</a>
+            <a data-view="faq">FAQ</a>
+            <a data-landing>Home</a>
+            <a data-view="terms">Terms</a>
+            <a data-view="cookies">Privacy</a>
+          </div>
+          <p class="footer-copy">© 2026 Shulkr. All rights reserved.</p>
+        </div>
+      </footer>
+    </div>
+  `;
+}
+
 function page() {
   if (state.loading) return loadingState();
   return {
     profile: profilePage,
     scripts: scriptsPage,
+    library: libraryPage,
     editor: editorPage,
+    flow: flowBuilderPage,
     statistics: statisticsPage,
     accounts: accountsPage,
+    billing: billingPage,
+    customerPortal: customerPortalPage,
     remote: remotePage,
-    settings: settingsPage
+    settings: settingsPage,
+    admin: adminPage
   }[state.page]?.() || profilePage();
 }
 
 function topBar(title, icon) {
+  const user = state.auth.user || state.profile || { displayName: "EnderUser" };
+  const unreadNotifications = notificationItems().filter(item => !state.notificationRead[item.id]).length;
   return `
     <header class="top-bar">
-      <div class="page-title">
-        <i class="${icon}"></i>
-        <h1>${escapeHtml(title)}</h1>
+      <div class="top-bar-left">
+        <div class="page-title">
+          <i class="${icon}"></i>
+          <div class="page-title-copy">
+            <span class="page-eyebrow">Dashboard workspace</span>
+            <h1>${escapeHtml(title)}</h1>
+          </div>
+        </div>
       </div>
-      <label class="global-search" data-testid="top-search">
-        <i class="fa-solid fa-magnifying-glass"></i>
-        <input id="search" value="${escapeAttr(state.search)}" placeholder="Search scripts, accounts..." />
-        <kbd>Ctrl</kbd><kbd>K</kbd>
-      </label>
+      <div class="global-search-shell">
+        <label class="global-search" data-testid="top-search">
+          <i class="fa-solid fa-magnifying-glass"></i>
+          <input id="search" value="${escapeAttr(state.search)}" placeholder="Search pages, scripts, devices..." autocomplete="off" aria-label="Search dashboard" />
+          <kbd>Ctrl</kbd><kbd>K</kbd>
+        </label>
+        <div class="global-search-results" id="global-search-results" hidden></div>
+      </div>
       <div class="top-actions">
-        <button class="btn-icon" title="Refresh" data-action="refresh"><i class="fa-solid fa-rotate"></i></button>
-        <span class="badge ${state.online ? "badge-good" : "badge-active"}" style="height: 32px;">${state.online ? "Online" : "Offline"}</span>
+        <button class="btn-icon" title="Refresh" aria-label="Refresh dashboard data" data-action="refresh"><i class="fa-solid fa-rotate"></i></button>
+        <div class="notification-shell">
+          <button class="btn-icon" title="Status center" aria-label="Open status center${unreadNotifications ? `, ${unreadNotifications} unread` : ""}" aria-expanded="${state.notificationsOpen}" data-action="notifications"><i class="fa-solid fa-bell"></i>${unreadNotifications ? `<span class="notification-count">${unreadNotifications}</span>` : ""}</button>
+          ${state.notificationsOpen ? notificationPanel() : ""}
+        </div>
+        <details class="account-menu">
+          <summary class="user-chip" title="Open account menu">
+            <span class="user-chip-avatar">${escapeHtml((user.displayName || "U").slice(0, 1))}</span>
+            <span class="user-chip-name">${escapeHtml(user.displayName || "EnderUser")}</span>
+            <i class="fa-solid fa-chevron-down account-menu-chevron"></i>
+          </summary>
+          <div class="account-menu-popover">
+            <div class="account-menu-heading">
+              <strong>${escapeHtml(user.displayName || "EnderUser")}</strong>
+              <span>${escapeHtml(user.tier || "Premium")} account</span>
+            </div>
+            <button data-page="admin"><i class="fa-solid fa-shield-halved"></i><span>Admin</span></button>
+            <button data-page="accounts"><i class="fa-solid fa-microchip"></i><span>Devices</span></button>
+            <button data-page="billing"><i class="fa-solid fa-credit-card"></i><span>Billing</span></button>
+            <button data-page="settings"><i class="fa-solid fa-gear"></i><span>Settings</span></button>
+            <div class="account-menu-divider"></div>
+            <button data-landing><i class="fa-solid fa-globe"></i><span>Website</span></button>
+            <button class="account-menu-danger" data-action="logout"><i class="fa-solid fa-right-from-bracket"></i><span>Sign out</span></button>
+          </div>
+        </details>
+        <span class="badge ${state.online ? "badge-good" : "badge-active"}" style="height: 32px;">${state.online ? "Backend online" : "Backend offline"}</span>
       </div>
     </header>
   `;
 }
 
+function notificationPanel() {
+  const items = notificationItems();
+  return `<div class="notification-popover" role="status" aria-label="System status"><div class="notification-popover-head"><span><strong>Status center</strong><small>Live dashboard state</small></span><button type="button" data-action="notifications-read">Mark all read</button></div>${items.map(item => `<div class="notification-item ${state.notificationRead[item.id] ? "" : "unread"}"><i class="fa-solid ${item.icon}"></i><span><strong>${escapeHtml(item.title)}</strong><small>${escapeHtml(item.detail)}</small></span></div>`).join("")}</div>`;
+}
+
+function notificationItems() {
+  const connected = state.clients.filter(client => client.connected !== false).length;
+  const flowDirty = flowStore.snapshot().dirty;
+  return [
+    { id: `backend-${state.online ? "online" : "offline"}`, title: state.online ? "Backend connected" : "Backend unavailable", detail: state.online ? "API requests are responding normally." : "Check the backend connection in Settings.", icon: state.online ? "fa-circle-check" : "fa-triangle-exclamation" },
+    { id: `clients-${connected}`, title: connected ? `${connected} Minecraft client${connected === 1 ? "" : "s"} connected` : "No Minecraft client connected", detail: connected ? "Remote execution controls are available." : "Open Minecraft and connect the Shulkr client.", icon: connected ? "fa-link" : "fa-link-slash" },
+    { id: `flow-${flowDirty ? "dirty" : "saved"}`, title: flowDirty ? "Flow Builder has unsaved changes" : "Flow Builder changes are saved", detail: flowDirty ? "Open Flow Builder to save or review the draft." : "Your latest visual automation is persisted.", icon: flowDirty ? "fa-floppy-disk" : "fa-cloud-arrow-up" }
+  ];
+}
+
+function updateGlobalSearchResults(value) {
+  const container = document.getElementById("global-search-results");
+  if (!container) return;
+  const query = String(value || "").trim().toLowerCase();
+  state.search = value;
+  if (!query) {
+    container.hidden = true;
+    container.innerHTML = "";
+    return;
+  }
+  const pageResults = nav
+    .filter(([, label, , description]) => `${label} ${description}`.toLowerCase().includes(query))
+    .map(([page, label, icon, description]) => ({ kind: "page", id: page, label, detail: description, icon }));
+  const scriptResults = state.scripts
+    .filter(script => `${script.name || ""} ${script.fileName || ""} ${script.path || ""}`.toLowerCase().includes(query))
+    .map(script => ({ kind: "script", id: script.path, label: script.name || script.fileName || script.path, detail: "Open in Script Editor", icon: "fa-solid fa-file-code" }));
+  const clientResults = state.clients
+    .filter(client => `${client.displayName || ""} ${client.deviceName || ""} ${client.id || ""}`.toLowerCase().includes(query))
+    .map(client => ({ kind: "client", id: client.id, label: client.deviceName || client.displayName || "Minecraft client", detail: client.connected !== false ? "Connected device" : "Offline device", icon: "fa-solid fa-microchip" }));
+  const results = [...pageResults, ...scriptResults, ...clientResults].slice(0, 7);
+  container.hidden = false;
+  container.innerHTML = results.length
+    ? results.map(result => `<button type="button" data-global-result="${result.kind}" data-global-id="${escapeAttr(result.id)}"><i class="${result.icon}"></i><span><strong>${escapeHtml(result.label)}</strong><small>${escapeHtml(result.detail)}</small></span><i class="fa-solid fa-arrow-right"></i></button>`).join("")
+    : `<div class="global-search-empty">No pages, scripts, or devices match “${escapeHtml(value)}”.</div>`;
+  container.querySelectorAll("[data-global-result]").forEach(button => button.addEventListener("click", () => {
+    const kind = button.dataset.globalResult;
+    const id = button.dataset.globalId;
+    state.search = "";
+    if (kind === "page") return navigateToPage(id);
+    if (kind === "script") return openScriptEditor(id);
+    if (kind === "client") {
+      state.selectedClient = state.clients.find(client => client.id === id) || state.selectedClient;
+      navigateToPage("remote");
+    }
+  }));
+}
+
+function changelogPage() {
+  return `
+    <div class="auth-page">
+      <div class="auth-card" style="max-width: 980px;">
+        <a href="#" class="logo" data-landing>
+          <img src="/shulkr-logo.png" alt="Shulkr" data-hide-on-error>
+          <span>Shulkr</span>
+        </a>
+        <h2 style="margin-top: 20px;">Changelog</h2>
+        <p class="auth-subtitle">What we shipped recently across the dashboard, client, and billing flow.</p>
+        <div class="list" style="margin-top: 24px;">
+          ${[
+            ["July 2026", "Remote dashboard layout tightened up, the customer portal landed, and billing navigation was cleaned up."],
+            ["June 2026", "Main menu branding, script library cleanup, and admin billing tools shipped."],
+            ["May 2026", "Stripe subscriptions, test-mode checkout, and tier unlocks were added."]
+          ].map(([date, text]) => `
+            <div class="list-item">
+              <div class="icon"><i class="fa-solid fa-clock-rotate-left"></i></div>
+              <div class="content">
+                <h4>${escapeHtml(date)}</h4>
+                <p>${escapeHtml(text)}</p>
+              </div>
+            </div>
+          `).join("")}
+        </div>
+        <div class="modal-actions" style="margin-top: 24px;">
+          <button class="btn btn-secondary" data-landing>Back to website</button>
+          <button class="btn btn-primary" data-auth="signup">Get Started</button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
 function profilePage() {
   const profile = state.profile || { displayName: "EnderUser", tier: "Premium" };
+  const pulseHistory = (state.statsHistory || []).slice(-12);
+  const pulseValues = pulseHistory.length ? pulseHistory.map((point) => point.commandsCompleted || point.scriptRuns || point.heartbeats || 0) : [];
+  const pulseLabels = pulseHistory.map((point) => chartPointLabel(point.at));
+  const totalScripts = state.stats?.scripts ?? state.scripts.length;
+  const totalLibraries = state.stats?.installedLibraries ?? state.libraries.length;
+  const totalTemplates = state.stats?.templates ?? state.templates.length;
+  const connectedClients = state.clients.filter((client) => client.connected !== false).length;
   return `
     ${topBar("Overview", "fa-solid fa-house")}
-    <section class="profile-hero">
-      <div class="card profile-main">
-        <div class="profile-info">
-          <div class="avatar-xl">${escapeHtml((profile.displayName || "U").slice(0, 1))}</div>
-          <div class="profile-name">
-            <h2>${escapeHtml(profile.displayName || "EnderUser")}</h2>
-            <p>@${escapeHtml(profile.username || profile.minecraft || "shulkr_user")}</p>
+    <section class="overview-hero">
+      <div class="card overview-hero-main">
+        <div class="overview-copy">
+          <span class="overview-kicker">Welcome back</span>
+          <h2>${escapeHtml(profile.displayName || "EnderUser")}</h2>
+          <p>Your scripts, libraries, and remote tools are all in one place. Pick up where you left off without digging through the whole client.</p>
+          <div class="overview-chip-row">
             <span class="badge badge-premium">${escapeHtml(profile.tier || "Premium")}</span>
+            <span class="soft-pill"><i class="fa-solid fa-microchip"></i>${connectedClients}/${state.clients.length || 1} devices active</span>
+            <span class="soft-pill"><i class="fa-solid fa-file-code"></i>${totalScripts} scripts ready</span>
           </div>
         </div>
-        <div class="profile-actions">
-          <button class="btn btn-secondary" data-page="settings"><i class="fa-solid fa-gear"></i> Settings</button>
-          <button class="btn btn-primary"><i class="fa-solid fa-download"></i> Download</button>
+        <div class="overview-hero-actions">
+          <button class="btn btn-primary" data-page="scripts"><i class="fa-solid fa-rocket"></i> Open scripts</button>
+          <button class="btn btn-secondary" data-page="remote"><i class="fa-solid fa-satellite-dish"></i> Remote console</button>
         </div>
       </div>
-      <div class="card profile-meta">
-        <div class="meta-row"><span>Plan</span><span>${escapeHtml(profile.tier || "Premium")}</span></div>
-        <div class="meta-row"><span>Last active</span><span>Just now</span></div>
-        <div class="meta-row"><span>Member since</span><span>November 2025</span></div>
-        <div class="meta-row"><span>Connections</span><span>${state.clients.length} accounts</span></div>
+      <div class="card overview-focus-card">
+        <div class="card-header">
+          <h3><i class="fa-solid fa-bullseye"></i> Session Focus</h3>
+        </div>
+        <div class="focus-stack">
+          ${focusItem("Selected script", state.selectedScript?.name || state.scripts[0]?.name || "Choose a script")}
+          ${focusItem("Libraries installed", `${totalLibraries} ready to import`)}
+          ${focusItem("Templates saved", `${totalTemplates} layouts available`)}
+          ${focusItem("Status", connectedClients ? `${connectedClients} client${connectedClients === 1 ? "" : "s"} connected and ready` : state.online ? "Backend online · no client connected" : "Backend offline")}
+        </div>
       </div>
     </section>
 
-    <section class="stats-row">
-      ${statCard("Scripts", state.stats?.scripts ?? state.scripts.length, "fa-solid fa-file-code", "var(--accent-purple)")}
-      ${statCard("Templates", state.stats?.templates ?? state.templates.length, "fa-solid fa-layer-group", "var(--accent-pink)")}
-      ${statCard("Libraries", state.stats?.installedLibraries ?? state.libraries.length, "fa-solid fa-cubes", "var(--accent-cyan)")}
-      ${statCard("Published", state.stats?.publishedScripts ?? state.library.length, "fa-solid fa-cloud-arrow-up", "var(--accent-orange)")}
+    <section class="overview-metrics">
+      ${overviewMetric("Scripts", totalScripts, "fa-solid fa-file-code", "Ready to run")}
+      ${overviewMetric("Libraries", totalLibraries, "fa-solid fa-cubes", "Reusable helpers")}
+      ${overviewMetric("Templates", totalTemplates, "fa-solid fa-layer-group", "Saved workflows")}
+      ${overviewMetric("Published", state.stats?.publishedScripts ?? state.library.length, "fa-solid fa-cloud-arrow-up", "Shared builds")}
     </section>
 
-    <div class="grid-2">
+    <div class="grid-2 overview-grid">
       <div class="card chart-card">
         <div class="card-header">
           <h3><i class="fa-solid fa-wave-square"></i> Activity Pulse</h3>
-          <button class="card-link">Details <i class="fa-solid fa-arrow-right"></i></button>
+          <button class="card-link" data-page="statistics">Details <i class="fa-solid fa-arrow-right"></i></button>
         </div>
         <div class="chart-area">
-          ${areaChart([3, 5, 4, 7, 6, 9, 11, 10, 13, 15, 14, 18], "var(--accent-purple)")}
+          ${pulseValues.length ? areaChart(pulseValues, "var(--accent-purple)", pulseLabels, (value) => `${formatNumber(value || 0)} events`) : empty("Activity will appear once the client starts sending telemetry.")}
         </div>
       </div>
+      <div class="card">
+        <div class="card-header">
+          <h3><i class="fa-solid fa-sparkles"></i> Quick Start</h3>
+          <button class="card-link" data-page="scripts">Library <i class="fa-solid fa-arrow-right"></i></button>
+        </div>
+        <div class="quick-start-stack">
+          ${quickStartCard("Run a script", "Pick a script and launch it on your connected client.", "fa-solid fa-play", "remote")}
+          ${quickStartCard("Open editor", "Jump into Minescript and keep building from the dashboard.", "fa-solid fa-code", "editor")}
+          ${quickStartCard("Manage billing", "Review your plan, current subscription, and customer tools.", "fa-solid fa-credit-card", stripeEnabled() ? "customerPortal" : "billing")}
+        </div>
+      </div>
+    </div>
+
+    <div class="grid-2 overview-grid overview-grid-secondary">
       <div class="card">
         <div class="card-header">
           <h3><i class="fa-solid fa-clock-rotate-left"></i> Recent Activity</h3>
           <button class="card-link" data-page="statistics">All <i class="fa-solid fa-arrow-right"></i></button>
         </div>
         <div class="list">
-          ${state.scripts.slice(0, 5).map(activityItem).join("") || empty("No recent activity.")}
+          ${state.scripts.slice(0, 4).map(activityItem).join("") || empty("No recent activity.")}
         </div>
       </div>
-    </div>
-
-    <div class="grid-2">
       <div class="card">
         <div class="card-header">
-          <h3><i class="fa-solid fa-server"></i> Connected Accounts</h3>
+          <h3><i class="fa-solid fa-microchip"></i> Licensed Device</h3>
           <button class="card-link" data-page="accounts">Manage <i class="fa-solid fa-arrow-right"></i></button>
         </div>
         <div class="list">
           ${state.clients.length ? state.clients.slice(0, 4).map(clientListItem).join("") : clientListItem({ displayName: "EnderUser", tier: "Premium", connected: state.online, source: "profile" })}
-        </div>
-      </div>
-      <div class="card">
-        <div class="card-header">
-          <h3><i class="fa-solid fa-bolt"></i> Quick Launch</h3>
-        </div>
-        <div class="list">
-          ${state.scripts.slice(0, 4).map(quickLaunchItem).join("") || empty("No scripts available.")}
         </div>
       </div>
     </div>
@@ -656,6 +1631,41 @@ function profilePage() {
 }
 
 function scriptsPage() {
+  const term = state.scriptSearch.trim().toLowerCase();
+  const folder = state.scriptFolder;
+  const visibleScripts = state.scripts.filter(script => {
+    const matchesTerm = !term || `${script.name || ""} ${script.path || ""} ${script.description || ""}`.toLowerCase().includes(term);
+    const matchesFolder = folder === "all" || String(script.path || "").startsWith(`${folder}/`);
+    return matchesTerm && matchesFolder;
+  });
+  return `
+    ${topBar("Scripts", "fa-solid fa-file-code")}
+    <section class="card">
+      <div class="card-header">
+        <h3><i class="fa-solid fa-folder-open"></i> Local scripts</h3>
+        <div class="script-management-actions">
+          <button class="btn btn-secondary" data-action="new-folder"><i class="fa-solid fa-folder-plus"></i> New folder</button>
+          <button class="btn btn-primary" data-page="editor"><i class="fa-solid fa-code"></i> Open editor</button>
+        </div>
+      </div>
+      <div class="script-management-toolbar">
+        <label><i class="fa-solid fa-magnifying-glass"></i><input id="script-search" value="${escapeAttr(state.scriptSearch)}" placeholder="Search local scripts…" aria-label="Search local scripts"></label>
+        <select id="script-folder-filter" aria-label="Filter by folder"><option value="all">All folders</option>${state.scriptFolders.map(item => `<option value="${escapeAttr(item.path)}" ${state.scriptFolder === item.path ? "selected" : ""}>${escapeHtml(item.path)}</option>`).join("")}</select>
+        ${folder !== "all" ? `<button class="btn btn-secondary btn-sm" data-folder-rename="${escapeAttr(folder)}"><i class="fa-solid fa-pen"></i> Rename folder</button><button class="btn btn-secondary btn-sm" data-folder-delete="${escapeAttr(folder)}"><i class="fa-solid fa-trash"></i> Delete folder</button>` : ""}
+      </div>
+      <div class="list script-management-list">
+        ${visibleScripts.length ? visibleScripts.map(scriptManagementItem).join("") : empty(state.scripts.length ? "No scripts match these filters." : "No local scripts yet. Create one in the editor.")}
+      </div>
+    </section>
+  `;
+}
+
+function scriptManagementItem(script) {
+  const name = script.name || script.fileName || script.path || "Untitled";
+  return `<div class="list-item script-management-item"><button class="script-management-open" data-script-open="${escapeAttr(script.path)}" aria-label="Open ${escapeAttr(name)} in editor"><span class="icon"><i class="fa-solid fa-file-code"></i></span><span class="content"><strong>${escapeHtml(name)}</strong><small>${escapeHtml(script.description || script.path || "Local script")}</small></span></button><span class="meta">${formatBytes(script.sizeBytes || 0)} · ${script.modifiedAt ? timeAgo(script.modifiedAt) : "Unknown"}</span><div class="script-management-row-actions"><button class="btn-icon" data-script-rename="${escapeAttr(script.path)}" aria-label="Rename ${escapeAttr(name)}" title="Rename"><i class="fa-solid fa-pen"></i></button><button class="btn-icon" data-script-delete="${escapeAttr(script.path)}" aria-label="Delete ${escapeAttr(name)}" title="Delete"><i class="fa-solid fa-trash"></i></button></div></div>`;
+}
+
+function libraryPage() {
   if (state.loading && state.library.length === 0) {
     return scriptHubSkeleton();
   }
@@ -680,7 +1690,7 @@ function scriptsPage() {
   const start = (page - 1) * state.hubPerPage;
   const pageItems = filtered.slice(start, start + state.hubPerPage);
 
-  const categories = ["all", "recent", "python", "pyjinn", "farming", "combat", "world", "utility", "other"];
+  const categories = ["all", "recent", "visual automation", "python", "pyjinn", "farming", "combat", "world", "utility", "other"];
 
   return `
     ${topBar("Script Hub", "fa-solid fa-file-code")}
@@ -693,8 +1703,8 @@ function scriptsPage() {
           </div>
           <div class="hub-actions">
             <span class="hub-count">${total} published</span>
-            <button class="btn btn-primary btn-icon" data-action="publish-script" title="Publish script"><i class="fa-solid fa-cloud-arrow-up"></i></button>
-            <button class="btn btn-secondary btn-icon" data-action="refresh" title="Refresh"><i class="fa-solid fa-rotate"></i></button>
+            <button class="hub-action-btn hub-action-btn-primary" data-action="publish-script" title="Publish script"><i class="fa-solid fa-cloud-arrow-up"></i></button>
+            <button class="hub-action-btn hub-action-btn-secondary" data-action="refresh" title="Refresh"><i class="fa-solid fa-rotate"></i></button>
           </div>
         </div>
         <div class="hub-searchbar">
@@ -814,25 +1824,30 @@ function hubScriptCard(script) {
   const category = escapeHtml(script.category || "Other");
   const tags = (script.tags || [category]).slice(0, 2);
   const ext = (script.fileName || script.name || "").split(".").pop()?.toLowerCase() || "py";
-  const iconClass = ext === "py" ? "fa-brands fa-python" : ext === "lua" ? "fa-solid fa-moon" : ext === "js" ? "fa-brands fa-js" : "fa-solid fa-code";
+  const isAutomation = script.kind === "automation";
+  const trustLabel = script.verification?.serverCompiled ? "Server verified" : "Review code";
+  const trustIcon = script.verification?.serverCompiled ? "fa-shield-check" : "fa-code";
+  const iconClass = isAutomation ? "fa-solid fa-diagram-project" : ext === "py" ? "fa-brands fa-python" : ext === "lua" ? "fa-solid fa-moon" : ext === "js" ? "fa-brands fa-js" : "fa-solid fa-code";
   const selected = state.selectedScript?.id === script.id ? "selected" : "";
   return `
     <div class="hub-card ${selected}" data-hub-script="${escapeAttr(script.id)}">
       <div class="hub-card-thumb">
         <div class="hub-thumb-icon"><i class="${iconClass}"></i></div>
-        ${script.badge ? `<span class="hub-card-badge">${escapeHtml(script.badge)}</span>` : ""}
+        <span class="hub-card-badge"><i class="fa-solid ${trustIcon}"></i> ${escapeHtml(script.badge || trustLabel)}</span>
       </div>
       <div class="hub-card-body">
         <div class="hub-card-title">
           <h4>${name}</h4>
-          <span class="hub-card-tag">${category}</span>
+          <span class="hub-card-tag">${isAutomation ? "Visual Automation" : category}</span>
         </div>
         <div class="hub-card-meta">
           <span>by ${author}</span>
           <span>•</span>
           <span>v${escapeHtml(script.version || "1.0.0")}</span>
           <span>•</span>
-          <span><i class="fa-solid fa-download"></i> ${formatNumber(script.downloads || 0)}</span>
+          <span>${isAutomation ? `${script.nodeCount || 0} nodes · ${script.edgeCount || 0} edges` : `<i class="fa-solid fa-download"></i> ${formatNumber(script.downloads || script.installs || 0)}`}</span>
+          <span>•</span>
+          <span>Updated ${escapeHtml(timeAgo(script.updatedAt || script.publishedAt))}</span>
         </div>
         <p class="hub-card-desc">${about}</p>
         <div class="hub-card-tags">
@@ -840,9 +1855,9 @@ function hubScriptCard(script) {
         </div>
       </div>
       <div class="hub-card-actions">
-        <button class="btn btn-primary btn-sm" data-hub-install="${escapeAttr(script.id)}" title="Install"><i class="fa-solid fa-download"></i></button>
-        <button class="btn btn-secondary btn-sm" data-hub-view="${escapeAttr(script.id)}" title="View code"><i class="fa-solid fa-code"></i></button>
-        <button class="btn btn-secondary btn-sm" data-hub-more="${escapeAttr(script.id)}" title="More"><i class="fa-solid fa-ellipsis"></i></button>
+        <button class="btn btn-primary btn-sm" data-hub-install="${escapeAttr(script.id)}" title="Install" aria-label="Install ${escapeAttr(script.name || "script")}"><i class="fa-solid fa-download"></i></button>
+        <button class="btn btn-secondary btn-sm" data-hub-view="${escapeAttr(script.id)}" title="${isAutomation ? "Review automation" : "View code"}" aria-label="${isAutomation ? "Review automation" : "View code"} ${escapeAttr(script.name || "script")}"><i class="fa-solid fa-${isAutomation ? "diagram-project" : "code"}"></i></button>
+        <button class="btn btn-secondary btn-sm" data-hub-more="${escapeAttr(script.id)}" title="More" aria-label="More options for ${escapeAttr(script.name || "script")}"><i class="fa-solid fa-ellipsis"></i></button>
       </div>
     </div>
   `;
@@ -924,7 +1939,7 @@ function editorPage() {
     return editorSkeletonPage();
   }
   const filtered = state.scripts.filter((s) => {
-    const term = state.search.toLowerCase();
+    const term = state.scriptSearch.toLowerCase();
     return !term || (s.name || s.fileName || s.path || "").toLowerCase().includes(term);
   });
   return `
@@ -935,6 +1950,7 @@ function editorPage() {
           <h3><i class="fa-solid fa-folder-open"></i> Scripts</h3>
           <button class="btn btn-primary btn-sm" data-action="new-script"><i class="fa-solid fa-plus"></i> New</button>
         </div>
+        <label class="editor-script-search"><i class="fa-solid fa-magnifying-glass"></i><input id="script-search" value="${escapeAttr(state.scriptSearch)}" placeholder="Search scripts…" aria-label="Search scripts"></label>
         <div class="scripts-list">
           ${filtered.map(scriptListItem).join("") || empty("No scripts found.")}
         </div>
@@ -984,11 +2000,11 @@ function scriptListItem(script) {
   const icon = ext === "py" ? "fa-brands fa-python" : ext === "lua" ? "fa-solid fa-moon" : "fa-solid fa-file-code";
   const active = state.editorScript?.path === script.path ? "active" : "";
   return `
-    <div class="script-item ${active}" data-select-script="${escapeAttr(script.path)}" data-select-name="${escapeAttr(name)}">
+    <div class="script-item ${active}" data-select-script="${escapeAttr(script.path)}" data-select-name="${escapeAttr(name)}" role="button" tabindex="0" aria-label="Open ${escapeAttr(name)}">
       <div class="script-icon"><i class="${icon}"></i></div>
       <div class="script-info">
         <h4>${name}</h4>
-        <p>${formatBytes(script.size || 0)} · ${script.modifiedAt ? timeAgo(script.modifiedAt) : "Unknown"}</p>
+        <p>${formatBytes(script.sizeBytes || script.size || 0)} · ${script.modifiedAt ? timeAgo(script.modifiedAt) : "Unknown"}</p>
       </div>
     </div>
   `;
@@ -1057,19 +2073,36 @@ function editorSkeleton(name) {
 
 function statisticsPage() {
   const summary = state.statsSummary || {};
-  const history = getFilteredHistory();
+  const history = state.statsHistory || [];
   const metric = state.metricTab;
-  const metricKey = metric === "time" ? "runtime" : metric === "starts" ? "runs" : metric === "failsafes" ? "failsafes" : metric === "exp" ? "exp" : "profit";
+  const metricKey = metric === "time"
+    ? "runtimeSeconds"
+    : metric === "fps"
+      ? "avgFps"
+      : metric === "commands"
+        ? "commandsCompleted"
+        : metric === "chat"
+          ? "chatMessages"
+          : "scriptRuns";
   const chartValues = history.length ? history.map((p) => p[metricKey] || 0) : [0];
-  const chartColor = metric === "exp" ? "var(--accent-lime)" : metric === "profit" ? "var(--accent-orange)" : metric === "starts" ? "var(--accent-pink)" : metric === "failsafes" ? "var(--accent-cyan)" : "var(--accent-purple)";
+  const chartColor = metric === "fps" ? "var(--accent-cyan)" : metric === "commands" ? "var(--accent-orange)" : metric === "chat" ? "var(--accent-lime)" : metric === "runs" ? "var(--accent-pink)" : "var(--accent-purple)";
+  const accountOptions = [{ id: "all", displayName: "All Devices" }, ...state.statsClients];
+  const scriptOptions = [{ path: "all", name: "All Scripts" }, ...state.statsScripts];
   return `
     ${topBar("Analytics", "fa-solid fa-chart-pie")}
     <div class="toolbar">
       <div class="toolbar-left">
-        <select id="stats-account"><option>All Accounts</option></select>
-        <select id="stats-script"><option>All Scripts</option></select>
+        <select id="stats-account">
+          ${accountOptions.map((client) => `<option value="${escapeAttr(client.id)}" ${state.statsClientFilter === client.id ? "selected" : ""}>${escapeHtml(client.displayName)}</option>`).join("")}
+        </select>
+        <select id="stats-script">
+          ${scriptOptions.map((script) => `<option value="${escapeAttr(script.path)}" ${state.statsScriptFilter === script.path ? "selected" : ""}>${escapeHtml(script.name)}</option>`).join("")}
+        </select>
       </div>
       <div class="toolbar-right">
+        <button class="btn btn-secondary btn-sm" data-action="export-analytics" ${history.length ? "" : "disabled"}>
+          <i class="fa-solid fa-file-csv"></i> Export CSV
+        </button>
         <div class="pill-group">
           ${["7d", "30d", "90d", "1yr", "All"].map((f) => `
             <button class="pill-btn ${state.timeFilter === f ? "active" : ""}" data-filter="${f}">${f}</button>
@@ -1082,22 +2115,25 @@ function statisticsPage() {
       <div class="card-header">
         <h3><i class="fa-solid fa-chart-area"></i> Performance Over Time</h3>
         <div class="pill-group">
-          ${[["time", "Time"], ["exp", "EXP"], ["profit", "Profit"], ["starts", "Runs"], ["failsafes", "Failsafes"]].map(([id, label]) => `
+          ${[["time", "Runtime"], ["fps", "FPS"], ["commands", "Commands"], ["runs", "Runs"], ["chat", "Chat"]].map(([id, label]) => `
             <button class="pill-btn ${state.metricTab === id ? "active" : ""}" data-metric="${id}">${label}</button>
           `).join("")}
         </div>
       </div>
       <div class="chart-area" style="min-height: 280px;">
-        ${areaChart(chartValues, chartColor)}
+        ${history.length ? areaChart(chartValues, chartColor, history.map((point) => chartPointLabel(point.at)), metricLabel(metric, chartValues)) : empty("Analytics will appear here once the client sends telemetry.")}
       </div>
     </div>
 
     <section class="stats-row">
-      ${statCard("Runtime", formatDuration(summary.runtime || 0), "fa-solid fa-hourglass-half", "var(--accent-purple)")}
-      ${statCard("Script Runs", formatNumber(summary.runs || 0), "fa-solid fa-play", "var(--accent-pink)")}
-      ${statCard("Failsafes", formatNumber(summary.failsafes || 0), "fa-solid fa-shield-halved", "var(--accent-cyan)")}
-      ${statCard("EXP Gained", formatNumber(summary.exp || 0), "fa-solid fa-star", "var(--accent-lime)")}
-      ${statCard("Profit", formatNumber(summary.profit || 0), "fa-solid fa-coins", "var(--accent-orange)")}
+      ${statCard("Runtime", formatDurationSeconds(summary.runtimeSeconds || 0), "fa-solid fa-hourglass-half", "var(--accent-purple)")}
+      ${statCard("Active Script Time", formatDurationSeconds(summary.activeScriptSeconds || 0), "fa-solid fa-code", "var(--accent-purple)")}
+      ${statCard("Script Runs", formatNumber(summary.scriptRuns || 0), "fa-solid fa-play", "var(--accent-pink)")}
+      ${statCard("Commands", formatNumber(summary.commandsCompleted || 0), "fa-solid fa-terminal", "var(--accent-orange)")}
+      ${statCard("Chat Sends", formatNumber(summary.chatMessages || 0), "fa-solid fa-comment-dots", "var(--accent-lime)")}
+      ${statCard("Avg FPS", formatNumber(summary.avgFps || 0), "fa-solid fa-gauge-high", "var(--accent-cyan)")}
+      ${statCard("Screenshots", formatNumber(summary.screenshots || 0), "fa-solid fa-camera", "var(--accent-orange)")}
+      ${statCard("Peak Clients", formatNumber(summary.activeClientsPeak || 0), "fa-solid fa-users", "var(--accent-purple)")}
       ${statCard("Sessions", formatNumber(summary.sessions || history.length), "fa-solid fa-route", "var(--accent-purple)")}
     </section>
 
@@ -1112,14 +2148,6 @@ function statisticsPage() {
   `;
 }
 
-function getFilteredHistory() {
-  const history = state.statsHistory || [];
-  const now = Date.now();
-  const days = { "7d": 7, "30d": 30, "90d": 90, "1yr": 365, "All": 10000 }[state.timeFilter] || 30;
-  const cutoff = now - days * 24 * 60 * 60 * 1000;
-  return history.filter((p) => (p.at || 0) >= cutoff);
-}
-
 function sessionHistoryItem(point) {
   const date = new Date(point.at || Date.now()).toLocaleDateString(undefined, { month: "short", day: "numeric" });
   return `
@@ -1127,16 +2155,18 @@ function sessionHistoryItem(point) {
       <div class="icon"><i class="fa-solid fa-calendar-day"></i></div>
       <div class="content">
         <h4>${date}</h4>
-        <p>${formatDuration(point.runtime || 0)} • ${point.runs || 0} runs</p>
+        <p>${formatDurationSeconds(point.runtimeSeconds || 0)} • ${formatNumber(point.scriptRuns || 0)} runs • ${formatNumber(point.commandsCompleted || 0)} commands</p>
       </div>
-      <span class="meta">${formatNumber(point.exp || 0)} EXP</span>
+      <span class="meta">${formatNumber(point.avgFps || 0)} FPS</span>
       <i class="fa-solid fa-chevron-right arrow"></i>
     </div>
   `;
 }
 
-function formatDuration(minutes) {
-  const m = Math.max(0, Math.round(Number(minutes) || 0));
+function formatDurationSeconds(seconds) {
+  const totalSeconds = Math.max(0, Math.round(Number(seconds) || 0));
+  if (totalSeconds < 60) return `${totalSeconds}s`;
+  const m = Math.floor(totalSeconds / 60);
   if (m < 60) return `${m}m`;
   const h = Math.floor(m / 60);
   const rem = m % 60;
@@ -1149,7 +2179,7 @@ function formatDuration(minutes) {
 function accountsPage() {
   const accounts = state.clients.length ? state.clients : [state.profile || { displayName: "EnderUser", tier: "Premium" }];
   return `
-    ${topBar("Accounts", "fa-solid fa-users")}
+    ${topBar("Licensed Devices", "fa-solid fa-microchip")}
     <section class="accounts-grid">
       ${accounts.map(accountCard).join("")}
     </section>
@@ -1157,43 +2187,93 @@ function accountsPage() {
 }
 
 function remotePage() {
+  const selectedClient = state.selectedClient;
+  const selectedScript = state.selectedScript;
+  const clientConnected = selectedClient?.connected !== false;
+  const stream = state.stream;
+  const streamReady = Boolean(stream?.available && stream?.running);
+  const streamSource = `${API_BASE}/api/stream/mjpeg?ts=${encodeURIComponent(stream?.startedAt || "idle")}`;
+  const clientStatus = selectedClient
+    ? [selectedClient.server || "Not connected", selectedClient.world || "Main menu", selectedClient.position || "-"]
+    : ["No client selected", "Waiting for heartbeat", "-"];
+  const eventLog = [
+    "Remote initialized.",
+    state.online ? "Backend handshake complete." : "Backend offline.",
+    selectedClient ? `${selectedClient.displayName || "Client"} ${clientConnected ? "is live." : "is offline."}` : "No client selected.",
+    selectedScript ? `Selected script: ${selectedScript.name || selectedScript.path}` : "No script selected.",
+    streamReady ? `Feed source: ${stream.captureTitle || stream.source || "window"}` : "Feed idle."
+  ];
+  const streamMessage = friendlyStreamMessage(stream);
   return `
     ${topBar("Remote", "fa-solid fa-satellite-dish")}
     <div class="remote-layout">
-      <div>
+      <div class="remote-main">
         <div class="remote-screen">
-          <div class="remote-placeholder">
-            <i class="fa-solid fa-desktop"></i>
-            <p>${state.selectedClient ? `Connected to ${escapeHtml(state.selectedClient.displayName || "account")}` : "Select an account to begin remote control"}</p>
-          </div>
+          ${streamReady ? `
+            <img
+              class="remote-stream"
+              src="${escapeAttr(streamSource)}"
+              alt="Live Minecraft feed"
+              data-stream-image
+            >
+          ` : `
+            <div class="remote-placeholder">
+              <i class="fa-solid fa-desktop"></i>
+              <p>${selectedClient ? `${clientConnected ? "Connected to" : "Last seen"} ${escapeHtml(selectedClient.deviceName || selectedClient.displayName || "device")}` : "Select a licensed device to begin remote control"}</p>
+              <p>${escapeHtml(clientStatus.join(" • "))}</p>
+              <p>${escapeHtml(streamMessage)}</p>
+            </div>
+          `}
         </div>
         <div class="remote-controls">
           <select id="remote-account">
-            ${state.clients.length ? state.clients.map((c) => `<option>${escapeHtml(c.displayName || "Account")}</option>`).join("") : `<option>EnderUser</option>`}
+            ${state.clients.length ? state.clients.map((c) => `<option value="${escapeAttr(c.id || "")}" ${selectedClient?.id === c.id ? "selected" : ""}>${escapeHtml(c.deviceName || c.displayName || "Device")}</option>`).join("") : `<option>This device</option>`}
           </select>
           <select id="remote-script">
-            ${state.scripts.length ? state.scripts.map((s) => `<option>${escapeHtml(s.name || s.fileName || s.path)}</option>`).join("") : `<option>No scripts</option>`}
+            ${state.scripts.length ? state.scripts.map((s) => `<option value="${escapeAttr(s.path || "")}" ${selectedScript?.path === s.path ? "selected" : ""}>${escapeHtml(s.name || s.fileName || s.path)}</option>`).join("") : `<option>No scripts</option>`}
           </select>
-          <button class="btn btn-secondary"><i class="fa-solid fa-camera"></i> Capture</button>
-          <button class="btn btn-primary" style="margin-left: auto;"><i class="fa-solid fa-play"></i> Run</button>
-          <button class="btn btn-secondary"><i class="fa-solid fa-stop"></i> Stop</button>
+          <button class="btn btn-secondary" data-action="remote-capture" ${selectedClient && clientConnected ? "" : "disabled"}><i class="fa-solid fa-camera"></i> Capture</button>
+          <button class="btn btn-secondary" data-action="remote-stream-restart"><i class="fa-solid fa-video"></i> Restart feed</button>
+          <button class="btn btn-primary" data-action="remote-run" style="margin-left: auto;" ${selectedClient && selectedScript && clientConnected ? "" : "disabled"}><i class="fa-solid fa-play"></i> Run</button>
+          <button class="btn btn-secondary" data-action="remote-stop" ${selectedClient && clientConnected ? "" : "disabled"}><i class="fa-solid fa-stop"></i> Stop</button>
         </div>
       </div>
       <div class="remote-sidebar">
         <div class="card">
-          <div class="card-header"><h3><i class="fa-solid fa-heart-pulse"></i> Live Status</h3></div>
-          <div class="panel-empty">
-            <div>
-              <i class="fa-solid fa-circle-notch fa-spin" style="font-size: 2rem; color: var(--accent-purple); margin-bottom: 12px;"></i>
-              <p>${state.online ? "Backend connected" : "Waiting for connection..."}</p>
-            </div>
+          <div class="card-header"><h3><i class="fa-solid fa-circle-info"></i> Remote Viewer Setup</h3></div>
+          <div class="remote-help">
+            <p>1. Keep Minecraft and the Shulkr backend running.</p>
+            <p>2. Select the connected device above.</p>
+            <p>3. Use Restart feed if the picture is blank.</p>
+            <span>${escapeHtml(stream?.available ? "Capture engine detected and ready." : "The capture engine is not available on this machine.")}</span>
           </div>
         </div>
         <div class="card">
           <div class="card-header"><h3><i class="fa-solid fa-terminal"></i> Event Log</h3></div>
           <div class="log-messages">
-            <div class="log-message"><span class="time">[00:00:00]</span> Remote initialized.</div>
-            ${state.online ? `<div class="log-message"><span class="time">[00:00:01]</span> Backend handshake complete.</div>` : ""}
+            ${eventLog.map((message) => `<div class="log-message"><span class="time" aria-hidden="true">•</span> ${escapeHtml(message)}</div>`).join("")}
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header"><h3><i class="fa-solid fa-comment-dots"></i> Live Chat</h3></div>
+          <div class="remote-chat-row">
+            <input id="remote-chat-input" placeholder="Type a live chat message..." value="${escapeAttr(state.remoteChatMessage)}">
+            <button class="btn btn-primary" data-action="remote-chat-send" ${selectedClient && clientConnected ? "" : "disabled"}><i class="fa-solid fa-paper-plane"></i> Send</button>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header"><h3><i class="fa-solid fa-bolt"></i> Quick Script</h3></div>
+          <div class="form-group">
+            <label>Script Name</label>
+            <input id="remote-draft-name" value="${escapeAttr(state.remoteDraftName)}" placeholder="QuickRemoteScript.py">
+          </div>
+          <div class="form-group">
+            <label>Script Code</label>
+            <textarea id="remote-draft-code" rows="6" placeholder="Write a fast remote script...">${escapeHtml(state.remoteDraftCode)}</textarea>
+          </div>
+          <div class="remote-quick-actions">
+            <button class="btn btn-secondary" data-action="remote-script-save"><i class="fa-solid fa-floppy-disk"></i> Save Script</button>
+            <button class="btn btn-primary" data-action="remote-script-save-run" ${selectedClient && clientConnected ? "" : "disabled"}><i class="fa-solid fa-play"></i> Save + Run</button>
           </div>
         </div>
       </div>
@@ -1201,30 +2281,331 @@ function remotePage() {
   `;
 }
 
+function friendlyStreamMessage(stream) {
+  if (!stream?.available) return "Live preview needs the capture engine to be installed.";
+  if (!stream?.lastError) return stream?.running ? "Live preview is ready." : "Feed stopped. Use Restart feed to begin window capture.";
+  const error = String(stream.lastError).toLowerCase();
+  if (error.includes("can't find window") || error.includes("cannot find window")) return "Live preview could not find the configured Minecraft window.";
+  if (error.includes("permission") || error.includes("access denied")) return "Live preview needs permission to capture the Minecraft window.";
+  if (error.includes("opening input") || error.includes("i/o error")) return "Live preview could not open the Minecraft window. Check that it is running and visible.";
+  return "Live preview is unavailable right now. Restart the feed after checking Minecraft.";
+}
+
+function billingPage() {
+  const billing = state.billingStatus || { enabled: false, plans: [] };
+  const currentTier = billing.currentTier || state.auth.user?.tier || "Free";
+  const canPurchase = !state.auth.user?.isAdmin;
+  const plans = billing.plans?.length
+    ? billing.plans
+    : [
+        { id: "pro", tier: "Pro", amount: 999, currency: "usd", interval: "month", description: "Remote dashboard, templates, and client modules." },
+        { id: "premium", tier: "Premium", amount: 1999, currency: "usd", interval: "month", description: "Everything in Pro plus publishing/import power features." }
+      ];
+  return `
+    ${topBar("Billing", "fa-solid fa-credit-card")}
+    <section class="profile-hero">
+      <div class="card profile-main">
+        <div class="profile-info">
+          <div class="avatar-xl"><i class="fa-solid fa-credit-card"></i></div>
+          <div class="profile-name">
+            <h2>${escapeHtml(currentTier)}</h2>
+            <p>${escapeHtml(billing.stripeStatus || "No active subscription")}</p>
+            <span class="badge badge-premium">${escapeHtml(currentTier)}</span>
+          </div>
+        </div>
+        <div class="profile-actions">
+          <button class="btn btn-primary" data-page="customerPortal"><i class="fa-solid fa-id-card"></i> Customer Portal</button>
+          <button class="btn btn-secondary" data-action="open-billing-portal" ${billing.stripeCustomerId ? "" : "disabled"}><i class="fa-solid fa-arrow-up-right-from-square"></i> Stripe Portal</button>
+        </div>
+      </div>
+      <div class="card profile-meta">
+        <div class="meta-row"><span>Customer</span><span>${billing.stripeCustomerId ? "Connected" : "Not linked"}</span></div>
+        <div class="meta-row"><span>Subscription</span><span>${escapeHtml(billing.stripeSubscriptionId || "None")}</span></div>
+        <div class="meta-row"><span>Status</span><span>${escapeHtml(billing.stripeStatus || "inactive")}</span></div>
+        <div class="meta-row"><span>HWID lock</span><span>${licenseHwidSummary(billing.currentLicense)}</span></div>
+      </div>
+    </section>
+
+    <section class="landing-section" style="padding: 0;">
+      <div class="pricing-grid">
+        <div class="pricing-card ${currentTier === "Free" ? "featured" : ""}">
+          <div class="pricing-header">
+            <h3>FREE</h3>
+            <div class="pricing-price"><span class="price-amount">$0</span><span class="price-period">/month</span></div>
+          </div>
+          <ul class="pricing-features">
+            <li><i class="fa-solid fa-check"></i> Script editor access</li>
+            <li><i class="fa-solid fa-check"></i> Local scripting and analytics</li>
+            <li><i class="fa-solid fa-check"></i> Core remote controls</li>
+            <li class="disabled"><i class="fa-solid fa-x"></i> Hosted stream feed</li>
+            <li class="disabled"><i class="fa-solid fa-x"></i> Premium templates</li>
+            <li class="disabled"><i class="fa-solid fa-x"></i> Client modules</li>
+          </ul>
+          <button class="btn btn-secondary" disabled>${currentTier === "Free" ? "CURRENT PLAN" : "FREE PLAN"}</button>
+        </div>
+        ${plans.map((plan) => {
+          const active = currentTier.toLowerCase() === String(plan.tier || "").toLowerCase();
+          const isFeatured = plan.id === "pro";
+          return `
+            <div class="pricing-card ${isFeatured ? "featured" : ""}">
+              ${isFeatured ? `<div class="featured-badge">RECOMMENDED</div>` : ""}
+              <div class="pricing-header">
+                <h3>${escapeHtml(String(plan.tier || "").toUpperCase())}</h3>
+                <div class="pricing-price"><span class="price-amount">${formatMoney(plan.amount, plan.currency)}</span><span class="price-period">/${escapeHtml(plan.interval || "month")}</span></div>
+              </div>
+              <p style="color: var(--text-secondary); margin: 0 0 18px;">${escapeHtml(plan.description || "")}</p>
+              <ul class="pricing-features">
+                <li><i class="fa-solid fa-check"></i> Hosted Stripe subscription</li>
+                <li><i class="fa-solid fa-check"></i> Automatic tier unlocks</li>
+                <li><i class="fa-solid fa-check"></i> Manage from customer portal</li>
+                <li><i class="fa-solid fa-check"></i> Test mode safe</li>
+              </ul>
+              <button class="btn ${active ? "btn-secondary" : "btn-primary"}" data-action="checkout-${escapeAttr(plan.id)}" ${active || !billing.enabled || !canPurchase ? "disabled" : ""}>
+                ${active ? "CURRENT PLAN" : !canPurchase ? "ADMIN ACCOUNT" : `UPGRADE TO ${escapeHtml(String(plan.tier || "").toUpperCase())}`}
+              </button>
+            </div>
+          `;
+        }).join("")}
+      </div>
+    </section>
+  `;
+}
+
+function customerPortalPage() {
+  const billing = state.billingStatus || { currentLicense: null, features: [] };
+  const license = billing.currentLicense || null;
+  const currentTier = billing.currentTier || state.auth.user?.tier || "Free";
+  const features = Array.isArray(billing.features) ? billing.features : [];
+  return `
+    ${topBar("Customer Portal", "fa-solid fa-id-card")}
+    <section class="profile-hero">
+      <div class="card profile-main">
+        <div class="profile-info">
+          <div class="avatar-xl"><i class="fa-solid fa-user-shield"></i></div>
+          <div class="profile-name">
+            <h2>${escapeHtml(state.auth.user?.displayName || "Customer")}</h2>
+            <p>${escapeHtml(state.auth.user?.email || state.auth.user?.username || "Signed in locally")}</p>
+            <span class="badge badge-premium">${escapeHtml(currentTier)}</span>
+          </div>
+        </div>
+        <div class="profile-actions">
+          <button class="btn btn-secondary" data-page="billing"><i class="fa-solid fa-credit-card"></i> Billing</button>
+          <button class="btn btn-primary" data-action="open-billing-portal" ${billing.stripeCustomerId ? "" : "disabled"}><i class="fa-solid fa-arrow-up-right-from-square"></i> Open Stripe Portal</button>
+        </div>
+      </div>
+      <div class="card profile-meta">
+        <div class="meta-row"><span>Current plan</span><span>${escapeHtml(currentTier)}</span></div>
+        <div class="meta-row"><span>Subscription status</span><span>${escapeHtml(billing.stripeStatus || license?.status || "inactive")}</span></div>
+        <div class="meta-row"><span>Seats</span><span>${escapeHtml(String(license?.seats || 1))}</span></div>
+        <div class="meta-row"><span>Bound hardware</span><span>${licenseHwidSummary(license)}</span></div>
+      </div>
+    </section>
+
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-header">
+          <h3><i class="fa-solid fa-receipt"></i> Subscription</h3>
+        </div>
+        <div class="meta-row"><span>Stripe customer</span><span>${escapeHtml(billing.stripeCustomerId || "Not linked")}</span></div>
+        <div class="meta-row"><span>Stripe subscription</span><span>${escapeHtml(billing.stripeSubscriptionId || "No subscription")}</span></div>
+        <div class="meta-row"><span>License status</span><span>${escapeHtml(license?.status || "inactive")}</span></div>
+        <div class="meta-row"><span>Tier source</span><span>${escapeHtml(license ? "License + entitlements" : "Account default")}</span></div>
+        <div class="meta-row"><span>Primary device</span><span>${escapeHtml(license?.primaryDeviceName || shortDeviceId(license?.primaryDeviceId) || "Not bound")}</span></div>
+        <div class="meta-row"><span>Access ends</span><span>${escapeHtml(formatDateLabel(license?.expiresAt))}</span></div>
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <h3><i class="fa-solid fa-bolt"></i> Enabled Features</h3>
+        </div>
+        <div class="admin-tag-row">
+          ${features.length ? features.map((feature) => `<span class="hub-tag">${escapeHtml(feature)}</span>`).join("") : `<span class="hub-tag">No premium features yet</span>`}
+        </div>
+        <div style="display:flex; gap:12px; margin-top: 18px; flex-wrap: wrap;">
+          <button class="btn btn-primary" data-page="billing"><i class="fa-solid fa-arrow-up"></i> Change Plan</button>
+          <button class="btn btn-secondary" data-action="refresh"><i class="fa-solid fa-rotate"></i> Refresh Status</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top: 24px;">
+      <div class="card-header">
+        <h3><i class="fa-solid fa-circle-info"></i> Customer Options</h3>
+      </div>
+      <div class="list">
+        ${portalOption("Update payment method", billing.stripeCustomerId ? "Open the Stripe portal to update cards, invoices, or billing details." : "Create a Stripe customer first by starting a checkout session.")}
+        ${portalOption("Change subscription tier", "Use the Billing page to switch between Free, Pro, and Premium.")}
+        ${portalOption("Check entitlement sync", "The dashboard reflects the stored license, bound hardware ID, and Stripe sync status for this device.")}
+      </div>
+    </div>
+  `;
+}
+
 function settingsPage() {
+  const entitlements = state.entitlements || {
+    tier: state.auth.user?.tier || "Premium",
+    features: state.auth.user?.features || [],
+    isAdmin: Boolean(state.auth.user?.isAdmin)
+  };
+  const tabs = [
+    ["customization", "Customization", "fa-solid fa-palette"],
+    ["layout", "Layout", "fa-solid fa-table-columns"],
+    ["connection", "Connection", "fa-solid fa-server"],
+    ["account", "Account", "fa-solid fa-user-shield"]
+  ];
   return `
     ${topBar("Settings", "fa-solid fa-sliders")}
-    <div class="settings-grid">
-      <div class="card">
-        <div class="card-header"><h3><i class="fa-solid fa-server"></i> Connection</h3></div>
-        <div class="form-group">
-          <label>Backend URL</label>
-          <input id="api-base" value="${escapeAttr(API_BASE)}" />
+    <section class="settings-workspace">
+      <div class="settings-hero">
+        <div>
+          <span class="page-eyebrow">Dashboard preferences</span>
+          <h2>Make Shulkr feel like yours.</h2>
+          <p>Theme, layout, account and connection controls—all saved instantly.</p>
         </div>
-        <div style="display: flex; gap: 12px;">
-          <button class="btn btn-primary" data-action="save-api"><i class="fa-solid fa-floppy-disk"></i> Save</button>
-          <button class="btn btn-secondary" data-action="refresh"><i class="fa-solid fa-rotate"></i> Test</button>
+        <div class="settings-save-state"><i class="fa-solid fa-circle-check"></i> Saved locally</div>
+      </div>
+      <div class="settings-tabs">
+        ${tabs.map(([id, label, icon]) => `<button class="${state.settingsTab === id ? "active" : ""}" data-settings-tab="${id}"><i class="${icon}"></i>${label}</button>`).join("")}
+      </div>
+      <div class="settings-tab-panel">
+        ${settingsTabContent(entitlements)}
+      </div>
+    </section>
+  `;
+}
+
+function settingsTabContent(entitlements) {
+  if (state.settingsTab === "customization") {
+    const themes = [
+      ["nova", "Nova", "Purple energy", ["#08050c", "#9d4dff", "#ff3aa5"]],
+      ["midnight", "Midnight", "Deep blue focus", ["#050814", "#5577ff", "#2de2e6"]],
+      ["ember", "Ember", "Warm dark contrast", ["#100706", "#ff6b35", "#ffd166"]],
+      ["matrix", "Matrix", "Terminal green", ["#030a07", "#35e58b", "#b8ff2c"]]
+    ];
+    return `
+      <div class="settings-customizer-grid">
+        <div class="card settings-control-card">
+          <div class="card-header"><h3><i class="fa-solid fa-swatchbook"></i> Theme presets</h3></div>
+          <div class="theme-preset-grid">
+            ${themes.map(([id, name, desc, colors]) => `
+              <button class="theme-preset ${state.theme === id ? "active" : ""}" data-theme-choice="${id}">
+                <span class="theme-preview" style="--preview-bg:${colors[0]};--preview-a:${colors[1]};--preview-b:${colors[2]}"><i></i><b></b><em></em></span>
+                <span><strong>${name}</strong><small>${desc}</small></span>
+                <i class="fa-solid fa-check theme-check"></i>
+              </button>`).join("")}
+          </div>
+        </div>
+        <div class="card settings-live-preview">
+          <div class="card-header"><h3><i class="fa-solid fa-eye"></i> Live preview</h3><span class="hub-tag">Instant</span></div>
+          <div class="theme-demo">
+            <div class="theme-demo-sidebar"><i></i><span></span><span></span><span></span></div>
+            <div class="theme-demo-main"><small>WELCOME BACK</small><strong>Shulkr Dashboard</strong><p>Your scripts and devices, beautifully organized.</p><button>OPEN SCRIPTS</button></div>
+          </div>
+          <p class="settings-note">The selected palette applies across every dashboard page and is remembered on this device.</p>
+        </div>
+      </div>`;
+  }
+  if (state.settingsTab === "layout") {
+    return `<div class="settings-grid">
+      <div class="card"><div class="card-header"><h3><i class="fa-solid fa-compress"></i> Interface density</h3></div>
+        <div class="density-options">${["compact", "comfortable", "spacious"].map(id => `<button class="${state.density === id ? "active" : ""}" data-density-choice="${id}"><i class="fa-solid fa-${id === "compact" ? "bars" : id === "spacious" ? "grip" : "list"}"></i><strong>${id[0].toUpperCase() + id.slice(1)}</strong><span>${id === "compact" ? "More content" : id === "spacious" ? "More breathing room" : "Balanced default"}</span></button>`).join("")}</div>
+      </div>
+      <div class="card"><div class="card-header"><h3><i class="fa-solid fa-wand-magic-sparkles"></i> Experience</h3></div><div class="meta-row"><span>Sidebar</span><span>Adaptive</span></div><div class="meta-row"><span>Animations</span><span>Enabled</span></div><div class="meta-row"><span>Card effects</span><span>Glass</span></div></div>
+    </div>`;
+  }
+  if (state.settingsTab === "connection") {
+    return `<div class="settings-grid"><div class="card"><div class="card-header"><h3><i class="fa-solid fa-server"></i> Backend connection</h3></div><div class="form-group"><label>Backend URL</label><input id="api-base" value="${escapeAttr(API_BASE)}" /></div><div class="settings-actions"><button class="btn btn-primary" data-action="save-api"><i class="fa-solid fa-floppy-disk"></i> Save</button><button class="btn btn-secondary" data-action="refresh"><i class="fa-solid fa-rotate"></i> Test connection</button></div></div><div class="card"><div class="card-header"><h3><i class="fa-solid fa-signal"></i> Status</h3></div><div class="meta-row"><span>Backend</span><span class="${state.online ? "settings-online" : ""}">${state.online ? "Connected" : "Offline"}</span></div><div class="meta-row"><span>Remote stream</span><span>${state.stream?.available ? "Ready" : "Unavailable"}</span></div></div></div>`;
+  }
+  return `<div class="settings-grid"><div class="card"><div class="card-header"><h3><i class="fa-solid fa-key"></i> Entitlements</h3></div><div class="meta-row"><span>Tier</span><span>${escapeHtml(entitlements.tier || "Premium")}</span></div><div class="meta-row"><span>Admin</span><span>${entitlements.isAdmin ? "Yes" : "No"}</span></div><div class="admin-tag-row settings-feature-tags">${(entitlements.features || []).map(feature => `<span class="hub-tag">${escapeHtml(feature)}</span>`).join("") || `<span class="hub-tag">client</span>`}</div></div><div class="card"><div class="card-header"><h3><i class="fa-solid fa-wallet"></i> Billing & account</h3></div><p class="settings-note">Manage your subscription, payment details, devices, and customer profile.</p><div class="settings-actions"><button class="btn btn-primary" data-page="billing"><i class="fa-solid fa-credit-card"></i> Billing</button><button class="btn btn-secondary" data-page="customerPortal"><i class="fa-solid fa-id-card"></i> Customer portal</button></div></div></div>`;
+}
+
+function applyDashboardTheme(theme, density) {
+  document.documentElement.dataset.theme = theme || "nova";
+  document.documentElement.dataset.density = density || "comfortable";
+}
+
+function adminPage() {
+  if (!state.auth.user?.isAdmin) {
+    return `
+      ${topBar("Admin", "fa-solid fa-shield-halved")}
+      <div class="card">
+        ${empty("Admin access required.")}
+      </div>
+    `;
+  }
+  const overview = state.adminOverview || { summary: {}, users: [], licenses: [], tamperEvents: [], analytics: {} };
+  const summary = overview.summary || {};
+  const analytics = overview.analytics || {};
+  return `
+    ${topBar("Admin", "fa-solid fa-shield-halved")}
+    <section class="stats-row">
+      ${statCard("Users", formatNumber(summary.users || 0), "fa-solid fa-users", "var(--accent-cyan)")}
+      ${statCard("Admins", formatNumber(summary.admins || 0), "fa-solid fa-crown", "var(--gold)")}
+      ${statCard("Licenses", formatNumber(summary.activeLicenses || 0), "fa-solid fa-id-card", "var(--accent-purple)")}
+      ${statCard("Clients", formatNumber(summary.connectedClients || 0), "fa-solid fa-plug", "var(--green)")}
+      ${statCard("Tamper Events", formatNumber(summary.tamperEvents || 0), "fa-solid fa-shield", "var(--accent-orange)")}
+      ${statCard("Blocked", formatNumber(summary.blockedAttempts || 0), "fa-solid fa-ban", "var(--red)")}
+    </section>
+
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-header"><h3><i class="fa-solid fa-lock"></i> Protection Status</h3></div>
+        <div class="admin-tag-row" style="margin-bottom: 18px;">
+          <span class="hub-tag">JWT auth</span>
+          <span class="hub-tag">tier checks</span>
+          <span class="hub-tag">feature gates</span>
+          <span class="hub-tag">tamper log</span>
+          <span class="hub-tag">admin routes</span>
+        </div>
+        <div class="list">
+          ${adminHealthItem("30d runtime", formatDurationSeconds(analytics.runtimeSeconds || 0))}
+          ${adminHealthItem("Script runs", formatNumber(analytics.scriptRuns || 0))}
+          ${adminHealthItem("Commands completed", formatNumber(analytics.commandsCompleted || 0))}
+          ${adminHealthItem("Peak active clients", formatNumber(analytics.activeClientsPeak || 0))}
         </div>
       </div>
       <div class="card">
-        <div class="card-header"><h3><i class="fa-solid fa-palette"></i> Appearance</h3></div>
-        <div class="form-group">
-          <label>Theme</label>
-          <select><option>Nova Dark</option><option>Midnight</option></select>
+        <div class="card-header"><h3><i class="fa-solid fa-triangle-exclamation"></i> Recent Tamper Events</h3></div>
+        <div class="list">
+          ${overview.tamperEvents?.length ? overview.tamperEvents.slice(0, 6).map(tamperEventItem).join("") : empty("No recent tamper events.")}
         </div>
-        <div class="form-group">
-          <label>Accent</label>
-          <select><option>Neon Purple</option><option>Cyber Pink</option><option>Cyan</option></select>
+      </div>
+    </div>
+
+    <div class="grid-2" style="margin-top: 24px;">
+      <div class="card">
+        <div class="card-header"><h3><i class="fa-solid fa-user-shield"></i> Users</h3></div>
+        <div class="admin-table-wrap">
+          <table class="admin-table">
+            <thead><tr><th>User</th><th>Login</th><th>Tier</th><th>Provider</th></tr></thead>
+            <tbody>
+              ${overview.users?.map((user) => `
+                <tr>
+                  <td>${escapeHtml(user.displayName || "User")}</td>
+                  <td>${escapeHtml(user.username || user.email || "")}</td>
+                  <td>${escapeHtml(user.tier || "Premium")}</td>
+                  <td>${escapeHtml(user.provider || "local")}</td>
+                </tr>
+              `).join("") || ""}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header"><h3><i class="fa-solid fa-file-contract"></i> Licenses</h3></div>
+        <div class="admin-table-wrap">
+          <table class="admin-table">
+            <thead><tr><th>User</th><th>Tier</th><th>Status</th><th>Features</th></tr></thead>
+            <tbody>
+              ${overview.licenses?.map((license) => `
+                <tr>
+                  <td>${escapeHtml(license.displayName || license.userId || "User")}</td>
+                  <td>${escapeHtml(license.tier || "Premium")}</td>
+                  <td>${escapeHtml(license.status || "active")}</td>
+                  <td>${escapeHtml((license.features || []).slice(0, 4).join(", "))}</td>
+                </tr>
+              `).join("") || ""}
+            </tbody>
+          </table>
         </div>
       </div>
     </div>
@@ -1275,9 +2656,90 @@ function statCard(label, value, icon, color) {
   `;
 }
 
+function sidebarSection(title, items) {
+  if (!items.length) return "";
+  return `
+    <div class="sidebar-section">
+      <span class="sidebar-section-title">${escapeHtml(title)}</span>
+      <div class="sidebar-section-items">
+        ${items.map(([id, label, icon, tip]) => `
+          <button class="nav-item ${state.page === id ? "active" : ""}" data-page="${id}" data-testid="nav-${id}" aria-label="${label}">
+            <span class="nav-item-icon"><i class="${icon}"></i></span>
+            <span class="nav-copy">
+              <strong>${escapeHtml(label)}</strong>
+            </span>
+            <span class="nav-tooltip">${escapeHtml(tip || label)}</span>
+          </button>
+        `).join("")}
+      </div>
+    </div>
+  `;
+}
+
+function overviewMetric(label, value, icon, detail) {
+  return `
+    <div class="overview-metric card">
+      <div class="overview-metric-top">
+        <span class="overview-metric-icon"><i class="${icon}"></i></span>
+        <span class="overview-metric-label">${escapeHtml(label)}</span>
+      </div>
+      <strong>${escapeHtml(String(value))}</strong>
+      <p>${escapeHtml(detail)}</p>
+    </div>
+  `;
+}
+
+function focusItem(label, value) {
+  return `
+    <div class="focus-item">
+      <span>${escapeHtml(label)}</span>
+      <strong>${escapeHtml(value)}</strong>
+    </div>
+  `;
+}
+
+function quickStartCard(title, text, icon, page) {
+  return `
+    <button class="quick-start-card" data-page="${escapeAttr(page)}">
+      <span class="quick-start-icon"><i class="${icon}"></i></span>
+      <span class="quick-start-copy">
+        <strong>${escapeHtml(title)}</strong>
+        <small>${escapeHtml(text)}</small>
+      </span>
+      <i class="fa-solid fa-arrow-right"></i>
+    </button>
+  `;
+}
+
+function adminHealthItem(label, value) {
+  return `
+    <div class="list-item">
+      <div class="icon"><i class="fa-solid fa-shield-heart"></i></div>
+      <div class="content">
+        <h4>${escapeHtml(label)}</h4>
+      </div>
+      <span class="meta">${escapeHtml(String(value))}</span>
+    </div>
+  `;
+}
+
+function tamperEventItem(event) {
+  const severityColor = event.severity === "error" ? "var(--red)" : "var(--accent-orange)";
+  return `
+    <div class="list-item">
+      <div class="icon"><i class="fa-solid fa-triangle-exclamation" style="color: ${severityColor};"></i></div>
+      <div class="content">
+        <h4>${escapeHtml(event.message || event.type || "Tamper event")}</h4>
+        <p>${escapeHtml([event.route, event.actorEmail || event.actorId, event.at ? timeAgo(event.at) : ""].filter(Boolean).join(" • "))}</p>
+      </div>
+      <span class="meta">${escapeHtml((event.severity || "warn").toUpperCase())}</span>
+    </div>
+  `;
+}
+
 function activityItem(script) {
   return `
-    <div class="list-item" data-select-script="${escapeAttr(script.path)}">
+    <div class="list-item" data-select-script="${escapeAttr(script.path)}" role="button" tabindex="0" aria-label="Open ${escapeAttr(script.name || script.fileName || script.path)}">
       <div class="icon"><i class="fa-solid fa-file-code"></i></div>
       <div class="content">
         <h4>${escapeHtml(script.name || script.fileName || script.path)}</h4>
@@ -1290,7 +2752,7 @@ function activityItem(script) {
 
 function quickLaunchItem(script) {
   return `
-    <div class="list-item" data-select-script="${escapeAttr(script.path)}">
+    <div class="list-item" data-select-script="${escapeAttr(script.path)}" role="button" tabindex="0" aria-label="Run ${escapeAttr(script.name || script.fileName || "Script")}">
       <div class="icon" style="background: rgba(45, 226, 230, 0.1); color: var(--accent-cyan);"><i class="fa-solid fa-play"></i></div>
       <div class="content">
         <h4>${escapeHtml(script.name || script.fileName || "Script")}</h4>
@@ -1333,34 +2795,70 @@ function sessionItem(script) {
 
 function accountCard(client) {
   const connected = client.connected !== false;
+  const shortId = shortDeviceId(client.deviceId || client.id || "");
+  const accountName = client.accountName ? ` • ${client.accountName}` : "";
+  const licenseLine = client.hardwareLocked === false
+    ? "Hardware lock disabled"
+    : `${client.licenseStatus === "blocked" ? "Blocked" : "HWID locked"}${shortId ? ` • ${shortId}` : ""}`;
   return `
     <div class="card account-card">
-      <div class="avatar">${escapeHtml((client.displayName || "U").slice(0, 1))}</div>
+      <div class="avatar">${escapeHtml((client.deviceName || client.displayName || "D").slice(0, 1))}</div>
       <div class="info">
-        <h4>${escapeHtml(client.displayName || "EnderUser")}</h4>
-        <p>${escapeHtml(client.tier || "Local user")}</p>
-        <span class="account-status ${connected ? "" : "offline"}"><span class="dot"></span>${connected ? "Active now" : "Offline"}${client.minecraft ? ` • ${escapeHtml(client.minecraft)}` : ""}</span>
+        <h4>${escapeHtml(client.deviceName || client.displayName || "This device")}</h4>
+        <p>${escapeHtml(licenseLine)}</p>
+        <span class="account-status ${connected ? "" : "offline"}"><span class="dot"></span>${connected ? "Active now" : "Offline"}${client.minecraft ? ` • ${escapeHtml(client.minecraft)}` : ""}${accountName ? ` • ${escapeHtml(client.accountName)}` : ""}</span>
       </div>
       <i class="fa-solid fa-chevron-right arrow"></i>
     </div>
   `;
 }
 
-function areaChart(values, color = "var(--accent-purple)") {
+function shortDeviceId(value) {
+  const text = String(value || "").trim();
+  if (!text) return "";
+  if (text.length <= 18) return text;
+  return `${text.slice(0, 10)}...${text.slice(-6)}`;
+}
+
+function licenseHwidSummary(license) {
+  if (!license) return "Not bound";
+  if (license.hardwareLock === false) return "Disabled";
+  const boundCount = Array.isArray(license.boundDeviceIds) ? license.boundDeviceIds.length : 0;
+  if (boundCount === 0) return "Waiting for first device";
+  return `${boundCount}/${Number(license.deviceLimit || license.seats || 1) || 1} bound`;
+}
+
+function areaChart(values, color = "var(--accent-purple)", labels = [], formatter = (value) => formatNumber(value)) {
+  if (!values.length) {
+    return empty("No chart data yet.");
+  }
+  if (values.length === 1) {
+    const value = values[0] || 0;
+    const label = labels[0] || "Latest";
+    return `
+      <div class="chart-single">
+        <div class="chart-single-label">${escapeHtml(label)}</div>
+        <div class="chart-single-value" style="color: ${color};">${escapeHtml(formatter(value))}</div>
+        <p>More points will appear as telemetry comes in.</p>
+      </div>
+    `;
+  }
   const width = 800;
   const height = 220;
   const max = Math.max(...values, 1);
   const min = Math.min(...values);
   const range = max - min || 1;
-  const stepX = width / (values.length - 1);
+  const stepX = values.length > 1 ? width / (values.length - 1) : width;
   const points = values.map((v, i) => {
     const x = i * stepX;
     const y = height - ((v - min) / range) * (height - 40) - 20;
     return `${x},${y}`;
   });
   const area = `${points[0]} ${points.map((p) => p).join(" ")} ${width},${height} 0,${height}`;
+  const lastValue = values[values.length - 1] || 0;
+  const lastLabel = labels[labels.length - 1] || "";
   return `
-    <svg viewBox="0 0 ${width} ${height}" preserveAspectRatio="none">
+    <svg viewBox="0 0 ${width} ${height}" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
       <defs>
         <linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
           <stop offset="0%" stop-color="${color}" stop-opacity="0.4"/>
@@ -1368,18 +2866,116 @@ function areaChart(values, color = "var(--accent-purple)") {
         </linearGradient>
       </defs>
       <line class="chart-grid" x1="0" y1="${height / 2}" x2="${width}" y2="${height / 2}"/>
+      <line class="chart-grid" x1="0" y1="20" x2="${width}" y2="20"/>
+      <line class="chart-grid" x1="0" y1="${height - 20}" x2="${width}" y2="${height - 20}"/>
       <polygon class="chart-fill" points="${area}" fill="url(#areaGrad)"/>
       <polyline class="chart-line" points="${points.join(" ")}" style="stroke: ${color};"/>
+      ${values.length ? `<circle cx="${points[points.length - 1].split(",")[0]}" cy="${points[points.length - 1].split(",")[1]}" r="5" fill="${color}"/>` : ""}
+      <text x="0" y="16" fill="rgba(255,255,255,0.55)" font-size="12">${escapeHtml(formatter(max))}</text>
+      <text x="0" y="${height - 6}" fill="rgba(255,255,255,0.55)" font-size="12">${escapeHtml(formatter(min))}</text>
+      ${lastLabel ? `<text x="${Math.max(0, width - 170)}" y="18" fill="rgba(255,255,255,0.75)" font-size="12">${escapeHtml(lastLabel)} • ${escapeHtml(formatter(lastValue))}</text>` : ""}
     </svg>
   `;
 }
 
+function chartPointLabel(timestamp) {
+  return new Date(timestamp || Date.now()).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+}
+
+function metricLabel(metric, values) {
+  return (value) => {
+    if (metric === "time") return formatDurationSeconds(value);
+    if (metric === "fps") return `${Math.round(value || 0)} FPS`;
+    if (metric === "commands") return `${formatNumber(value || 0)} cmds`;
+    if (metric === "chat") return `${formatNumber(value || 0)} chat`;
+    return `${formatNumber(value || 0)} runs`;
+  };
+}
+
+function portalOption(title, text) {
+  return `
+    <div class="list-item">
+      <div class="icon"><i class="fa-solid fa-check"></i></div>
+      <div class="content">
+        <h4>${escapeHtml(title)}</h4>
+        <p>${escapeHtml(text)}</p>
+      </div>
+    </div>
+  `;
+}
+
+function formatDateLabel(value) {
+  if (!value) return "Not scheduled";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return String(value);
+  return date.toLocaleDateString(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "numeric"
+  });
+}
+
+function flowBuilderPage() {
+  flowStore.state.templates = state.templates.filter((template) => template.kind === "automation");
+  const connectedClient = state.clients.find(client => client.connected !== false);
+  flowStore.setClientConnection(Boolean(connectedClient), false, connectedClient?.id || "");
+  if (!flowEditorModule) {
+    void ensureFlowEditorModule().catch(error => { state.error = error.message || "Flow Builder could not be loaded"; render(); });
+    return `${topBar("Flow Builder", "fa-solid fa-diagram-project")}<div class="card flow-module-loading" data-flow-loading><i class="fa-solid fa-diagram-project"></i><strong>Loading Flow Builder…</strong><span>Preparing the visual automation canvas.</span></div>`;
+  }
+  return `${topBar("Flow Builder", "fa-solid fa-diagram-project")}${flowEditorModule.flowBuilderPage()}`;
+}
+
+function navigateToPage(nextPage) {
+  if (!nextPage) return;
+  state.auth.view = "dashboard";
+  state.page = nextPage;
+  state.notificationsOpen = false;
+  if (nextPage === "flow") {
+    void ensureFlowEditorModule();
+    if (!flowStore.snapshot().loading && !flowStore.snapshot().automations.length) flowStore.loadAll();
+  }
+  render();
+  if (nextPage === "remote" || nextPage === "statistics") {
+    refreshLiveState()
+      .then(() => { if (state.page === nextPage) render(); })
+      .catch(error => { if (state.page === nextPage) toast(error.message || "Live data could not be refreshed"); });
+  }
+}
+
 function bind() {
-  document.querySelectorAll("[data-page]").forEach((node) => {
+  if (state.page === "flow" && flowEditorModule) flowEditorModule.mountFlowBuilder({ rerender: render, toast });
+  document.querySelectorAll("[data-hide-on-error]").forEach(image => {
+    image.addEventListener("error", () => { image.hidden = true; }, { once: true });
+  });
+  document.querySelector("[data-stream-image]")?.addEventListener("error", event => {
+    event.currentTarget.closest(".remote-screen")?.classList.add("stream-error");
+  }, { once: true });
+  document.querySelectorAll(".modal-card").forEach(card => card.addEventListener("click", event => event.stopPropagation()));
+  document.querySelectorAll("[data-settings-tab]").forEach((node) => {
     node.addEventListener("click", () => {
-      state.page = node.dataset.page;
+      state.settingsTab = node.dataset.settingsTab;
       render();
     });
+  });
+  document.querySelectorAll("[data-theme-choice]").forEach((node) => {
+    node.addEventListener("click", () => {
+      state.theme = node.dataset.themeChoice;
+      localStorage.setItem("shulkr_theme", state.theme);
+      applyDashboardTheme(state.theme, state.density);
+      render();
+    });
+  });
+  document.querySelectorAll("[data-density-choice]").forEach((node) => {
+    node.addEventListener("click", () => {
+      state.density = node.dataset.densityChoice;
+      localStorage.setItem("shulkr_density", state.density);
+      applyDashboardTheme(state.theme, state.density);
+      render();
+    });
+  });
+  document.querySelectorAll("[data-page]").forEach((node) => {
+    node.addEventListener("click", () => navigateToPage(node.dataset.page));
   });
   document.querySelectorAll("[data-landing]").forEach((node) => {
     node.addEventListener("click", (e) => {
@@ -1391,15 +2987,33 @@ function bind() {
   document.querySelectorAll("[data-action]").forEach((node) => {
     node.addEventListener("click", () => handleAction(node.dataset.action));
   });
-  document.querySelectorAll("[data-filter]").forEach((node) => {
+  document.querySelectorAll("[data-modal-close]").forEach((node) => {
     node.addEventListener("click", () => {
+      state.modal = null;
+      render();
+    });
+  });
+  document.querySelectorAll("[data-filter]").forEach((node) => {
+    node.addEventListener("click", async () => {
       state.timeFilter = node.dataset.filter;
+      if (state.page === "statistics") {
+        try {
+          await refreshLiveState();
+        } catch {
+        }
+      }
       render();
     });
   });
   document.querySelectorAll("[data-metric]").forEach((node) => {
-    node.addEventListener("click", () => {
+    node.addEventListener("click", async () => {
       state.metricTab = node.dataset.metric;
+      if (state.page === "statistics") {
+        try {
+          await refreshLiveState();
+        } catch {
+        }
+      }
       render();
     });
   });
@@ -1410,10 +3024,31 @@ function bind() {
       } else {
         state.selectedScript = state.scripts.find((s) => s.path === node.dataset.selectScript) || state.selectedScript;
         state.page = "remote";
+        ensureRemoteStream().catch(() => {});
         render();
       }
     });
+    if (node.getAttribute("role") === "button") node.addEventListener("keydown", event => {
+      if (event.key !== "Enter" && event.key !== " ") return;
+      event.preventDefault();
+      node.click();
+    });
   });
+  document.querySelectorAll("[data-script-open]").forEach(node => node.addEventListener("click", () => openScriptEditor(node.dataset.scriptOpen)));
+  document.querySelectorAll("[data-script-rename]").forEach(node => node.addEventListener("click", () => renameManagedScript(node.dataset.scriptRename)));
+  document.querySelectorAll("[data-script-delete]").forEach(node => node.addEventListener("click", () => deleteManagedScript(node.dataset.scriptDelete)));
+  document.querySelectorAll("[data-folder-rename]").forEach(node => node.addEventListener("click", () => renameScriptFolder(node.dataset.folderRename)));
+  document.querySelectorAll("[data-folder-delete]").forEach(node => node.addEventListener("click", () => deleteScriptFolder(node.dataset.folderDelete)));
+  const scriptSearchInput = document.getElementById("script-search");
+  if (scriptSearchInput) scriptSearchInput.addEventListener("input", event => {
+    state.scriptSearch = event.target.value;
+    render();
+    const replacement = document.getElementById("script-search");
+    replacement?.focus();
+    replacement?.setSelectionRange?.(replacement.value.length, replacement.value.length);
+  });
+  const scriptFolderFilter = document.getElementById("script-folder-filter");
+  if (scriptFolderFilter) scriptFolderFilter.addEventListener("change", event => { state.scriptFolder = event.target.value; render(); });
   document.querySelectorAll("[data-hub-script]").forEach((node) => {
     node.addEventListener("click", (e) => {
       if (e.target.closest("[data-hub-install], [data-hub-view], [data-hub-more]")) return;
@@ -1472,6 +3107,79 @@ function bind() {
       viewHubScript(node.dataset.hubView);
     });
   });
+  document.querySelectorAll("[data-hub-more]").forEach((node) => {
+    node.addEventListener("click", (e) => {
+      e.stopPropagation();
+      openHubDetails(node.dataset.hubMore);
+    });
+  });
+  document.querySelectorAll("[data-modal-install]").forEach((node) => {
+    node.addEventListener("click", () => installHubScript(node.dataset.modalInstall));
+  });
+  document.querySelectorAll("[data-modal-open-editor]").forEach((node) => {
+    node.addEventListener("click", () => viewHubScript(node.dataset.modalOpenEditor));
+  });
+  const publishForm = document.getElementById("publish-script-form");
+  if (publishForm) {
+    publishForm.addEventListener("submit", (e) => {
+      e.preventDefault();
+      submitPublishHubScript();
+    });
+  }
+  const remoteAccount = document.getElementById("remote-account");
+  if (remoteAccount) {
+    remoteAccount.addEventListener("change", (e) => {
+      state.selectedClient = state.clients.find((client) => client.id === e.target.value) || null;
+      render();
+    });
+  }
+  const statsAccount = document.getElementById("stats-account");
+  if (statsAccount) {
+    statsAccount.addEventListener("change", async (e) => {
+      state.statsClientFilter = e.target.value || "all";
+      await refreshLiveState();
+      render();
+    });
+  }
+  const statsScript = document.getElementById("stats-script");
+  if (statsScript) {
+    statsScript.addEventListener("change", async (e) => {
+      state.statsScriptFilter = e.target.value || "all";
+      await refreshLiveState();
+      render();
+    });
+  }
+  const remoteScript = document.getElementById("remote-script");
+  if (remoteScript) {
+    remoteScript.addEventListener("change", (e) => {
+      state.selectedScript = state.scripts.find((script) => script.path === e.target.value) || null;
+      render();
+    });
+  }
+  const remoteChatInput = document.getElementById("remote-chat-input");
+  if (remoteChatInput) {
+    remoteChatInput.addEventListener("input", (e) => {
+      state.remoteChatMessage = e.target.value;
+    });
+    remoteChatInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        handleAction("remote-chat-send");
+      }
+    });
+  }
+  const remoteDraftName = document.getElementById("remote-draft-name");
+  if (remoteDraftName) {
+    remoteDraftName.addEventListener("input", (e) => {
+      state.remoteDraftName = e.target.value;
+    });
+  }
+  const remoteDraftCode = document.getElementById("remote-draft-code");
+  if (remoteDraftCode) {
+    remoteDraftCode.addEventListener("input", (e) => {
+      state.remoteDraftCode = e.target.value;
+    });
+  }
   const hubSearchInput = document.getElementById("hub-search");
   if (hubSearchInput) {
     hubSearchInput.addEventListener("input", (e) => {
@@ -1479,6 +3187,20 @@ function bind() {
       state.hubPage = 1;
       render();
     });
+  }
+  const globalSearchInput = document.getElementById("search");
+  if (globalSearchInput) {
+    const update = () => updateGlobalSearchResults(globalSearchInput.value);
+    globalSearchInput.addEventListener("input", update);
+    globalSearchInput.addEventListener("focus", update);
+    globalSearchInput.addEventListener("keydown", event => {
+      if (event.key !== "Escape") return;
+      globalSearchInput.value = "";
+      state.search = "";
+      update();
+      globalSearchInput.blur();
+    });
+    if (state.search) update();
   }
   if (state.page === "editor" && state.editorScript && document.getElementById("monaco-editor")) {
     initMonacoEditor();
@@ -1489,6 +3211,13 @@ function bindLanding() {
   document.querySelectorAll("[data-auth]").forEach((node) => {
     node.addEventListener("click", () => {
       state.auth.view = node.dataset.auth;
+      render();
+    });
+  });
+  document.querySelectorAll("[data-view]").forEach((node) => {
+    node.addEventListener("click", (e) => {
+      e.preventDefault();
+      state.auth.view = node.dataset.view;
       render();
     });
   });
@@ -1599,27 +3328,87 @@ async function handleAuthSubmit(mode) {
     const endpoint = mode === "signin" ? "/api/auth/local/signin" : "/api/auth/local/signup";
     const body = mode === "signin" ? { email, password } : { email, password, displayName };
     const result = await api(endpoint, { method: "POST", body: JSON.stringify(body) });
-    saveAuth({ id: result.user.id, displayName: result.user.displayName, email: result.user.email, tier: result.user.tier }, result.token);
+    saveAuth({
+      id: result.user.id,
+      displayName: result.user.displayName,
+      username: result.user.username,
+      email: result.user.email,
+      tier: result.user.tier,
+      isAdmin: Boolean(result.user.isAdmin),
+      features: Array.isArray(result.user.features) ? result.user.features : []
+    });
+    flowStore.configure({ api, userId: state.auth.user.id });
     toast(mode === "signin" ? "Welcome back." : "Account created.");
     await refreshAll();
-    setInterval(refreshLight, 10000);
+    if (state.auth.user?.isAdmin) state.page = "admin";
+    ensureLightRefresh();
     render();
   } catch (error) {
     toast(error.message || "Authentication failed");
   }
 }
 
+function bindGlobalShortcuts() {
+  if (keybindingsBound) return;
+  keybindingsBound = true;
+  window.addEventListener("keydown", (e) => {
+    const target = e.target;
+    const typing = target instanceof HTMLElement && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable);
+    if (e.key === "Escape" && state.modal) {
+      state.modal = null;
+      render();
+      return;
+    }
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
+      e.preventDefault();
+      const focusTarget = state.page === "scripts"
+        ? document.getElementById("script-search")
+        : document.getElementById("search")
+          || document.getElementById("hub-search");
+      focusTarget?.focus();
+      focusTarget?.select?.();
+      return;
+    }
+    if (typing) return;
+    if (state.page === "remote" && e.key.toLowerCase() === "r" && state.selectedClient && state.selectedScript) {
+      handleAction("remote-run");
+    }
+  });
+}
+
 async function handleAction(action) {
   try {
     if (action === "refresh") return refreshAll();
     if (action === "save-api") return saveApiBase();
+    if (action === "notifications") {
+      state.notificationsOpen = !state.notificationsOpen;
+      return render();
+    }
+    if (action === "notifications-read") {
+      for (const item of notificationItems()) state.notificationRead[item.id] = Date.now();
+      localStorage.setItem("shulkr_notification_read", JSON.stringify(state.notificationRead));
+      return render();
+    }
+    if (action === "export-analytics") return exportAnalyticsCsv();
     if (action === "logout") {
+      try { await api("/api/auth/logout", { method: "POST", body: JSON.stringify({}) }); } catch {}
       clearAuth();
       return render();
     }
     if (action === "new-script") return createNewScript();
+    if (action === "new-folder") return createScriptFolder();
     if (action === "save-script") return saveCurrentScript();
     if (action === "run-script") return runCurrentScript();
+    if (action === "checkout-pro") return startCheckout("pro");
+    if (action === "checkout-premium") return startCheckout("premium");
+    if (action === "open-billing-portal") return openBillingPortal();
+    if (action === "remote-run") return runRemoteScript();
+    if (action === "remote-stop") return stopRemoteScripts();
+    if (action === "remote-capture") return captureRemoteClient();
+    if (action === "remote-stream-restart") return restartRemoteStream();
+    if (action === "remote-chat-send") return sendRemoteChat();
+    if (action === "remote-script-save") return saveRemoteQuickScript(false);
+    if (action === "remote-script-save-run") return saveRemoteQuickScript(true);
     if (action === "publish-script") return publishHubScript();
   } catch (error) {
     toast(error.message || "Action failed");
@@ -1644,10 +3433,79 @@ async function openScriptEditor(scriptPath) {
   }
 }
 
+function exportAnalyticsCsv() {
+  if (!state.statsHistory?.length) {
+    toast("There is no analytics history to export yet.");
+    return;
+  }
+  const columns = [
+    ["Timestamp", "at"],
+    ["Runtime seconds", "runtimeSeconds"],
+    ["Active script seconds", "activeScriptSeconds"],
+    ["Average FPS", "avgFps"],
+    ["Script runs", "scriptRuns"],
+    ["Commands completed", "commandsCompleted"],
+    ["Chat messages", "chatMessages"],
+    ["Screenshots", "screenshots"],
+    ["Peak clients", "activeClientsPeak"]
+  ];
+  const csvCell = (value) => `"${String(value ?? "").replaceAll('"', '""')}"`;
+  const rows = [
+    columns.map(([label]) => csvCell(label)).join(","),
+    ...state.statsHistory.map((point) => columns.map(([, key]) => csvCell(
+      key === "at" ? new Date(point[key] || Date.now()).toISOString() : Number(point[key] || 0)
+    )).join(","))
+  ];
+  const blob = new Blob([`\uFEFF${rows.join("\r\n")}`], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `shulkr-analytics-${new Date().toISOString().slice(0, 10)}.csv`;
+  document.body.append(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+  toast("Analytics exported.");
+}
+
+
+async function startCheckout(tier) {
+  const result = await api("/api/billing/checkout", {
+    method: "POST",
+    body: JSON.stringify({ tier })
+  });
+  if (!result?.url) throw new Error("Stripe checkout URL was not returned");
+  window.location.href = result.url;
+}
+
+async function openBillingPortal() {
+  const result = await api("/api/billing/portal", {
+    method: "POST",
+    body: JSON.stringify({})
+  });
+  if (!result?.url) throw new Error("Billing portal URL was not returned");
+  window.location.href = result.url;
+}
+
 async function installHubScript(id) {
   try {
-    await api(`/api/library/scripts/${encodeURIComponent(id)}/install`, { method: "POST" });
+    const installed = await api(`/api/library/scripts/${encodeURIComponent(id)}/install`, { method: "POST" });
+    if (installed?.graph) {
+      flowStore.setGraph(installed.graph, { dirty: false });
+      state.page = "flow";
+      state.modal = null;
+      render();
+      toast("Automation imported privately; review it before running");
+      return;
+    }
     await refreshAll();
+    if (state.modal?.type === "hub-details" && state.modal.script?.id === id) {
+      state.modal = {
+        ...state.modal,
+        installedPath: installed?.path || state.modal.installedPath || ""
+      };
+      render();
+    }
     toast("Script installed");
   } catch (error) {
     toast(error.message || "Failed to install script");
@@ -1657,6 +3515,11 @@ async function installHubScript(id) {
 async function viewHubScript(id) {
   try {
     const script = await api(`/api/library/scripts/${encodeURIComponent(id)}`);
+    if (script.kind === "automation") {
+      state.modal = { type: "hub-details", script };
+      render();
+      return;
+    }
     state.editorScript = { path: script.fileName || script.id, name: script.fileName || script.name, ...script };
     state.editorContent = script.code || "";
     state.editorDirty = false;
@@ -1668,20 +3531,149 @@ async function viewHubScript(id) {
 }
 
 async function publishHubScript() {
-  const name = prompt("Script name:");
-  if (!name) return;
-  const code = prompt("Paste script code (or leave blank to publish a placeholder):", "# New Shulkr script\nimport minescript as ms\n\nms.echo(\"Hello from Shulkr!\")\n");
-  if (code === null) return;
+  state.modal = {
+    type: "publish-script",
+    values: {
+      name: "",
+      category: "Utility",
+      about: "",
+      code: "# New Shulkr script\nimport minescript as ms\n\nms.echo(\"Hello from Shulkr!\")\n"
+    }
+  };
+  render();
+}
+
+async function submitPublishHubScript() {
+  const form = document.getElementById("publish-script-form");
+  if (!form) return;
+  const formData = new FormData(form);
+  const name = String(formData.get("name") || "").trim();
+  const category = String(formData.get("category") || "Utility").trim();
+  const about = String(formData.get("about") || "").trim();
+  const code = String(formData.get("code") || "");
+  if (!name) {
+    toast("Script name is required");
+    return;
+  }
   try {
     await api("/api/library/scripts", {
       method: "POST",
-      body: JSON.stringify({ name, code, category: scriptCategoryFromName(name), author: state.auth.user?.displayName || "Shulkr user" })
+      body: JSON.stringify({
+        name,
+        code,
+        about,
+        category: category || scriptCategoryFromName(name),
+        author: state.auth.user?.displayName || "Shulkr user"
+      })
     });
     await refreshAll();
+    state.modal = null;
     toast("Script published");
   } catch (error) {
     toast(error.message || "Failed to publish script");
   }
+}
+
+function openHubDetails(id) {
+  const script = getHubScripts().find((item) => item.id === id);
+  if (!script) return;
+  state.modal = { type: "hub-details", script, installedPath: "" };
+  render();
+}
+
+function renderModal() {
+  if (state.modal?.type === "publish-script") {
+    return publishScriptModal();
+  }
+  if (state.modal?.type === "hub-details") {
+    return hubDetailsModal(state.modal.script, state.modal.installedPath);
+  }
+  return "";
+}
+
+function publishScriptModal() {
+  const values = state.modal?.values || {};
+  return `
+    <div class="modal-backdrop" data-modal-close>
+      <div class="modal-card modal-lg">
+        <div class="card-header">
+          <h3><i class="fa-solid fa-cloud-arrow-up"></i> Publish Script</h3>
+          <button class="btn-icon" type="button" data-modal-close title="Close"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <form id="publish-script-form" class="modal-form">
+          <div class="form-group">
+            <label>Script Name</label>
+            <input name="name" value="${escapeAttr(values.name || "")}" placeholder="Camera Controller" />
+          </div>
+          <div class="form-group">
+            <label>Category</label>
+            <select name="category">
+              ${["Utility", "Python", "Pyjinn", "Farming", "Combat", "World", "Other"].map((category) => `<option value="${escapeAttr(category)}" ${values.category === category ? "selected" : ""}>${escapeHtml(category)}</option>`).join("")}
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Description</label>
+            <textarea name="about" rows="3" placeholder="What does this script do?">${escapeHtml(values.about || "")}</textarea>
+          </div>
+          <div class="form-group">
+            <label>Code</label>
+            <textarea name="code" rows="14" placeholder="Paste your script code here">${escapeHtml(values.code || "")}</textarea>
+          </div>
+          <div class="modal-actions">
+            <button type="button" class="btn btn-secondary" data-modal-close>Cancel</button>
+            <button type="submit" class="btn btn-primary"><i class="fa-solid fa-cloud-arrow-up"></i> Publish</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  `;
+}
+
+function hubDetailsModal(script, installedPath = "") {
+  if (!script) return "";
+  const automation = script.kind === "automation";
+  return `
+    <div class="modal-backdrop" data-modal-close>
+      <div class="modal-card modal-lg">
+        <div class="card-header">
+          <h3><i class="fa-solid fa-circle-info"></i> ${escapeHtml(script.name || "Script Details")}</h3>
+          <button class="btn-icon" type="button" data-modal-close title="Close"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <div class="modal-meta-grid">
+          <div class="stat-card">
+            <div class="label"><i class="fa-solid fa-user"></i> Author</div>
+            <div class="value modal-stat">${escapeHtml(script.author || "Shulkr user")}</div>
+          </div>
+          ${automation ? `<div class="stat-card"><div class="label"><i class="fa-solid fa-diagram-project"></i> Graph</div><div class="value modal-stat">${script.nodeCount || 0} nodes · ${script.edgeCount || 0} edges</div></div>` : ""}
+          <div class="stat-card">
+            <div class="label"><i class="fa-solid fa-layer-group"></i> Category</div>
+            <div class="value modal-stat">${escapeHtml(script.category || "Other")}</div>
+          </div>
+          <div class="stat-card">
+            <div class="label"><i class="fa-solid fa-download"></i> Downloads</div>
+            <div class="value modal-stat">${escapeHtml(formatNumber(script.downloads || 0))}</div>
+          </div>
+          <div class="stat-card"><div class="label"><i class="fa-solid fa-shield-halved"></i> Verification</div><div class="value modal-stat">${script.verification?.serverCompiled ? "Graph validated and compiled by Shulkr" : "Source code requires review before running"}</div></div>
+        </div>
+        <div class="form-group">
+          <label>Description</label>
+          <div class="modal-code-preview">${escapeHtml(script.about || "No description yet.")}</div>
+        </div>
+        <div class="form-group">
+          <label>${automation ? "Required permissions" : "Install Path"}</label>
+          <div class="modal-code-preview">${automation ? escapeHtml((script.requiredPermissions || []).join(", ") || "None") : `<code>${escapeHtml(script.fileName || script.name || "script.py")}</code>${installedPath ? `<br><span class="modal-note">Installed as ${escapeHtml(installedPath)}</span>` : ""}`}</div>
+        </div>
+        <div class="form-group">
+          <label>${automation ? "Compatibility and changelog" : "Import Example"}</label>
+          <div class="modal-code-preview">${automation ? `${escapeHtml((script.supportedMinecraftVersions || []).join(", "))} · client ${escapeHtml(script.supportedClientVersion || "1.0.0")}<br>${escapeHtml(script.changelog || "Initial version")}` : `<code>${escapeHtml(importExample(script.fileName || script.name || ""))}</code>`}</div>
+        </div>
+        <div class="modal-actions">
+          ${automation ? `<button class="btn btn-secondary" data-modal-open-editor="${escapeAttr(script.id)}"><i class="fa-solid fa-code"></i> Review Graph</button>` : `<button class="btn btn-secondary" data-modal-open-editor="${escapeAttr(script.id)}"><i class="fa-solid fa-code"></i> View Code</button>`}
+          <button class="btn btn-primary" data-modal-install="${escapeAttr(script.id)}"><i class="fa-solid fa-${automation ? "clone" : "download"}"></i> ${automation ? "Import Copy" : "Install"}</button>
+        </div>
+      </div>
+    </div>
+  `;
 }
 
 async function createNewScript() {
@@ -1698,6 +3690,56 @@ async function createNewScript() {
   } catch (error) {
     toast(error.message || "Failed to create script");
   }
+}
+
+async function createScriptFolder() {
+  const name = prompt("New folder name:", "automation-scripts");
+  if (!name) return;
+  const folder = await api("/api/scripts/folders", { method: "POST", body: JSON.stringify({ name }) });
+  await refreshLiveState();
+  state.scriptFolder = folder.path;
+  render();
+  toast("Folder created");
+}
+
+async function renameManagedScript(scriptPath) {
+  const currentName = String(scriptPath || "").split("/").pop();
+  const name = prompt("Rename script:", currentName);
+  if (!name || name === currentName) return;
+  const renamed = await api("/api/scripts", { method: "PATCH", body: JSON.stringify({ path: scriptPath, name }) });
+  if (state.editorScript?.path === scriptPath) state.editorScript = { ...state.editorScript, ...renamed };
+  await refreshLiveState();
+  render();
+  toast(`Renamed to ${renamed.name}`);
+}
+
+async function deleteManagedScript(scriptPath) {
+  if (!confirm(`Delete ${scriptPath}? This cannot be undone.`)) return;
+  await api("/api/scripts", { method: "DELETE", body: JSON.stringify({ path: scriptPath }) });
+  if (state.editorScript?.path === scriptPath) { state.editorScript = null; state.editorContent = ""; state.editorDirty = false; }
+  await refreshLiveState();
+  render();
+  toast("Script deleted");
+}
+
+async function renameScriptFolder(folderPath) {
+  const currentName = String(folderPath || "").split("/").pop();
+  const name = prompt("Rename folder:", currentName);
+  if (!name || name === currentName) return;
+  const renamed = await api("/api/scripts/folders", { method: "PATCH", body: JSON.stringify({ path: folderPath, name }) });
+  state.scriptFolder = renamed.path;
+  await refreshLiveState();
+  render();
+  toast(`Renamed folder to ${renamed.name}`);
+}
+
+async function deleteScriptFolder(folderPath) {
+  if (!confirm(`Delete ${folderPath} and every script inside it? This cannot be undone.`)) return;
+  await api("/api/scripts/folders", { method: "DELETE", body: JSON.stringify({ path: folderPath }) });
+  state.scriptFolder = "all";
+  await refreshLiveState();
+  render();
+  toast("Folder deleted");
 }
 
 async function saveCurrentScript() {
@@ -1722,12 +3764,127 @@ async function runCurrentScript() {
   try {
     await api("/api/control/commands", {
       method: "POST",
-      body: JSON.stringify({ type: "run_script", payload: { path: state.editorScript.path } })
+      body: JSON.stringify({
+        clientId: state.selectedClient?.id || "local-user",
+        type: "run_script",
+        payload: { path: state.editorScript.path }
+      })
     });
     toast("Script queued on client");
   } catch (error) {
     toast(error.message || "Failed to run script");
   }
+}
+
+async function runRemoteScript() {
+  if (!state.selectedClient) throw new Error("Select a client first");
+  if (!state.selectedScript) throw new Error("Select a script first");
+  await api("/api/control/commands", {
+    method: "POST",
+    body: JSON.stringify({
+      clientId: state.selectedClient.id,
+      type: "run_script",
+      payload: { path: state.selectedScript.path }
+    })
+  });
+  toast(`Queued ${state.selectedScript.name || state.selectedScript.path}`);
+  await refreshRemoteState();
+  render();
+}
+
+async function stopRemoteScripts() {
+  if (!state.selectedClient) throw new Error("Select a client first");
+  await api("/api/control/commands", {
+    method: "POST",
+    body: JSON.stringify({
+      clientId: state.selectedClient.id,
+      type: "stop_scripts",
+      payload: {}
+    })
+  });
+  toast("Stop command queued");
+}
+
+async function captureRemoteClient() {
+  if (!state.selectedClient) throw new Error("Select a client first");
+  await api("/api/control/commands", {
+    method: "POST",
+    body: JSON.stringify({
+      clientId: state.selectedClient.id,
+      type: "take_screenshot",
+      payload: {}
+    })
+  });
+  toast("Capture command queued");
+}
+
+async function sendRemoteChat() {
+  if (!state.selectedClient) throw new Error("Select a client first");
+  const message = (state.remoteChatMessage || "").trim();
+  if (!message) throw new Error("Type a chat message first");
+  await api("/api/control/commands", {
+    method: "POST",
+    body: JSON.stringify({
+      clientId: state.selectedClient.id,
+      type: "send_chat",
+      payload: { message }
+    })
+  });
+  state.remoteChatMessage = "";
+  render();
+  toast("Chat sent to Minecraft");
+}
+
+async function saveRemoteQuickScript(runAfterSave) {
+  const scriptName = (state.remoteDraftName || "").trim() || "QuickRemoteScript.py";
+  const scriptCode = state.remoteDraftCode || "";
+  const saved = await api("/api/scripts", {
+    method: "POST",
+    body: JSON.stringify({
+      name: scriptName,
+      content: scriptCode,
+      overwrite: true
+    })
+  });
+  await refreshRemoteState();
+  state.selectedScript = state.scripts.find((script) => script.path === saved.path) || saved;
+  if (runAfterSave) {
+    if (!state.selectedClient) throw new Error("Select a client first");
+    await api("/api/control/commands", {
+      method: "POST",
+      body: JSON.stringify({
+        clientId: state.selectedClient.id,
+        type: "run_script",
+        payload: { path: saved.path }
+      })
+    });
+    toast("Quick script saved and queued");
+    return;
+  }
+  toast("Quick script saved");
+}
+
+async function ensureRemoteStream({ start = false } = {}) {
+  if (!state.online || !state.selectedClient?.id) return;
+  const current = state.stream || await api("/api/stream/status");
+  state.stream = current;
+  if (!current?.available) return;
+  const clientId = state.selectedClient.id;
+  if (current?.running) {
+    await api("/api/stream/session", { method: "POST", body: JSON.stringify({ clientId }) });
+    return;
+  }
+  if (!start) return;
+  const started = await api("/api/stream/start", {
+    method: "POST",
+    body: JSON.stringify({
+      clientId,
+      mode: "window",
+      fps: 15,
+      title: "Minecraft"
+    })
+  });
+  state.stream = started || current;
 }
 
 let monacoEditor = null;
@@ -1790,7 +3947,9 @@ function initMonacoEditor() {
 function saveApiBase() {
   const value = document.querySelector("#api-base")?.value.trim();
   if (!value) return;
-  localStorage.setItem("shulkr_api_base", value);
+  const normalized = safeApiBase(value);
+  if (normalized !== value.replace(/\/$/, "")) return toast("Backend URL must use localhost or a loopback IP.");
+  localStorage.setItem("shulkr_api_base", normalized);
   toast("Backend URL saved. Reloading...");
   setTimeout(() => location.reload(), 700);
 }
@@ -1808,10 +3967,43 @@ function empty(text) {
   return `<div class="empty-state" style="min-height: 120px;">${escapeHtml(text)}</div>`;
 }
 
+function importExample(fileName) {
+  const moduleName = String(fileName || "script.py")
+    .replace(/\.[^.]+$/, "")
+    .replace(/[^a-zA-Z0-9_]/g, "_")
+    .replace(/^[^a-zA-Z_]+/, "")
+    || "script_library";
+  return `import ${moduleName}`;
+}
+
 function formatBytes(bytes) {
   if (!bytes) return "0 B";
   if (bytes < 1024) return `${bytes} B`;
   return `${(bytes / 1024).toFixed(1)} KB`;
+}
+
+async function restartRemoteStream() {
+  if (!state.selectedClient?.id) throw new Error("Select a connected client first");
+  const clientId = state.selectedClient.id;
+  try {
+    await api("/api/stream/stop", { method: "POST", body: JSON.stringify({}) });
+  } catch {
+  }
+  state.stream = await api("/api/stream/start", {
+    method: "POST",
+    body: JSON.stringify({ clientId, mode: "window", fps: 15, quality: 6, title: "Minecraft" })
+  });
+  await api("/api/stream/session", { method: "POST", body: JSON.stringify({ clientId }) });
+  render();
+  toast("Remote viewer restarted");
+}
+
+function formatMoney(amount, currency = "usd") {
+  return new Intl.NumberFormat(undefined, {
+    style: "currency",
+    currency: String(currency || "usd").toUpperCase(),
+    minimumFractionDigits: 2
+  }).format((Number(amount) || 0) / 100);
 }
 
 function formatNumber(num) {

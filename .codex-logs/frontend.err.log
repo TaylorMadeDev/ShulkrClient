@@ -1,0 +1,2057 @@
+10:41:19 PM [vite] (client) [Unhandled error] ReferenceError: applyDashboardTheme is not defined
+ > src/main.js?t=1783806079099:69:1
+
+10:41:20 PM [vite] (client) [Unhandled error] ReferenceError: applyDashboardTheme is not defined
+ > src/main.js?t=1783806079099:69:1
+
+10:41:27 PM [vite] (client) [Unhandled error] ReferenceError: applyDashboardTheme is not defined
+ > src/main.js?t=1783806079099:69:1
+
+10:41:28 PM [vite] (client) [Unhandled error] ReferenceError: applyDashboardTheme is not defined
+ > src/main.js?t=1783806079099:69:1
+
+10:41:41 PM [vite] (client) [Unhandled error] ReferenceError: applyDashboardTheme is not defined
+ > src/main.js?t=1783806079099:69:1
+
+1:15:42 AM [vite] (client) [Unhandled rejection] ReferenceError: flowBuilderPage is not defined
+ > page src/main.js?t=1783901740648:1348:5
+ > render src/main.js?t=1783901740648:400:42
+ > refreshAll src/main.js?t=1783901740648:232:5
+
+1:27:44 AM [vite] (client) [Unhandled rejection] ReferenceError: bindFlowDragging is not defined
+ > bind src/main.js?t=1783902463292:2879:3
+ > render src/main.js?t=1783902463292:423:3
+ > init src/main.js?t=1783902463292:155:3
+ > src/main.js?t=1783902463292:89:1
+
+1:32:58 AM [vite] (client) [Unhandled error] SyntaxError: The requested module 'http://127.0.0.1:5177/src/flow/graph.js?t=1783902747967' doesn't provide an export named: 'duplicateNode'
+
+1:33:00 AM [vite] (client) [Unhandled error] SyntaxError: The requested module 'http://127.0.0.1:5177/src/flow/graph.js?t=1783902747967' doesn't provide an export named: 'duplicateNode'
+
+1:33:01 AM [vite] (client) [Unhandled error] SyntaxError: The requested module 'http://127.0.0.1:5177/src/flow/graph.js?t=1783902747967' doesn't provide an export named: 'duplicateNode'
+
+1:33:09 AM [vite] (client) [Unhandled error] SyntaxError: The requested module 'http://127.0.0.1:5177/src/flow/graph.js?t=1783902747967' doesn't provide an export named: 'duplicateNode'
+
+1:33:09 AM [vite] (client) [Unhandled error] SyntaxError: The requested module 'http://127.0.0.1:5177/src/flow/graph.js?t=1783902747967' doesn't provide an export named: 'duplicateNode'
+
+1:33:10 AM [vite] (client) [Unhandled error] SyntaxError: The requested module 'http://127.0.0.1:5177/src/flow/graph.js?t=1783902747967' doesn't provide an export named: 'duplicateNode'
+
+1:33:10 AM [vite] (client) [Unhandled error] SyntaxError: The requested module 'http://127.0.0.1:5177/src/flow/graph.js?t=1783902747967' doesn't provide an export named: 'duplicateNode'
+
+1:33:10 AM [vite] (client) [Unhandled error] SyntaxError: The requested module 'http://127.0.0.1:5177/src/flow/graph.js?t=1783902747967' doesn't provide an export named: 'duplicateNode'
+
+1:33:11 AM [vite] (client) [Unhandled error] SyntaxError: The requested module 'http://127.0.0.1:5177/src/flow/graph.js?t=1783902747967' doesn't provide an export named: 'duplicateNode'
+
+1:34:50 AM [vite] (client) [Unhandled error] SyntaxError: The requested module 'http://127.0.0.1:5177/src/flow/graph.js?t=1783902747967' doesn't provide an export named: 'duplicateNode'
+
+1:37:53 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:37:53 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:37:53 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:37:53 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:37:53 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:37:53 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:37:54 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:37:54 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:37:54 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:37:55 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:37:55 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:37:55 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:37:55 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:37:55 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:37:55 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:37:55 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:37:55 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:37:55 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:37:57 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:37:57 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:37:57 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:37:57 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:37:57 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:37:57 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:37:58 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:37:58 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:37:58 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:37:59 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:37:59 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:37:59 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:37:59 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:37:59 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:37:59 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:37:59 AM [vite] (client) [console.warn] Do not assign mappings to elements without corresponding data (i.e. ele `d2d8c851-f78f-4f7a-bd39-73e21a692e7c` has no mapping for property `label` with data field `label`); try a `[label]` selector to limit scope to elements with `label` defined
+1:38:03 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:38:03 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:38:03 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:38:03 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:38:03 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:38:03 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:38:05 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:38:05 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:38:05 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:38:07 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:38:07 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:38:07 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:38:07 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:38:07 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:38:07 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:38:15 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:38:15 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:38:15 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:38:15 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:38:15 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:38:15 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:38:15 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:38:15 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:38:15 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:38:15 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:38:15 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:38:15 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:38:15 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:38:15 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:38:15 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:38:15 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:38:15 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:38:15 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:38:16 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:38:16 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:38:16 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:38:16 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:38:16 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:38:16 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:38:22 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:38:22 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:38:22 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:38:23 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:38:23 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:38:23 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:38:23 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:38:23 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:38:23 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:38:24 AM [vite] (client) [console.warn] Do not assign mappings to elements without corresponding data (i.e. ele `f3d0c6ac-2721-4ae3-9c62-dd853b2ec621` has no mapping for property `label` with data field `label`); try a `[label]` selector to limit scope to elements with `label` defined
+1:38:24 AM [vite] (client) [console.warn] Do not assign mappings to elements without corresponding data (i.e. ele `f3d0c6ac-2721-4ae3-9c62-dd853b2ec621` has no mapping for property `label` with data field `label`); try a `[label]` selector to limit scope to elements with `label` defined
+1:38:24 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:38:24 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:38:24 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:38:25 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:38:25 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:38:25 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:38:25 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:38:25 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:38:25 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:38:27 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:38:27 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:38:27 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:38:27 AM [vite] (client) [console.warn] Do not assign mappings to elements without corresponding data (i.e. ele `2bba1386-6d38-46a8-b590-9554d8629eee` has no mapping for property `label` with data field `label`); try a `[label]` selector to limit scope to elements with `label` defined
+1:38:27 AM [vite] (client) [console.warn] Do not assign mappings to elements without corresponding data (i.e. ele `2bba1386-6d38-46a8-b590-9554d8629eee` has no mapping for property `label` with data field `label`); try a `[label]` selector to limit scope to elements with `label` defined
+1:38:28 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:38:28 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:38:28 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:38:28 AM [vite] (client) [console.warn] Do not assign mappings to elements without corresponding data (i.e. ele `89c7d1a2-fab5-4be9-9b1a-037bda62bc0e` has no mapping for property `label` with data field `label`); try a `[label]` selector to limit scope to elements with `label` defined
+1:38:28 AM [vite] (client) [console.warn] Do not assign mappings to elements without corresponding data (i.e. ele `89c7d1a2-fab5-4be9-9b1a-037bda62bc0e` has no mapping for property `label` with data field `label`); try a `[label]` selector to limit scope to elements with `label` defined
+1:38:29 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:38:29 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:38:29 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:38:29 AM [vite] (client) [console.warn] Do not assign mappings to elements without corresponding data (i.e. ele `52f2a25e-948e-4f57-b763-2024a0e3da1b` has no mapping for property `label` with data field `label`); try a `[label]` selector to limit scope to elements with `label` defined
+1:38:29 AM [vite] (client) [console.warn] Do not assign mappings to elements without corresponding data (i.e. ele `52f2a25e-948e-4f57-b763-2024a0e3da1b` has no mapping for property `label` with data field `label`); try a `[label]` selector to limit scope to elements with `label` defined
+1:38:29 AM [vite] (client) [console.warn] Edge `edge-mrihuoda-3z2gc6` has invalid endpoints and so it is impossible to draw.  Adjust your edge style (e.g. control points) accordingly or use an alternative edge type.  This is expected behaviour when the source node and the target node overlap.
+1:38:29 AM [vite] (client) [console.warn] Edge `7dafdee9-c14e-4103-8505-ca7cab8f68d8` has invalid endpoints and so it is impossible to draw.  Adjust your edge style (e.g. control points) accordingly or use an alternative edge type.  This is expected behaviour when the source node and the target node overlap.
+1:38:29 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:38:29 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:38:29 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:38:30 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:38:30 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:38:30 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:38:30 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:38:30 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:38:30 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:38:32 AM [vite] (client) [console.warn] Do not assign mappings to elements without corresponding data (i.e. ele `0b3f5c1f-b3fe-40cd-a6e8-285b0935a331` has no mapping for property `label` with data field `label`); try a `[label]` selector to limit scope to elements with `label` defined
+1:38:32 AM [vite] (client) [console.warn] Do not assign mappings to elements without corresponding data (i.e. ele `0b3f5c1f-b3fe-40cd-a6e8-285b0935a331` has no mapping for property `label` with data field `label`); try a `[label]` selector to limit scope to elements with `label` defined
+1:38:32 AM [vite] (client) [console.warn] Edge `edge-mrihuoda-3z2gc6` has invalid endpoints and so it is impossible to draw.  Adjust your edge style (e.g. control points) accordingly or use an alternative edge type.  This is expected behaviour when the source node and the target node overlap.
+1:38:32 AM [vite] (client) [console.warn] Edge `c4e5533e-5317-41aa-b377-7140064935d1` has invalid endpoints and so it is impossible to draw.  Adjust your edge style (e.g. control points) accordingly or use an alternative edge type.  This is expected behaviour when the source node and the target node overlap.
+1:38:33 AM [vite] (client) [console.warn] Do not assign mappings to elements without corresponding data (i.e. ele `0b3f5c1f-b3fe-40cd-a6e8-285b0935a331` has no mapping for property `label` with data field `label`); try a `[label]` selector to limit scope to elements with `label` defined
+1:38:33 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:38:33 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:38:33 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:38:33 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:38:33 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:38:33 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:38:33 AM [vite] (client) [console.warn] Do not assign mappings to elements without corresponding data (i.e. ele `226a4c66-2a45-45d8-bca4-ce705eebde72` has no mapping for property `label` with data field `label`); try a `[label]` selector to limit scope to elements with `label` defined
+1:38:33 AM [vite] (client) [console.warn] Do not assign mappings to elements without corresponding data (i.e. ele `226a4c66-2a45-45d8-bca4-ce705eebde72` has no mapping for property `label` with data field `label`); try a `[label]` selector to limit scope to elements with `label` defined
+1:38:33 AM [vite] (client) [console.warn] Edge `edge-mrihuoda-3z2gc6` has invalid endpoints and so it is impossible to draw.  Adjust your edge style (e.g. control points) accordingly or use an alternative edge type.  This is expected behaviour when the source node and the target node overlap.
+1:38:33 AM [vite] (client) [console.warn] Edge `62f44eb2-4af9-4502-aeb9-d4e7cd0efc75` has invalid endpoints and so it is impossible to draw.  Adjust your edge style (e.g. control points) accordingly or use an alternative edge type.  This is expected behaviour when the source node and the target node overlap.
+1:38:34 AM [vite] (client) [console.warn] Do not assign mappings to elements without corresponding data (i.e. ele `226a4c66-2a45-45d8-bca4-ce705eebde72` has no mapping for property `label` with data field `label`); try a `[label]` selector to limit scope to elements with `label` defined
+1:38:34 AM [vite] (client) [console.warn] Do not assign mappings to elements without corresponding data (i.e. ele `226a4c66-2a45-45d8-bca4-ce705eebde72` has no mapping for property `label` with data field `label`); try a `[label]` selector to limit scope to elements with `label` defined
+1:38:34 AM [vite] (client) [console.warn] Edge `edge-mrihuoda-3z2gc6` has invalid endpoints and so it is impossible to draw.  Adjust your edge style (e.g. control points) accordingly or use an alternative edge type.  This is expected behaviour when the source node and the target node overlap.
+1:38:34 AM [vite] (client) [console.warn] Edge `95d91332-44c2-4a48-b747-534618fa8484` has invalid endpoints and so it is impossible to draw.  Adjust your edge style (e.g. control points) accordingly or use an alternative edge type.  This is expected behaviour when the source node and the target node overlap.
+1:38:35 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:38:35 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:38:35 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:38:35 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:38:35 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:38:35 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:38:35 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:38:35 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:38:35 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:38:35 AM [vite] (client) [console.warn] Do not assign mappings to elements without corresponding data (i.e. ele `f9b8e8e6-e82b-4af1-9f68-2963c7870de4` has no mapping for property `label` with data field `label`); try a `[label]` selector to limit scope to elements with `label` defined
+1:38:35 AM [vite] (client) [console.warn] Do not assign mappings to elements without corresponding data (i.e. ele `f9b8e8e6-e82b-4af1-9f68-2963c7870de4` has no mapping for property `label` with data field `label`); try a `[label]` selector to limit scope to elements with `label` defined
+1:38:35 AM [vite] (client) [console.warn] Edge `edge-mrihuoda-3z2gc6` has invalid endpoints and so it is impossible to draw.  Adjust your edge style (e.g. control points) accordingly or use an alternative edge type.  This is expected behaviour when the source node and the target node overlap.
+1:38:35 AM [vite] (client) [console.warn] Edge `4b894818-47d8-4a96-af84-139a5137fbec` has invalid endpoints and so it is impossible to draw.  Adjust your edge style (e.g. control points) accordingly or use an alternative edge type.  This is expected behaviour when the source node and the target node overlap.
+1:38:36 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:38:36 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:38:36 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:38:36 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:38:36 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:38:36 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:38:37 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:38:37 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:38:37 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:38:37 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:38:37 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:38:37 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:38:38 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:38:38 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:38:38 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:38:45 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:38:45 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:38:45 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:39:06 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:39:06 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:39:06 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:39:10 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:39:10 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:39:10 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:39:10 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:39:10 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:39:10 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:39:13 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:39:13 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:39:13 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:39:13 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:39:13 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:39:13 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:39:14 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:39:14 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:39:14 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:39:14 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:39:14 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:39:14 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:39:15 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:39:15 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:39:15 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:39:15 AM [vite] (client) [console.warn] Do not assign mappings to elements without corresponding data (i.e. ele `412f9ad8-5841-408a-ad93-082c70c0471c` has no mapping for property `label` with data field `label`); try a `[label]` selector to limit scope to elements with `label` defined
+1:39:15 AM [vite] (client) [console.warn] Do not assign mappings to elements without corresponding data (i.e. ele `412f9ad8-5841-408a-ad93-082c70c0471c` has no mapping for property `label` with data field `label`); try a `[label]` selector to limit scope to elements with `label` defined
+1:39:15 AM [vite] (client) [console.warn] Do not assign mappings to elements without corresponding data (i.e. ele `412f9ad8-5841-408a-ad93-082c70c0471c` has no mapping for property `label` with data field `label`); try a `[label]` selector to limit scope to elements with `label` defined
+1:39:15 AM [vite] (client) [console.warn] Do not assign mappings to elements without corresponding data (i.e. ele `412f9ad8-5841-408a-ad93-082c70c0471c` has no mapping for property `label` with data field `label`); try a `[label]` selector to limit scope to elements with `label` defined
+1:39:15 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:39:15 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:39:15 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:39:16 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:39:16 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:39:16 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:39:16 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:39:16 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:39:16 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:39:16 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:39:16 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:39:16 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:39:16 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:39:16 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:39:16 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:39:17 AM [vite] (client) [console.warn] Do not assign mappings to elements without corresponding data (i.e. ele `14b824c8-e344-42b5-b2f8-13c79d9a1db9` has no mapping for property `label` with data field `label`); try a `[label]` selector to limit scope to elements with `label` defined
+1:39:17 AM [vite] (client) [console.warn] Do not assign mappings to elements without corresponding data (i.e. ele `14b824c8-e344-42b5-b2f8-13c79d9a1db9` has no mapping for property `label` with data field `label`); try a `[label]` selector to limit scope to elements with `label` defined
+1:39:17 AM [vite] (client) [console.warn] Do not assign mappings to elements without corresponding data (i.e. ele `14b824c8-e344-42b5-b2f8-13c79d9a1db9` has no mapping for property `label` with data field `label`); try a `[label]` selector to limit scope to elements with `label` defined
+1:39:17 AM [vite] (client) [console.warn] Do not assign mappings to elements without corresponding data (i.e. ele `14b824c8-e344-42b5-b2f8-13c79d9a1db9` has no mapping for property `label` with data field `label`); try a `[label]` selector to limit scope to elements with `label` defined
+1:39:17 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:39:17 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:39:17 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:39:18 AM [vite] (client) [console.warn] Do not assign mappings to elements without corresponding data (i.e. ele `d3f73843-e4fc-409d-b19e-a51b22139f54` has no mapping for property `label` with data field `label`); try a `[label]` selector to limit scope to elements with `label` defined
+1:39:18 AM [vite] (client) [console.warn] Do not assign mappings to elements without corresponding data (i.e. ele `d3f73843-e4fc-409d-b19e-a51b22139f54` has no mapping for property `label` with data field `label`); try a `[label]` selector to limit scope to elements with `label` defined
+1:39:18 AM [vite] (client) [console.warn] Edge `edge-mrihuoda-3z2gc6` has invalid endpoints and so it is impossible to draw.  Adjust your edge style (e.g. control points) accordingly or use an alternative edge type.  This is expected behaviour when the source node and the target node overlap.
+1:39:18 AM [vite] (client) [console.warn] Edge `40b14822-25b3-4d42-a62f-c72e186921a9` has invalid endpoints and so it is impossible to draw.  Adjust your edge style (e.g. control points) accordingly or use an alternative edge type.  This is expected behaviour when the source node and the target node overlap.
+1:39:18 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:39:18 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:39:18 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:39:20 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:39:20 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:39:20 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:39:21 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:39:21 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:39:21 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:39:27 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:39:27 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:39:27 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:39:37 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:39:37 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:39:37 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:39:47 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:39:47 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:39:47 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:39:58 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:39:58 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:39:58 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:40:08 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:40:08 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:40:08 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:40:18 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:40:18 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:40:18 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:41:18 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:41:18 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:41:18 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:41:22 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:41:22 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:41:22 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:41:22 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:41:22 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:41:22 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:41:22 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:41:22 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:41:22 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:41:24 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:41:24 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:41:24 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:41:25 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:41:25 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:41:25 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:41:25 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:41:25 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:41:25 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:41:27 AM [vite] (client) [console.warn] Do not assign mappings to elements without corresponding data (i.e. ele `33f211dc-4e57-4c3d-bc19-ddda1b0b0a1f` has no mapping for property `label` with data field `label`); try a `[label]` selector to limit scope to elements with `label` defined
+1:41:27 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:41:27 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:41:27 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:41:27 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:41:27 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:41:27 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:41:28 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:41:28 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:41:28 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:41:30 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:41:30 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:41:30 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:41:31 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:41:31 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:41:31 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:41:40 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:41:40 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:41:40 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:41:41 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:41:41 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:41:41 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:41:41 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:41:41 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:41:41 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:41:41 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:41:41 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:41:41 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:41:46 AM [vite] (client) [console.warn] Do not assign mappings to elements without corresponding data (i.e. ele `d661ea5b-aa99-417a-8552-213f5d21f684` has no mapping for property `label` with data field `label`); try a `[label]` selector to limit scope to elements with `label` defined
+1:41:46 AM [vite] (client) [console.warn] Do not assign mappings to elements without corresponding data (i.e. ele `d661ea5b-aa99-417a-8552-213f5d21f684` has no mapping for property `label` with data field `label`); try a `[label]` selector to limit scope to elements with `label` defined
+1:41:46 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:41:46 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:41:46 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:41:46 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:41:46 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:41:46 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:41:47 AM [vite] (client) [console.warn] Do not assign mappings to elements without corresponding data (i.e. ele `bf9f92ea-0c88-4c5a-8106-3eb6b2a6020b` has no mapping for property `label` with data field `label`); try a `[label]` selector to limit scope to elements with `label` defined
+1:41:47 AM [vite] (client) [console.warn] Do not assign mappings to elements without corresponding data (i.e. ele `bf9f92ea-0c88-4c5a-8106-3eb6b2a6020b` has no mapping for property `label` with data field `label`); try a `[label]` selector to limit scope to elements with `label` defined
+1:41:47 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:41:47 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:41:47 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:41:49 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:41:49 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:41:49 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:41:51 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:41:51 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:41:51 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:42:01 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:42:01 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:42:01 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:42:11 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:42:11 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:42:11 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:42:20 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:42:20 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:42:20 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:42:20 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:42:20 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:42:20 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:42:21 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:42:21 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:42:21 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:42:28 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:42:28 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:42:28 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:42:28 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:42:28 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:42:28 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:42:31 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:42:31 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:42:31 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:42:33 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:42:33 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:42:33 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:42:33 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:42:33 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:42:33 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:42:37 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:42:37 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:42:37 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:42:37 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:42:37 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:42:37 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:42:40 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:42:40 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:42:40 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:42:40 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:42:40 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:42:40 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:42:41 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:42:41 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:42:41 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:42:42 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:42:42 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:42:42 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:42:52 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:42:52 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:42:52 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:43:00 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:43:00 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:43:00 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:43:00 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:43:01 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:43:01 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:43:01 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:43:01 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:43:01 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:43:03 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:43:03 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:43:03 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:43:10 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:43:10 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:43:10 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:43:10 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:43:10 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:43:10 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:43:10 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:43:10 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:43:10 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:43:13 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:43:13 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:43:13 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:43:19 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:43:19 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:43:19 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:43:20 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:43:20 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:43:20 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:43:20 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:43:20 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:43:20 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:43:23 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:43:23 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:43:23 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:43:30 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:43:30 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:43:30 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:43:33 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:43:33 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:43:33 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:43:39 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:43:39 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:43:39 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:43:40 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:43:40 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:43:40 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:43:43 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:43:43 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:43:43 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:43:50 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:43:50 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:43:50 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:43:54 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:43:54 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:43:54 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:44:00 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:44:00 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:44:00 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:44:04 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:44:04 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:44:04 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:44:10 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:44:10 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:44:10 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:44:14 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:44:14 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:44:14 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:44:20 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:44:20 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:44:20 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:44:24 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:44:24 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:44:24 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:44:30 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:44:30 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:44:30 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:44:34 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:44:34 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:44:34 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:44:40 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:44:40 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:44:40 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:44:46 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:44:46 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:44:46 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:44:57 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:44:57 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:44:57 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:45:07 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:45:07 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:45:07 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:45:17 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:45:17 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:45:17 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:45:43 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:45:43 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:45:43 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:45:43 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:45:43 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:45:43 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:45:43 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:45:43 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:45:43 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:45:48 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:45:48 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:45:48 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:45:52 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:45:52 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:45:52 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:45:58 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:45:58 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:45:58 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:46:02 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:46:02 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:46:02 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:46:02 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:46:02 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:46:02 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:46:08 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:46:08 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:46:08 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:46:13 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:46:13 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:46:13 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:46:18 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:46:18 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:46:18 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:46:23 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:46:23 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:46:23 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:46:28 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:46:28 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:46:28 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:46:33 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:46:33 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:46:33 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:46:38 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:46:38 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:46:38 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:46:44 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:46:44 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:46:44 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:46:48 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:46:48 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:46:48 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:46:54 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:46:54 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:46:54 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:46:58 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:46:58 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:46:58 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:47:04 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:47:04 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:47:04 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:47:08 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:47:08 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:47:08 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:47:15 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:47:15 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:47:15 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:47:18 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:47:18 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:47:18 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:47:25 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:47:25 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:47:25 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:47:28 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:47:28 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:47:28 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:47:35 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:47:35 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:47:35 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:47:38 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:47:38 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:47:38 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:47:45 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:47:45 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:47:45 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:47:48 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:47:48 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:47:48 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:47:55 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:47:55 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:47:55 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:47:58 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:47:58 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:47:58 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:48:06 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:48:06 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:48:06 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:48:16 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:48:16 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:48:16 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:48:22 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:48:22 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:48:22 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:48:26 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:48:26 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:48:26 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:48:36 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:48:36 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:48:36 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:48:46 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:48:46 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:48:46 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:48:56 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:48:56 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:48:56 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:49:06 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:49:06 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:49:06 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:49:17 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:49:17 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:49:17 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:49:22 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:49:22 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:49:22 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:49:27 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:49:27 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:49:27 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:49:37 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:49:37 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:49:37 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:49:39 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:49:39 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:49:39 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:49:48 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:49:48 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:49:48 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:49:48 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:49:48 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:49:48 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:49:58 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:49:58 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:49:58 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:49:58 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:49:58 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:49:58 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:50:08 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:50:08 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:50:08 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:50:09 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:50:09 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:50:09 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:50:18 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:50:18 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:50:18 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:50:19 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:50:19 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:50:19 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:50:28 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:50:28 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:50:28 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:50:30 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:50:30 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:50:30 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:50:40 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:50:40 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:50:40 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:50:50 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:50:50 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:50:50 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:51:00 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:51:00 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:51:00 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:51:10 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:51:10 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:51:10 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:51:20 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:51:20 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:51:20 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:51:30 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:51:30 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:51:30 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:51:40 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:51:40 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:51:40 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:51:51 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:51:51 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:51:51 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:52:01 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:52:01 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:52:01 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:52:11 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:52:11 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:52:11 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:52:21 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:52:21 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:52:21 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:52:31 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:52:31 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:52:31 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:52:42 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:52:42 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:52:42 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:56:26 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:56:26 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:56:26 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:56:26 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:56:26 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:56:26 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:56:26 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:56:26 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:56:26 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:56:34 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:56:34 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:56:34 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:56:43 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:56:43 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:56:43 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:56:44 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:56:44 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:56:44 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:56:48 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:56:48 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:56:48 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:56:49 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:56:49 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:56:49 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:56:49 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:56:49 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:56:49 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:56:53 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:56:53 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:56:53 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:56:54 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:56:54 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:56:54 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:56:54 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:56:54 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:56:54 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:56:54 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:56:54 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:56:54 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:56:59 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:56:59 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:56:59 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:57:04 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:57:04 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:57:04 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:57:14 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:57:14 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:57:14 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:57:24 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:57:24 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:57:24 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:57:34 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:57:34 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:57:34 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:57:44 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:57:44 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:57:44 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:57:54 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:57:54 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:57:54 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:58:04 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:58:04 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:58:04 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:58:14 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:58:14 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:58:14 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:59:36 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:59:36 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:59:36 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:59:36 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:59:36 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:59:36 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:59:36 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:59:36 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:59:36 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:59:36 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:59:36 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:59:36 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:59:36 AM [vite] (client) [Unhandled error] TypeError: Cannot read properties of null (reading 'png')
+ > Core.png node_modules/cytoscape/dist/cytoscape.esm.mjs:15669:20
+ > Core.render node_modules/cytoscape-navigator/cytoscape-navigator.js:874:24
+ > complete node_modules/cytoscape-navigator/cytoscape-navigator.js:151:24
+ > maxDelayed node_modules/cytoscape-navigator/cytoscape-navigator.js:168:8
+
+1:59:36 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:59:36 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:59:36 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:59:37 AM [vite] (client) [Unhandled error] TypeError: Cannot read properties of null (reading 'png')
+ > Core.png node_modules/cytoscape/dist/cytoscape.esm.mjs:15669:20
+ > Core.render node_modules/cytoscape-navigator/cytoscape-navigator.js:874:24
+ > complete node_modules/cytoscape-navigator/cytoscape-navigator.js:151:24
+ > maxDelayed node_modules/cytoscape-navigator/cytoscape-navigator.js:168:8
+
+1:59:37 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:59:37 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:59:37 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:59:37 AM [vite] (client) [Unhandled error] TypeError: Cannot read properties of null (reading 'png')
+ > Core.png node_modules/cytoscape/dist/cytoscape.esm.mjs:15669:20
+ > Core.render node_modules/cytoscape-navigator/cytoscape-navigator.js:874:24
+ > complete node_modules/cytoscape-navigator/cytoscape-navigator.js:151:24
+ > maxDelayed node_modules/cytoscape-navigator/cytoscape-navigator.js:168:8
+
+1:59:37 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:59:37 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:59:37 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:59:37 AM [vite] (client) [Unhandled error] TypeError: Cannot read properties of null (reading 'png')
+ > Core.png node_modules/cytoscape/dist/cytoscape.esm.mjs:15669:20
+ > Core.render node_modules/cytoscape-navigator/cytoscape-navigator.js:874:24
+ > complete node_modules/cytoscape-navigator/cytoscape-navigator.js:151:24
+ > maxDelayed node_modules/cytoscape-navigator/cytoscape-navigator.js:168:8
+
+1:59:38 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:59:38 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:59:38 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:59:38 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:59:38 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:59:38 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:59:46 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:59:46 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:59:46 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:59:50 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:59:50 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:59:50 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:59:52 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:59:52 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:59:52 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:59:55 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+1:59:55 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+1:59:55 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+2:00:06 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+2:00:06 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+2:00:06 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+2:00:15 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+2:00:15 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+2:00:15 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+2:00:22 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+2:00:22 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+2:00:22 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+2:00:23 AM [vite] (client) [Unhandled error] TypeError: Cannot read properties of null (reading 'png')
+ > Core.png node_modules/cytoscape/dist/cytoscape.esm.mjs:15669:20
+ > Core.render node_modules/cytoscape-navigator/cytoscape-navigator.js:874:24
+ > complete node_modules/cytoscape-navigator/cytoscape-navigator.js:151:24
+ > maxDelayed node_modules/cytoscape-navigator/cytoscape-navigator.js:168:8
+
+2:00:23 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+2:00:23 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+2:00:23 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+2:00:23 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+2:00:23 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+2:00:23 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+2:00:25 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+2:00:25 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+2:00:25 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+2:00:35 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+2:00:36 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+2:00:36 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+2:00:42 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+2:00:42 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+2:00:42 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+2:00:45 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+2:00:45 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+2:00:45 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+2:00:49 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+2:00:49 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+2:00:49 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+2:00:49 AM [vite] (client) [Unhandled error] TypeError: Cannot read properties of null (reading 'png')
+ > Core.png node_modules/cytoscape/dist/cytoscape.esm.mjs:15669:20
+ > Core.render node_modules/cytoscape-navigator/cytoscape-navigator.js:874:24
+ > complete node_modules/cytoscape-navigator/cytoscape-navigator.js:151:24
+ > maxDelayed node_modules/cytoscape-navigator/cytoscape-navigator.js:168:8
+
+2:00:50 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+2:00:50 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+2:00:50 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+2:00:50 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+2:00:50 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+2:00:50 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+2:00:56 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+2:00:56 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+2:00:56 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+2:01:06 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+2:01:06 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+2:01:06 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+2:01:07 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+2:01:07 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+2:01:07 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+2:01:09 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+2:01:09 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+2:01:09 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+2:01:16 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+2:01:16 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+2:01:16 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+2:01:41 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+2:01:41 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+2:01:41 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+2:01:42 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+2:01:42 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+2:01:42 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+2:01:42 AM [vite] (client) [Unhandled error] TypeError: Cannot read properties of null (reading 'png')
+ > Core.png node_modules/cytoscape/dist/cytoscape.esm.mjs:15669:20
+ > Core.render node_modules/cytoscape-navigator/cytoscape-navigator.js:874:24
+ > complete node_modules/cytoscape-navigator/cytoscape-navigator.js:151:24
+ > maxDelayed node_modules/cytoscape-navigator/cytoscape-navigator.js:168:8
+
+2:01:42 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+2:01:42 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+2:01:42 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+2:01:42 AM [vite] (client) [Unhandled error] TypeError: Cannot read properties of null (reading 'png')
+ > Core.png node_modules/cytoscape/dist/cytoscape.esm.mjs:15669:20
+ > Core.render node_modules/cytoscape-navigator/cytoscape-navigator.js:874:24
+ > complete node_modules/cytoscape-navigator/cytoscape-navigator.js:151:24
+ > maxDelayed node_modules/cytoscape-navigator/cytoscape-navigator.js:168:8
+
+2:01:42 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+2:01:42 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+2:01:42 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+2:01:43 AM [vite] (client) [Unhandled error] TypeError: Cannot read properties of null (reading 'png')
+ > Core.png node_modules/cytoscape/dist/cytoscape.esm.mjs:15669:20
+ > Core.render node_modules/cytoscape-navigator/cytoscape-navigator.js:874:24
+ > complete node_modules/cytoscape-navigator/cytoscape-navigator.js:151:24
+ > maxDelayed node_modules/cytoscape-navigator/cytoscape-navigator.js:168:8
+
+2:01:43 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+2:01:43 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+2:01:43 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+2:01:43 AM [vite] (client) [Unhandled error] TypeError: Cannot read properties of null (reading 'png')
+ > Core.png node_modules/cytoscape/dist/cytoscape.esm.mjs:15669:20
+ > Core.render node_modules/cytoscape-navigator/cytoscape-navigator.js:874:24
+ > complete node_modules/cytoscape-navigator/cytoscape-navigator.js:151:24
+ > maxDelayed node_modules/cytoscape-navigator/cytoscape-navigator.js:168:8
+
+2:01:43 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+2:01:43 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+2:01:43 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+2:01:43 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+2:01:43 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+2:01:43 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+2:01:51 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+2:01:51 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+2:01:51 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+2:02:06 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+2:02:06 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+2:02:06 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+2:02:07 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+2:02:07 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+2:02:07 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+2:02:07 AM [vite] (client) [Unhandled error] TypeError: Cannot read properties of null (reading 'png')
+ > Core.png node_modules/cytoscape/dist/cytoscape.esm.mjs:15669:20
+ > Core.render node_modules/cytoscape-navigator/cytoscape-navigator.js:874:24
+ > complete node_modules/cytoscape-navigator/cytoscape-navigator.js:151:24
+ > maxDelayed node_modules/cytoscape-navigator/cytoscape-navigator.js:168:8
+
+2:02:07 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+2:02:07 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+2:02:07 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+2:02:07 AM [vite] (client) [Unhandled error] TypeError: Cannot read properties of null (reading 'png')
+ > Core.png node_modules/cytoscape/dist/cytoscape.esm.mjs:15669:20
+ > Core.render node_modules/cytoscape-navigator/cytoscape-navigator.js:874:24
+ > complete node_modules/cytoscape-navigator/cytoscape-navigator.js:151:24
+ > maxDelayed node_modules/cytoscape-navigator/cytoscape-navigator.js:168:8
+
+2:02:07 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+2:02:07 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+2:02:07 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+2:02:08 AM [vite] (client) [Unhandled error] TypeError: Cannot read properties of null (reading 'png')
+ > Core.png node_modules/cytoscape/dist/cytoscape.esm.mjs:15669:20
+ > Core.render node_modules/cytoscape-navigator/cytoscape-navigator.js:874:24
+ > complete node_modules/cytoscape-navigator/cytoscape-navigator.js:151:24
+ > maxDelayed node_modules/cytoscape-navigator/cytoscape-navigator.js:168:8
+
+2:02:08 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+2:02:08 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+2:02:08 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+2:02:16 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+2:02:16 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+2:02:16 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+2:02:17 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+2:02:17 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+2:02:17 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+2:02:18 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+2:02:18 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+2:02:18 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+2:02:20 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+2:02:20 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+2:02:20 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+2:02:26 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+2:02:26 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+2:02:26 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+2:02:29 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+2:02:29 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+2:02:29 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+2:02:36 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+2:02:36 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+2:02:36 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+2:02:46 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+2:02:46 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+2:02:46 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+2:02:56 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+2:02:56 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+2:02:56 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+2:03:06 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+2:03:06 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+2:03:06 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+2:03:16 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+2:03:16 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+2:03:16 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+2:03:26 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+2:03:26 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+2:03:26 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+2:03:28 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+2:03:28 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+2:03:28 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+2:03:30 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+2:03:30 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+2:03:30 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+2:03:36 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+2:03:36 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+2:03:36 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+2:03:46 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+2:03:46 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+2:03:46 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+2:03:56 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+2:03:56 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+2:03:56 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+2:04:20 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+2:04:20 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+2:04:20 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+2:04:20 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+2:04:20 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+2:04:20 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+2:04:20 AM [vite] (client) [Unhandled error] TypeError: Cannot read properties of null (reading 'png')
+ > Core.png node_modules/cytoscape/dist/cytoscape.esm.mjs:15669:20
+ > Core.render node_modules/cytoscape-navigator/cytoscape-navigator.js:874:24
+ > complete node_modules/cytoscape-navigator/cytoscape-navigator.js:151:24
+ > maxDelayed node_modules/cytoscape-navigator/cytoscape-navigator.js:168:8
+
+2:04:30 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+2:04:30 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+2:04:30 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+2:04:40 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+2:04:40 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+2:04:40 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+2:04:50 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+2:04:50 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+2:04:50 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+2:05:00 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+2:05:00 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+2:05:00 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+2:05:10 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+2:05:10 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+2:05:10 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+2:05:15 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+2:05:15 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+2:05:15 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+2:05:15 AM [vite] (client) [Unhandled error] TypeError: Cannot read properties of null (reading 'png')
+ > Core.png node_modules/cytoscape/dist/cytoscape.esm.mjs:15669:20
+ > Core.render node_modules/cytoscape-navigator/cytoscape-navigator.js:874:24
+ > complete node_modules/cytoscape-navigator/cytoscape-navigator.js:151:24
+ > maxDelayed node_modules/cytoscape-navigator/cytoscape-navigator.js:168:8
+
+2:05:16 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+2:05:16 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+2:05:16 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+2:05:16 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+2:05:16 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+2:05:16 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+2:05:20 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+2:05:20 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+2:05:20 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+2:05:30 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+2:05:30 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+2:05:30 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+2:05:40 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+2:05:40 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+2:05:40 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+2:05:50 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+2:05:50 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+2:05:50 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+2:05:58 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+2:05:58 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+2:05:58 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+2:05:59 AM [vite] (client) [Unhandled error] TypeError: Cannot read properties of null (reading 'isHeadless')
+ > Core.headless node_modules/cytoscape/dist/cytoscape.esm.mjs:20049:34
+ > boundingBoxImpl node_modules/cytoscape/dist/cytoscape.esm.mjs:11581:20
+ > cachedBoundingBoxImpl node_modules/cytoscape/dist/cytoscape.esm.mjs:11870:9
+ > elesfn$b.boundingBox node_modules/cytoscape/dist/cytoscape.esm.mjs:11962:34
+ > Navigator.bb node_modules/cytoscape-navigator/cytoscape-navigator.js:298:32
+ > Navigator._setupThumbnailSizes node_modules/cytoscape-navigator/cytoscape-navigator.js:426:30
+ > Navigator._checkThumbnailSizesAndUpdate node_modules/cytoscape-navigator/cytoscape-navigator.js:445:11
+ > Core.render node_modules/cytoscape-navigator/cytoscape-navigator.js:863:11
+ > complete node_modules/cytoscape-navigator/cytoscape-navigator.js:151:24
+ > maxDelayed node_modules/cytoscape-navigator/cytoscape-navigator.js:168:8
+
+2:06:00 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+2:06:00 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+2:06:00 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+2:06:01 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+2:06:01 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+2:06:01 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+2:06:10 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+2:06:10 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+2:06:10 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+2:06:15 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+2:06:15 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+2:06:15 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+2:06:16 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+2:06:16 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+2:06:16 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+2:06:20 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+2:06:20 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+2:06:20 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+2:06:24 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+2:06:24 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+2:06:24 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+2:06:24 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+2:06:24 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+2:06:24 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+2:06:24 AM [vite] (client) [Unhandled error] TypeError: Cannot read properties of null (reading 'png')
+ > Core.png node_modules/cytoscape/dist/cytoscape.esm.mjs:15669:20
+ > Core.render node_modules/cytoscape-navigator/cytoscape-navigator.js:874:24
+ > complete node_modules/cytoscape-navigator/cytoscape-navigator.js:151:24
+ > maxDelayed node_modules/cytoscape-navigator/cytoscape-navigator.js:168:8
+
+2:06:25 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+2:06:25 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+2:06:25 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+2:06:30 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+2:06:30 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+2:06:30 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+2:06:40 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+2:06:40 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+2:06:40 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+2:06:50 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+2:06:50 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+2:06:50 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+2:07:00 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+2:07:00 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+2:07:00 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+2:07:10 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+2:07:10 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+2:07:10 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+2:07:20 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+2:07:20 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+2:07:20 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+2:07:30 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+2:07:30 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+2:07:30 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+2:08:39 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+2:08:39 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+2:08:39 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+2:08:40 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+2:08:40 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+2:08:40 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+2:08:40 AM [vite] (client) [Unhandled error] TypeError: Cannot read properties of null (reading 'png')
+ > Core.png node_modules/cytoscape/dist/cytoscape.esm.mjs:15669:20
+ > Core.render node_modules/cytoscape-navigator/cytoscape-navigator.js:874:24
+ > complete node_modules/cytoscape-navigator/cytoscape-navigator.js:151:24
+ > maxDelayed node_modules/cytoscape-navigator/cytoscape-navigator.js:168:8
+
+2:08:40 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+2:08:40 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+2:08:40 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+2:08:40 AM [vite] (client) [Unhandled error] TypeError: Cannot read properties of null (reading 'png')
+ > Core.png node_modules/cytoscape/dist/cytoscape.esm.mjs:15669:20
+ > Core.render node_modules/cytoscape-navigator/cytoscape-navigator.js:874:24
+ > complete node_modules/cytoscape-navigator/cytoscape-navigator.js:151:24
+ > maxDelayed node_modules/cytoscape-navigator/cytoscape-navigator.js:168:8
+
+2:08:41 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+2:08:41 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+2:08:41 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+2:08:49 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+2:08:49 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+2:08:49 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+2:08:59 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+2:08:59 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+2:08:59 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+2:09:03 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+2:09:03 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+2:09:03 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+2:09:05 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+2:09:05 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+2:09:05 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+2:09:09 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+2:09:09 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+2:09:09 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+2:09:27 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+2:09:27 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+2:09:27 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+2:09:28 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+2:09:28 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+2:09:28 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+2:09:28 AM [vite] (client) [Unhandled error] TypeError: Cannot read properties of null (reading 'png')
+ > Core.png node_modules/cytoscape/dist/cytoscape.esm.mjs:15669:20
+ > Core.render node_modules/cytoscape-navigator/cytoscape-navigator.js:874:24
+ > complete node_modules/cytoscape-navigator/cytoscape-navigator.js:151:24
+ > maxDelayed node_modules/cytoscape-navigator/cytoscape-navigator.js:168:8
+
+2:09:28 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+2:09:28 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+2:09:28 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+2:09:29 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+2:09:29 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+2:09:29 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+2:09:37 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+2:09:37 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+2:09:37 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+2:09:38 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+2:09:38 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+2:09:38 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+2:09:40 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+2:09:40 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+2:09:40 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+2:09:40 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+2:09:40 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+2:09:40 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+2:09:40 AM [vite] (client) [Unhandled error] TypeError: Cannot read properties of null (reading 'png')
+ > Core.png node_modules/cytoscape/dist/cytoscape.esm.mjs:15669:20
+ > Core.render node_modules/cytoscape-navigator/cytoscape-navigator.js:874:24
+ > complete node_modules/cytoscape-navigator/cytoscape-navigator.js:151:24
+ > maxDelayed node_modules/cytoscape-navigator/cytoscape-navigator.js:168:8
+
+2:09:50 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+2:09:50 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+2:09:50 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+2:09:56 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+2:09:56 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+2:09:56 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+2:09:57 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+2:09:57 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+2:09:57 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+2:09:57 AM [vite] (client) [Unhandled error] TypeError: Cannot read properties of null (reading 'png')
+ > Core.png node_modules/cytoscape/dist/cytoscape.esm.mjs:15669:20
+ > Core.render node_modules/cytoscape-navigator/cytoscape-navigator.js:874:24
+ > complete node_modules/cytoscape-navigator/cytoscape-navigator.js:151:24
+ > maxDelayed node_modules/cytoscape-navigator/cytoscape-navigator.js:168:8
+
+2:09:57 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+2:09:57 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+2:09:57 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+2:09:57 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+2:09:57 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+2:09:57 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+2:09:57 AM [vite] (client) [Unhandled error] TypeError: Cannot read properties of null (reading 'png')
+ > Core.png node_modules/cytoscape/dist/cytoscape.esm.mjs:15669:20
+ > Core.render node_modules/cytoscape-navigator/cytoscape-navigator.js:874:24
+ > complete node_modules/cytoscape-navigator/cytoscape-navigator.js:151:24
+ > maxDelayed node_modules/cytoscape-navigator/cytoscape-navigator.js:168:8
+
+2:09:57 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+2:09:57 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+2:09:57 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+2:09:58 AM [vite] (client) [Unhandled error] TypeError: Cannot read properties of null (reading 'png')
+ > Core.png node_modules/cytoscape/dist/cytoscape.esm.mjs:15669:20
+ > Core.render node_modules/cytoscape-navigator/cytoscape-navigator.js:874:24
+ > complete node_modules/cytoscape-navigator/cytoscape-navigator.js:151:24
+ > maxDelayed node_modules/cytoscape-navigator/cytoscape-navigator.js:168:8
+
+2:10:00 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+2:10:00 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+2:10:00 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+2:10:10 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+2:10:10 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+2:10:10 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+2:10:20 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+2:10:20 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+2:10:20 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+2:10:21 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+2:10:21 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+2:10:21 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+2:10:21 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+2:10:21 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+2:10:21 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+2:10:21 AM [vite] (client) [Unhandled error] TypeError: Cannot read properties of null (reading 'png')
+ > Core.png node_modules/cytoscape/dist/cytoscape.esm.mjs:15669:20
+ > Core.render node_modules/cytoscape-navigator/cytoscape-navigator.js:874:24
+ > complete node_modules/cytoscape-navigator/cytoscape-navigator.js:151:24
+ > maxDelayed node_modules/cytoscape-navigator/cytoscape-navigator.js:168:8
+
+2:10:22 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+2:10:22 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+2:10:22 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+2:10:30 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+2:10:30 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+2:10:30 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+2:10:34 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+2:10:34 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+2:10:34 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+2:10:40 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+2:10:40 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+2:10:40 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+2:10:41 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+2:10:41 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+2:10:41 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+2:10:42 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+2:10:42 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+2:10:42 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+2:10:42 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+2:10:42 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+2:10:42 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+2:10:50 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+2:10:50 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+2:10:50 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+2:11:00 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+2:11:00 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+2:11:00 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+2:11:10 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+2:11:10 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+2:11:10 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+2:11:20 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+2:11:20 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+2:11:20 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+2:11:37 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+2:11:37 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+2:11:37 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+2:11:37 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+2:11:37 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+2:11:37 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+2:11:37 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+2:11:37 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+2:11:37 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+2:11:37 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+2:11:37 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+2:11:37 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+2:11:38 AM [vite] (client) [Unhandled error] TypeError: Cannot read properties of null (reading 'png')
+ > Core.png node_modules/cytoscape/dist/cytoscape.esm.mjs:15669:20
+ > Core.render node_modules/cytoscape-navigator/cytoscape-navigator.js:874:24
+ > complete node_modules/cytoscape-navigator/cytoscape-navigator.js:151:24
+ > maxDelayed node_modules/cytoscape-navigator/cytoscape-navigator.js:168:8
+
+2:11:38 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+2:11:38 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+2:11:38 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+2:11:38 AM [vite] (client) [Unhandled error] TypeError: Cannot read properties of null (reading 'png')
+ > Core.png node_modules/cytoscape/dist/cytoscape.esm.mjs:15669:20
+ > Core.render node_modules/cytoscape-navigator/cytoscape-navigator.js:874:24
+ > complete node_modules/cytoscape-navigator/cytoscape-navigator.js:151:24
+ > maxDelayed node_modules/cytoscape-navigator/cytoscape-navigator.js:168:8
+
+2:11:38 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+2:11:38 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+2:11:38 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+2:11:38 AM [vite] (client) [Unhandled error] TypeError: Cannot read properties of null (reading 'png')
+ > Core.png node_modules/cytoscape/dist/cytoscape.esm.mjs:15669:20
+ > Core.render node_modules/cytoscape-navigator/cytoscape-navigator.js:874:24
+ > complete node_modules/cytoscape-navigator/cytoscape-navigator.js:151:24
+ > maxDelayed node_modules/cytoscape-navigator/cytoscape-navigator.js:168:8
+
+2:11:39 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+2:11:39 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+2:11:39 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+2:11:39 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+2:11:39 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+2:11:39 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+2:11:47 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+2:11:47 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+2:11:47 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+2:11:47 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+2:11:47 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+2:11:47 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+2:11:48 AM [vite] (client) [Unhandled error] TypeError: Cannot read properties of null (reading 'png')
+ > Core.png node_modules/cytoscape/dist/cytoscape.esm.mjs:15669:20
+ > Core.render node_modules/cytoscape-navigator/cytoscape-navigator.js:874:24
+ > complete node_modules/cytoscape-navigator/cytoscape-navigator.js:151:24
+ > maxDelayed node_modules/cytoscape-navigator/cytoscape-navigator.js:168:8
+
+2:11:48 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+2:11:48 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+2:11:48 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+2:11:48 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+2:11:48 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+2:11:48 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+2:11:57 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+2:11:57 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+2:11:57 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+2:12:04 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+2:12:04 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+2:12:04 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+2:12:07 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+2:12:07 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+2:12:07 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+2:12:10 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+2:12:10 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+2:12:10 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+2:12:17 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+2:12:17 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+2:12:17 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+2:12:27 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+2:12:27 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+2:12:27 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+2:12:37 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+2:12:37 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+2:12:37 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+2:12:47 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+2:12:47 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+2:12:47 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+2:12:52 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+2:12:52 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+2:12:52 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+2:12:52 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+2:12:52 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+2:12:52 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+2:12:57 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+2:12:57 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+2:12:57 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+2:13:05 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+2:13:05 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+2:13:05 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+2:13:05 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+2:13:05 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+2:13:05 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+2:13:05 AM [vite] (client) [Unhandled error] TypeError: Cannot read properties of null (reading 'png')
+ > Core.png node_modules/cytoscape/dist/cytoscape.esm.mjs:15669:20
+ > Core.render node_modules/cytoscape-navigator/cytoscape-navigator.js:874:24
+ > complete node_modules/cytoscape-navigator/cytoscape-navigator.js:151:24
+ > maxDelayed node_modules/cytoscape-navigator/cytoscape-navigator.js:168:8
+
+2:13:07 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+2:13:07 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+2:13:07 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+2:13:17 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+2:13:17 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+2:13:17 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+2:13:22 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+2:13:22 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+2:13:22 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+2:13:22 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+2:13:22 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+2:13:22 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+2:13:23 AM [vite] (client) [Unhandled error] TypeError: Cannot read properties of null (reading 'png')
+ > Core.png node_modules/cytoscape/dist/cytoscape.esm.mjs:15669:20
+ > Core.render node_modules/cytoscape-navigator/cytoscape-navigator.js:874:24
+ > complete node_modules/cytoscape-navigator/cytoscape-navigator.js:151:24
+ > maxDelayed node_modules/cytoscape-navigator/cytoscape-navigator.js:168:8
+
+2:13:23 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+2:13:23 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+2:13:23 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+2:13:23 AM [vite] (client) [Unhandled error] TypeError: Cannot read properties of null (reading 'png')
+ > Core.png node_modules/cytoscape/dist/cytoscape.esm.mjs:15669:20
+ > Core.render node_modules/cytoscape-navigator/cytoscape-navigator.js:874:24
+ > complete node_modules/cytoscape-navigator/cytoscape-navigator.js:151:24
+ > maxDelayed node_modules/cytoscape-navigator/cytoscape-navigator.js:168:8
+
+2:13:23 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+2:13:23 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+2:13:23 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+2:13:23 AM [vite] (client) [Unhandled error] TypeError: Cannot read properties of null (reading 'png')
+ > Core.png node_modules/cytoscape/dist/cytoscape.esm.mjs:15669:20
+ > Core.render node_modules/cytoscape-navigator/cytoscape-navigator.js:874:24
+ > complete node_modules/cytoscape-navigator/cytoscape-navigator.js:151:24
+ > maxDelayed node_modules/cytoscape-navigator/cytoscape-navigator.js:168:8
+
+2:13:23 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+2:13:23 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+2:13:23 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+2:13:23 AM [vite] (client) [Unhandled error] TypeError: Cannot read properties of null (reading 'png')
+ > Core.png node_modules/cytoscape/dist/cytoscape.esm.mjs:15669:20
+ > Core.render node_modules/cytoscape-navigator/cytoscape-navigator.js:874:24
+ > complete node_modules/cytoscape-navigator/cytoscape-navigator.js:151:24
+ > maxDelayed node_modules/cytoscape-navigator/cytoscape-navigator.js:168:8
+
+2:13:23 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+2:13:23 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+2:13:23 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+2:13:24 AM [vite] (client) [Unhandled error] TypeError: Cannot read properties of null (reading 'png')
+ > Core.png node_modules/cytoscape/dist/cytoscape.esm.mjs:15669:20
+ > Core.render node_modules/cytoscape-navigator/cytoscape-navigator.js:874:24
+ > complete node_modules/cytoscape-navigator/cytoscape-navigator.js:151:24
+ > maxDelayed node_modules/cytoscape-navigator/cytoscape-navigator.js:168:8
+
+2:13:27 AM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+2:13:27 AM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+2:13:27 AM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+2:15:07 AM [vite] (client) [Unhandled error] TypeError: Cannot read properties of null (reading 'png')
+ > Core.png node_modules/cytoscape/dist/cytoscape.esm.mjs:15669:20
+ > Core.render node_modules/cytoscape-navigator/cytoscape-navigator.js:874:24
+ > complete node_modules/cytoscape-navigator/cytoscape-navigator.js:151:24
+ > maxDelayed node_modules/cytoscape-navigator/cytoscape-navigator.js:168:8
+
+2:15:08 AM [vite] (client) [Unhandled error] TypeError: Cannot read properties of null (reading 'png')
+ > Core.png node_modules/cytoscape/dist/cytoscape.esm.mjs:15669:20
+ > Core.render node_modules/cytoscape-navigator/cytoscape-navigator.js:874:24
+ > complete node_modules/cytoscape-navigator/cytoscape-navigator.js:151:24
+ > maxDelayed node_modules/cytoscape-navigator/cytoscape-navigator.js:168:8
+
+2:15:08 AM [vite] (client) [Unhandled error] TypeError: Cannot read properties of null (reading 'png')
+ > Core.png node_modules/cytoscape/dist/cytoscape.esm.mjs:15669:20
+ > Core.render node_modules/cytoscape-navigator/cytoscape-navigator.js:874:24
+ > complete node_modules/cytoscape-navigator/cytoscape-navigator.js:151:24
+ > maxDelayed node_modules/cytoscape-navigator/cytoscape-navigator.js:168:8
+
+2:15:08 AM [vite] (client) [Unhandled error] TypeError: Cannot read properties of null (reading 'png')
+ > Core.png node_modules/cytoscape/dist/cytoscape.esm.mjs:15669:20
+ > Core.render node_modules/cytoscape-navigator/cytoscape-navigator.js:874:24
+ > complete node_modules/cytoscape-navigator/cytoscape-navigator.js:151:24
+ > maxDelayed node_modules/cytoscape-navigator/cytoscape-navigator.js:168:8
+
+2:15:09 AM [vite] (client) [Unhandled error] TypeError: Cannot read properties of null (reading 'png')
+ > Core.png node_modules/cytoscape/dist/cytoscape.esm.mjs:15669:20
+ > Core.render node_modules/cytoscape-navigator/cytoscape-navigator.js:874:24
+ > complete node_modules/cytoscape-navigator/cytoscape-navigator.js:151:24
+ > maxDelayed node_modules/cytoscape-navigator/cytoscape-navigator.js:168:8
+
+2:15:09 AM [vite] (client) [Unhandled error] TypeError: Cannot read properties of null (reading 'png')
+ > Core.png node_modules/cytoscape/dist/cytoscape.esm.mjs:15669:20
+ > Core.render node_modules/cytoscape-navigator/cytoscape-navigator.js:874:24
+ > complete node_modules/cytoscape-navigator/cytoscape-navigator.js:151:24
+ > maxDelayed node_modules/cytoscape-navigator/cytoscape-navigator.js:168:8
+
+2:10:49 PM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+2:10:49 PM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+2:10:49 PM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+2:10:50 PM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+2:10:50 PM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+2:10:50 PM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+2:10:50 PM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+2:10:50 PM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+2:10:50 PM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+2:10:50 PM [vite] (client) [console.warn] The style property `shadow-color: #35e58b` is invalid
+2:10:50 PM [vite] (client) [console.warn] The style property `shadow-opacity: 0.7` is invalid
+2:10:50 PM [vite] (client) [console.warn] The style property `shadow-blur: 12` is invalid
+1:02:30 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:02:30 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:03:16 AM [vite] (client) [Unhandled rejection] Canceled: Canceled
+ > _ ../../../../../ajax/libs/monaco-editor/0.52.0/min/vs/editor/editor.main.js:11:662
+ > cancel ../../../../../ajax/libs/monaco-editor/0.52.0/min/vs/editor/editor.main.js:122:13889
+ > dispose ../../../../../ajax/libs/monaco-editor/0.52.0/min/vs/editor/editor.main.js:122:14018
+ > t ../../../../../ajax/libs/monaco-editor/0.52.0/min/vs/editor/editor.main.js:11:22161
+ > clear ../../../../../ajax/libs/monaco-editor/0.52.0/min/vs/editor/editor.main.js:11:22776
+ > dispose ../../../../../ajax/libs/monaco-editor/0.52.0/min/vs/editor/editor.main.js:11:22685
+ > dispose ../../../../../ajax/libs/monaco-editor/0.52.0/min/vs/editor/editor.main.js:722:24461
+ > dispose ../../../../../ajax/libs/monaco-editor/0.52.0/min/vs/editor/editor.main.js:722:25373
+ > t ../../../../../ajax/libs/monaco-editor/0.52.0/min/vs/editor/editor.main.js:11:22161
+ > clearAndDisposeAll ../../../../../ajax/libs/monaco-editor/0.52.0/min/vs/editor/editor.main.js:11:24315
+ > dispose ../../../../../ajax/libs/monaco-editor/0.52.0/min/vs/editor/editor.main.js:11:24248
+ > t ../../../../../ajax/libs/monaco-editor/0.52.0/min/vs/editor/editor.main.js:11:22161
+ > clear ../../../../../ajax/libs/monaco-editor/0.52.0/min/vs/editor/editor.main.js:11:22776
+ > dispose ../../../../../ajax/libs/monaco-editor/0.52.0/min/vs/editor/editor.main.js:11:22685
+ > dispose ../../../../../ajax/libs/monaco-editor/0.52.0/min/vs/editor/editor.main.js:11:23403
+ > t ../../../../../ajax/libs/monaco-editor/0.52.0/min/vs/editor/editor.main.js:11:22161
+ > clear ../../../../../ajax/libs/monaco-editor/0.52.0/min/vs/editor/editor.main.js:11:22776
+ > dispose ../../../../../ajax/libs/monaco-editor/0.52.0/min/vs/editor/editor.main.js:11:22685
+ > dispose ../../../../../ajax/libs/monaco-editor/0.52.0/min/vs/editor/editor.main.js:11:23403
+ > dispose ../../../../../ajax/libs/monaco-editor/0.52.0/min/vs/editor/editor.main.js:693:17594
+ > dispose ../../../../../ajax/libs/monaco-editor/0.52.0/min/vs/editor/editor.main.js:738:10256
+ > initMonacoEditor src/main.js?t=1783987295618:3611:24
+ > bind src/main.js?t=1783987295618:3024:5
+ > render src/main.js?t=1783987295618:415:3
+ > refreshLight src/main.js?t=1783987295618:257:7
+
+1:03:21 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:03:21 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:04:10 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:04:10 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:10:24 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:10:24 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:10:24 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:10:24 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:10:33 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:10:33 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:10:33 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:10:33 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:10:33 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:10:33 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:10:33 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:10:33 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:10:34 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:10:34 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:10:34 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:10:34 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:10:34 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:10:34 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:10:34 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:10:34 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:11:31 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:11:31 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:11:31 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:11:31 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:11:31 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:11:31 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:11:31 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:11:31 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:11:31 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:11:31 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:11:31 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:11:31 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:11:33 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:11:33 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:11:33 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:11:33 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:11:33 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:11:33 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:11:33 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:11:33 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:11:34 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:11:34 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:11:34 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:11:34 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:12:35 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:12:35 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:12:35 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:12:35 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:12:35 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:12:35 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:12:35 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:12:35 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:12:35 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:12:35 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:12:35 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:12:35 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:12:37 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:12:37 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:12:37 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:12:37 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:12:37 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:12:37 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:12:37 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:12:37 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:12:38 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:12:38 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:12:38 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:12:38 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:12:48 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:12:48 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:12:48 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:12:48 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:12:48 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:12:48 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:12:48 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:12:48 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:12:49 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:12:49 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:12:49 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:12:49 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:13:01 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:13:01 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:13:01 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:13:01 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:13:02 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:13:02 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:13:02 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:13:02 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:13:03 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:13:03 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:13:03 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:13:03 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:13:04 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:13:04 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:13:04 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:13:04 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:13:51 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:13:51 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:13:51 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:13:51 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:13:53 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:13:53 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:13:53 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:13:53 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:13:55 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:13:55 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:13:55 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:13:55 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:13:56 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:13:56 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:13:56 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:13:56 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:14:19 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:14:19 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:14:19 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:14:19 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:14:19 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:14:19 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:14:19 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:14:19 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:14:19 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:14:19 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:14:19 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:14:19 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:14:21 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:14:21 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:14:21 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:14:21 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:14:21 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:14:21 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:14:21 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:14:21 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:14:22 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:14:22 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:14:22 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:14:22 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:14:22 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:14:22 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:14:22 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:14:22 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:14:23 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:14:23 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:14:23 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:14:23 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:14:23 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:14:23 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:14:23 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:14:23 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:14:24 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:14:24 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:14:24 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:14:24 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:14:24 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:14:24 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:14:24 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:14:24 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:18:18 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:18:18 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:18:18 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:18:18 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:20:16 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:20:16 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:20:16 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:20:16 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:20:25 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:20:25 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:20:25 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:20:25 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:20:25 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:20:25 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:20:25 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:20:25 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:20:26 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:20:26 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:20:26 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:20:26 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:20:26 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:20:26 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:20:26 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:20:26 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:22:43 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:22:43 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:22:43 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:22:43 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:22:43 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:22:43 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:22:43 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:22:43 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:22:43 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:22:43 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:22:43 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:22:43 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:23:05 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:23:05 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:23:05 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:23:05 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:23:05 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:23:05 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:23:05 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:23:05 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:23:06 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:23:06 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:23:06 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:23:06 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:24:22 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:24:22 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:24:22 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:24:22 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:24:22 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:24:22 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:24:22 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:24:22 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:24:22 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:24:22 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:24:22 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:24:22 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:24:52 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:24:52 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:24:52 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:24:52 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:24:52 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:24:52 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:24:52 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:24:52 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:24:53 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:24:53 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:24:53 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:24:53 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:24:58 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:24:58 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:24:58 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:24:58 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:24:58 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:24:58 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:24:58 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:24:58 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:24:59 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:24:59 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:24:59 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:24:59 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:25:12 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:25:12 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:25:12 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:25:12 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:25:13 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:25:13 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:25:13 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:25:13 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:25:13 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:25:13 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:25:13 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:25:13 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:25:18 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:25:18 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:25:18 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:25:18 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:25:18 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:25:18 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:25:18 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:25:18 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:25:19 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:25:19 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:25:19 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:25:19 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:25:19 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:25:19 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:25:19 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:25:19 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:25:21 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:25:21 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:25:21 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:25:21 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:25:22 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:25:22 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:25:22 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:25:22 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:25:22 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:25:22 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:25:22 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:25:22 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:25:23 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:25:23 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:25:23 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:25:23 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:25:23 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:25:23 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:25:23 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:25:23 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:25:24 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:25:24 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:25:24 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:25:24 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:25:24 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:25:24 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:25:24 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:25:24 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:25:25 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:25:25 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:25:25 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:25:25 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:25:38 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:25:38 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:25:38 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:25:38 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:26:07 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:26:07 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:26:07 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:26:07 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:26:17 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:26:17 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:26:17 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:26:17 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:26:18 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:26:18 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:26:18 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:26:18 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:26:55 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:26:55 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:26:55 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:26:55 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:26:57 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:26:57 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:26:57 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:26:57 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:26:59 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:26:59 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:26:59 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:26:59 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:26:59 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:26:59 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:26:59 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:26:59 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:26:59 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:26:59 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:26:59 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:26:59 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:27:00 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:27:00 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:27:00 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:27:00 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:27:00 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:27:00 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:27:00 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:27:00 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:27:00 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:27:00 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:27:00 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:27:00 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:27:01 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:27:01 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:27:01 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:27:01 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:27:01 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:27:01 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:27:01 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:27:01 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:27:02 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:27:02 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:27:02 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:27:02 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:27:02 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:27:02 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:27:02 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:27:02 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:27:03 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:27:03 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:27:03 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:27:03 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:27:03 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:27:03 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:27:03 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:27:03 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:27:03 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:27:03 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:27:03 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:27:03 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:27:04 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:27:04 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:27:04 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:27:04 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:27:04 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:27:04 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:27:04 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:27:04 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:27:05 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:27:05 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:27:05 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:27:05 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:27:34 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:27:34 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:27:34 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:27:34 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:27:34 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:27:34 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:27:34 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:27:34 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:27:34 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:27:34 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:27:34 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:27:34 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:27:35 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:27:35 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:27:35 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:27:35 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:27:36 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:27:36 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:27:36 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:27:36 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:27:36 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:27:36 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:27:36 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:27:36 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:27:37 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:27:37 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:27:37 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:27:37 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:27:37 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:27:37 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:27:37 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:27:37 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:27:47 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:27:47 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:27:47 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:27:47 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:28:28 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:28:28 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:28:28 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:28:28 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:28:35 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:28:35 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:28:35 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:28:35 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:28:37 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:28:37 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:28:37 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:28:37 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:29:21 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:29:21 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:29:21 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:29:21 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:29:21 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:29:21 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:29:22 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:29:22 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:29:22 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:29:22 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:29:32 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:29:32 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:29:32 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:29:32 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:29:43 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:29:43 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:29:43 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:29:43 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:34:32 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:34:32 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:34:32 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:34:32 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:34:32 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:34:32 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:34:32 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:34:32 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:34:32 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:34:32 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:34:32 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:34:32 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:35:32 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:35:32 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:35:32 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:35:32 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:35:32 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:35:32 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:35:32 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:35:32 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:35:32 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:35:32 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:35:32 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:35:32 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:35:34 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:35:34 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:35:34 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:35:34 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:41:38 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:41:38 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:41:38 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:41:38 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:45:45 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:45:45 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid
+1:45:45 AM [vite] (client) [console.warn] The style property `font-weight: 650` is invalid
+1:45:45 AM [vite] (client) [console.warn] The selector `node.flow-main-node[invalid = true]`is invalid

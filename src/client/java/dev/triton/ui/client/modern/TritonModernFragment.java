@@ -10,6 +10,7 @@ import dev.triton.ui.client.app.FluxusAppState.ModuleItem;
 import dev.triton.ui.client.app.FluxusAppState.ScriptSummary;
 import dev.triton.ui.client.app.FluxusAppState.TemplateItem;
 import dev.triton.ui.client.config.FluxusConfig;
+import dev.triton.ui.client.module.ModuleManager;
 import icyllis.modernui.R;
 import icyllis.modernui.animation.Animator;
 import icyllis.modernui.animation.AnimatorSet;
@@ -68,6 +69,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -95,6 +98,7 @@ public final class TritonModernFragment extends Fragment {
 		ADDONS,
 		TEMPLATES,
 		WINDOWSPY,
+		REMOTE,
 		SETTINGS,
 		OVERLAYS,
 		ABOUT
@@ -116,11 +120,6 @@ public final class TritonModernFragment extends Fragment {
 		}
 	}
 
-	private static final int BACKDROP = Color.argb(172, 3, 6, 13);
-	private static final int TEXT = Color.argb(255, 247, 244, 255);
-	private static final int MUTED = Color.argb(230, 171, 179, 204);
-	private static final int FAINT = Color.argb(180, 136, 145, 174);
-	private static final int GREEN = Color.argb(255, 62, 216, 99);
 	private static final long HOVER_IN_MS = 150L;
 	private static final long HOVER_OUT_MS = 190L;
 	private static final long MENU_IN_MS = 165L;
@@ -133,13 +132,21 @@ public final class TritonModernFragment extends Fragment {
 	private static final int TOP_BAR_HEIGHT = 56;
 	private static final int SEARCH_WIDTH = 520;
 	private static final int DOCK_WIDTH = 520;
-	private static final String[] THEME_OPTIONS = {"Dark glass", "Deep transparent", "High contrast", "Blue dusk"};
-	private static final String[] ACCENT_OPTIONS = {"Shulkr purple", "Soft blue", "Electric cyan", "Emerald", "Rose"};
+	private static final String[] THEME_OPTIONS = {"Frontend Nova", "Dark glass", "Deep transparent", "High contrast", "Blue dusk"};
+	private static final String[] ACCENT_OPTIONS = {"Nova purple", "Shulkr purple", "Soft blue", "Electric cyan", "Emerald", "Rose"};
 	private static final String[] DENSITY_OPTIONS = {"Comfortable", "Compact", "Spacious"};
 	private static final String[] SIDEBAR_WIDTH_OPTIONS = {"300 px", "330 px", "360 px"};
+	private static final String SHORTCUT_OPEN_UI = "open-ui";
+	private static final String SHORTCUT_OVERLAY_EDIT = "overlay-edit";
+	private static final String SHORTCUT_RUN_LAST = "run-last-script";
 	private int PURPLE = Color.argb(255, 163, 88, 255);
 	private int PURPLE_DARK = Color.argb(255, 104, 49, 205);
 	private int PURPLE_SOFT = Color.argb(150, 163, 88, 255);
+	private int BACKDROP = Color.argb(182, 5, 4, 12);
+	private int TEXT = Color.argb(255, 247, 244, 255);
+	private int MUTED = Color.argb(230, 171, 179, 204);
+	private int FAINT = Color.argb(180, 136, 145, 174);
+	private int GREEN = Color.argb(255, 62, 216, 99);
 	private int PANEL = Color.argb(222, 7, 11, 22);
 	private int PANEL_DARK = Color.argb(238, 4, 8, 18);
 	private int CARD = Color.argb(204, 10, 15, 29);
@@ -153,6 +160,7 @@ public final class TritonModernFragment extends Fragment {
 	private LinearLayout consoleLogList;
 	private TextView completionHint;
 	private TextView completionGhost;
+	private TextView editorLineNumbers;
 	private EditText codeEditor;
 	private View currentPageFrame;
 	private Page lastAnimatedPage;
@@ -183,10 +191,12 @@ public final class TritonModernFragment extends Fragment {
 	private String detectedPython = "";
 	private String completionRemainder = "";
 	private String openDropdownKey = "";
+	private String capturingShortcutAction = "";
 	private String windowSpyTab = "Live";
 	private String scriptFilter = "All";
 	private String selectedLibraryScriptId = "";
 	private String moduleFilter = "All";
+	private String moduleSearchQuery = "";
 	private String selectedModuleId = "";
 	private String selectedShulkrAddonId = "core-runtime";
 	private String overlayFilter = "HUD";
@@ -223,7 +233,9 @@ public final class TritonModernFragment extends Fragment {
 		return thread;
 	});
 	private ScheduledFuture<?> ruffLintTask;
+	private ScheduledFuture<?> editorAnalysisTask;
 	private int lintGeneration;
+	private int editorLineCount;
 	private final String initialPage;
 	private static final String[][] SHULKR_ADDONS = {
 			{"core-runtime", "Core Runtime", "The event bridge, lifecycle, and shared services used by every Shulkr addon.", "v0.1", "Bundled", "box-solid.png", "purple"},
@@ -292,10 +304,27 @@ public final class TritonModernFragment extends Fragment {
 		if (ruffLintTask != null) {
 			ruffLintTask.cancel(true);
 		}
+		if (editorAnalysisTask != null) {
+			editorAnalysisTask.cancel(true);
+		}
 		lintExecutor.shutdownNow();
 	}
 
 	public boolean handleGlobalKey(int key, int action, int modifiers) {
+		if (!capturingShortcutAction.isBlank() && action == 1) {
+			int nextKey = (key == InputConstants.KEY_ESCAPE || key == InputConstants.KEY_BACKSPACE || key == InputConstants.KEY_DELETE)
+					? InputConstants.UNKNOWN.getValue()
+					: key;
+			TritonUIClient.setShortcutKey(capturingShortcutAction, nextKey);
+			settingsConfig = TritonUIClient.config();
+			String label = shortcutDisplayName(capturingShortcutAction);
+			capturingShortcutAction = "";
+			settingsMessage = nextKey == InputConstants.UNKNOWN.getValue()
+					? label + " shortcut cleared."
+					: label + " bound to " + keybindLabel(nextKey) + ".";
+			renderShell();
+			return true;
+		}
 		if (action != 1) {
 			return false;
 		}
@@ -346,6 +375,9 @@ public final class TritonModernFragment extends Fragment {
 		if (page == Page.WINDOWSPY) {
 			return windowSpyPage();
 		}
+		if (page == Page.REMOTE) {
+			return remoteViewerPage();
+		}
 		if (page == Page.SETTINGS) {
 			return settingsPage();
 		}
@@ -359,6 +391,8 @@ public final class TritonModernFragment extends Fragment {
 	}
 
 	private View sidebar() {
+		FluxusAppState.Profile profileData = currentProfile();
+		boolean online = FluxusAppState.get().backendOnline();
 		LinearLayout side = column(18);
 		side.setPadding(18, 18, 16, 16);
 		side.setBackground(panel(18));
@@ -370,7 +404,7 @@ public final class TritonModernFragment extends Fragment {
 		String[][] primaryNav = {
 				{"Dashboard", "house-solid.png"}, {"Scripts", "code-solid.png"}, {"Editor", "border-all-solid.png"},
 				{"Libraries", "puzzle-piece-solid.png"}, {"Modules", "box-open-solid.png"}, {"Templates", "layer-group-solid.png"},
-				{"WindowSpy", "window-restore-regular.png"}, {"Overlays", "border-none-solid.png"}
+				{"WindowSpy", "window-restore-regular.png"}, {"Remote", "window-restore-regular.png"}, {"Overlays", "border-none-solid.png"}
 		};
 		for (String[] item : primaryNav) {
 			side.addView(nav(item[0], item[1], navActive(item[0])), new LinearLayout.LayoutParams(match(), 44));
@@ -397,11 +431,12 @@ public final class TritonModernFragment extends Fragment {
 		avatar.addView(icon("user-solid.png", GREEN), centered(24, 24));
 		profile.addView(avatar, new LinearLayout.LayoutParams(50, 50));
 		LinearLayout copy = column(4);
-		copy.addView(label("EnderUser", 15, TEXT));
-		copy.addView(label("Premium", 13, PURPLE));
-		copy.addView(label("*  Minecraft 1.20.4", 12, MUTED));
-		copy.addView(label("Connected", 11, FAINT));
+		copy.addView(label(profileData.displayName(), 15, TEXT));
+		copy.addView(label(profileData.tier(), 13, PURPLE));
+		copy.addView(label("*  Minecraft " + System.getProperty("minecraft.version", "26.1.2"), 12, MUTED));
+		copy.addView(label(online ? "Connected" : "Offline", 11, online ? GREEN : FAINT));
 		profile.addView(copy, new LinearLayout.LayoutParams(0, wrap(), 1.0F));
+		profile.setOnClickListener(view -> openPage(Page.SETTINGS));
 		LinearLayout.LayoutParams profileLp = new LinearLayout.LayoutParams(match(), 112);
 		profileLp.setMargins(0, 0, 0, 14);
 		side.addView(profile, profileLp);
@@ -416,6 +451,7 @@ public final class TritonModernFragment extends Fragment {
 				|| (page == Page.ADDONS && name.equals("Modules"))
 				|| (page == Page.TEMPLATES && name.equals("Templates"))
 				|| (page == Page.WINDOWSPY && name.equals("WindowSpy"))
+				|| (page == Page.REMOTE && name.equals("Remote"))
 				|| (page == Page.SETTINGS && name.equals("Settings"))
 				|| (page == Page.OVERLAYS && name.equals("Overlays"))
 				|| (page == Page.ABOUT && name.equals("About"));
@@ -447,7 +483,7 @@ public final class TritonModernFragment extends Fragment {
 		welcome.setGravity(Gravity.CENTER_VERTICAL);
 		welcome.setBackground(panel(16));
 		LinearLayout copy = column(9);
-		copy.addView(label("Welcome back, EnderUser", 22, TEXT));
+		copy.addView(label("Welcome back, " + currentProfile().displayName(), 22, TEXT));
 		copy.addView(label("Ready to automate your world.", 15, MUTED));
 		welcome.addView(copy, new LinearLayout.LayoutParams(0, wrap(), 1.0F));
 		View scriptStat = stat("Scripts", String.valueOf(editorScripts.size()), "code-solid.png");
@@ -695,6 +731,11 @@ public final class TritonModernFragment extends Fragment {
 
 	private void openExternalUrl(String url) throws IOException {
 		URI uri = URI.create(url);
+		String scheme = uri.getScheme() == null ? "" : uri.getScheme().toLowerCase(Locale.ROOT);
+		String host = uri.getHost() == null ? "" : uri.getHost().toLowerCase(Locale.ROOT);
+		if (!(scheme.equals("http") || scheme.equals("https")) || !(host.equals("127.0.0.1") || host.equals("localhost") || host.equals("::1")) || uri.getUserInfo() != null) {
+			throw new IOException("Dashboard links must use a local HTTP address.");
+		}
 		if (System.getProperty("os.name", "").toLowerCase(Locale.ROOT).contains("win")) {
 			new ProcessBuilder("rundll32", "url.dll,FileProtocolHandler", url).start();
 			return;
@@ -815,16 +856,34 @@ public final class TritonModernFragment extends Fragment {
 		titleLine.addView(icon("puzzle-piece-solid.png", PURPLE), new LinearLayout.LayoutParams(26, 26));
 		titleLine.addView(label("Libraries", 24, TEXT));
 		title.addView(titleLine);
-		title.addView(label("Manage libraries for your Python scripts.", 14, MUTED));
+		title.addView(label("Reusable local script libraries you can import into your own scripts.", 14, MUTED));
 		header.addView(title, new LinearLayout.LayoutParams(0, wrap(), 1.0F));
-		header.addView(label(allModules.size() + " libraries", 13, MUTED));
+		header.addView(label(allModules.size() + " importable", 13, MUTED));
 		header.addView(viewToggle("border-all-solid.png", true), new LinearLayout.LayoutParams(38, 38));
 		panel.addView(header, new LinearLayout.LayoutParams(match(), 66));
+		EditText search = new EditText(requireContext());
+		search.setSingleLine(true);
+		search.setText(moduleSearchQuery);
+		search.setHint("Search libraries...");
+		search.setTextSize(12);
+		search.setTextColor(TEXT);
+		search.setHintTextColor(FAINT);
+		search.setPadding(12, 0, 12, 0);
+		search.setBackground(round(Color.argb(116, 10, 15, 26), 8, STROKE));
+		search.addTextChangedListener(new TextWatcher() {
+			public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+			public void onTextChanged(CharSequence s, int start, int before, int count) {
+				moduleSearchQuery = s.toString();
+				search.post(() -> renderShell());
+			}
+			public void afterTextChanged(Editable e) {}
+		});
+		panel.addView(search, new LinearLayout.LayoutParams(match(), 38));
 
 		LinearLayout chips = row(8);
-		String[] filters = {"All", "Installed", "Popular", "Data", "Visualization", "Web", "Utility", "Game", "Machine Learning", "Other"};
+		String[] filters = {"All", "Installed", "Python", "Pyjinn"};
 		for (String filter : filters) {
-			int width = filter.equals("Machine Learning") ? 136 : filter.equals("Visualization") ? 110 : filter.equals("Installed") ? 88 : 70;
+			int width = filter.equals("Installed") ? 88 : filter.equals("Python") ? 80 : 72;
 			View chip = chip(filter, filter.equals(moduleFilter));
 			chip.setOnClickListener(view -> {
 				moduleFilter = filter;
@@ -837,7 +896,7 @@ public final class TritonModernFragment extends Fragment {
 		ScrollView scroller = new ScrollView(requireContext());
 		LinearLayout grid = column(10);
 		if (modules.isEmpty()) {
-			TextView empty = label("No helper libraries yet. Open a script in Editor and mark it as a library from Script Info.", 14, MUTED);
+			TextView empty = label("No libraries match this filter yet. Mark a script as a library from the Editor to reuse it here.", 14, MUTED);
 			empty.setGravity(Gravity.CENTER);
 			grid.addView(empty, new LinearLayout.LayoutParams(match(), 140));
 		}
@@ -846,12 +905,12 @@ public final class TritonModernFragment extends Fragment {
 			LinearLayout line = row(10);
 			for (int col = 0; col < 4; col++) {
 				if (index < modules.size()) {
-					line.addView(moduleCard(modules.get(index++)), new LinearLayout.LayoutParams(0, 160, 1.0F));
+					line.addView(moduleCard(modules.get(index++)), new LinearLayout.LayoutParams(0, 184, 1.0F));
 				} else {
-					line.addView(new View(requireContext()), new LinearLayout.LayoutParams(0, 160, 1.0F));
+					line.addView(new View(requireContext()), new LinearLayout.LayoutParams(0, 184, 1.0F));
 				}
 			}
-			grid.addView(line, new LinearLayout.LayoutParams(match(), 168));
+			grid.addView(line, new LinearLayout.LayoutParams(match(), 192));
 		}
 		scroller.addView(grid, new ScrollView.LayoutParams(match(), wrap()));
 		panel.addView(scroller, new LinearLayout.LayoutParams(match(), 0, 1.0F));
@@ -877,24 +936,27 @@ public final class TritonModernFragment extends Fragment {
 
 		LinearLayout head = row(12);
 		head.setGravity(Gravity.TOP);
-		head.addView(moduleArt(data), new LinearLayout.LayoutParams(58, 58));
+		head.addView(iconBadge(data.icon(), data.installed() ? PURPLE : MUTED, Color.argb(120, 22, 18, 36), 58, 13), new LinearLayout.LayoutParams(58, 58));
 		LinearLayout copy = column(5);
 		copy.addView(label(data.name(), 16, TEXT));
 		copy.addView(label(wrapModuleDescription(data.description()), 12, MUTED));
 		head.addView(copy, new LinearLayout.LayoutParams(0, wrap(), 1.0F));
-		card.addView(head, new LinearLayout.LayoutParams(match(), 70));
+		card.addView(head, new LinearLayout.LayoutParams(match(), 76));
 
 		LinearLayout meta = row(8);
 		meta.setGravity(Gravity.CENTER_VERTICAL);
-		meta.addView(tag(data.version(), false), new LinearLayout.LayoutParams(66, 24));
-		meta.addView(label("by " + data.author(), 11, MUTED), new LinearLayout.LayoutParams(0, wrap(), 1.0F));
-		meta.addView(installBadge(data.installed()), new LinearLayout.LayoutParams(data.installed() ? 78 : 96, 22));
+		meta.addView(tag(data.category(), false), new LinearLayout.LayoutParams(data.category().equalsIgnoreCase("Python") ? 80 : 84, 24));
+		meta.addView(label(data.version(), 11, MUTED), new LinearLayout.LayoutParams(0, wrap(), 1.0F));
+		meta.addView(tag(data.status(), data.installed()), new LinearLayout.LayoutParams(data.installed() ? 78 : 88, 24));
 		card.addView(meta, new LinearLayout.LayoutParams(match(), 26));
+		card.addView(label(data.author(), 11, FAINT));
 		return card;
 	}
 
 	private View moduleDetailsPanel() {
 		ModuleItem selected = selectedModule();
+		Path script = localModulePath(selected);
+		String importSnippet = moduleImportSnippet(selected);
 		LinearLayout side = column(0);
 		side.setBackground(panel(16));
 
@@ -902,17 +964,17 @@ public final class TritonModernFragment extends Fragment {
 		summary.setPadding(20, 18, 20, 18);
 		LinearLayout hero = row(14);
 		hero.setGravity(Gravity.CENTER_VERTICAL);
-		hero.addView(iconBadge(selected.icon(), PURPLE, Color.argb(120, 93, 48, 168), 68, 13));
+		hero.addView(iconBadge(selected.icon(), selected.installed() ? PURPLE : MUTED, Color.argb(120, 93, 48, 168), 68, 13));
 		LinearLayout copy = column(5);
 		copy.addView(label(selected.name(), 18, TEXT));
-		copy.addView(label("by " + selected.author(), 12, MUTED));
+		copy.addView(label("Reusable " + selected.category() + " library", 12, MUTED));
 		hero.addView(copy, new LinearLayout.LayoutParams(0, wrap(), 1.0F));
 		summary.addView(hero, new LinearLayout.LayoutParams(match(), 72));
 		LinearLayout installed = row(8);
 		installed.setGravity(Gravity.CENTER_VERTICAL);
-		installed.addView(installBadge(selected.installed()), new LinearLayout.LayoutParams(selected.installed() ? 92 : 110, 24));
+		installed.addView(tag(selected.status(), selected.installed()), new LinearLayout.LayoutParams(selected.installed() ? 92 : 104, 24));
 		installed.addView(new View(requireContext()), new LinearLayout.LayoutParams(0, 1, 1.0F));
-		installed.addView(tag(selected.version(), false), new LinearLayout.LayoutParams(66, 24));
+		installed.addView(tag(selected.version(), false), new LinearLayout.LayoutParams(82, 24));
 		summary.addView(installed, new LinearLayout.LayoutParams(match(), 26));
 		summary.addView(label(selected.description(), 13, MUTED));
 		side.addView(summary, new LinearLayout.LayoutParams(match(), 220));
@@ -920,37 +982,51 @@ public final class TritonModernFragment extends Fragment {
 		LinearLayout links = column(8);
 		links.setPadding(20, 14, 20, 14);
 		links.setBackground(glass(Color.argb(56, 10, 15, 27), Color.argb(84, 7, 12, 22), 0, Color.argb(54, 105, 116, 150)));
-		links.addView(moduleAction("Copy import snippet", "clone-solid.png", () -> copyModuleImport(selected)), new LinearLayout.LayoutParams(match(), 34));
-		links.addView(moduleAction("Insert import in editor", "code-solid.png", () -> insertModuleImport(selected)), new LinearLayout.LayoutParams(match(), 34));
-		links.addView(moduleAction("Open library source", "folder-open-solid.png", () -> openSelectedModuleInEditor(selected)), new LinearLayout.LayoutParams(match(), 34));
-		links.addView(moduleAction("Refresh libraries", "arrows-rotate-solid.png", () -> {
-			FluxusAppState.get().reload();
-			saveUiMessage("Libraries refreshed.");
-		}), new LinearLayout.LayoutParams(match(), 34));
-		side.addView(links, new LinearLayout.LayoutParams(match(), 170));
+		links.addView(moduleAction("Insert import", "plus-solid.png", () -> insertModuleImport(selected)), new LinearLayout.LayoutParams(match(), 34));
+		links.addView(moduleAction("Copy import", "clone-solid.png", () -> copyModuleImport(selected)), new LinearLayout.LayoutParams(match(), 34));
+		links.addView(moduleAction("Open source", "folder-open-solid.png", () -> openSelectedModuleInEditor(selected)), new LinearLayout.LayoutParams(match(), 34));
+		links.addView(moduleAction("Remove from libraries", "broom-solid.png", () -> removeSelectedModule(selected)), new LinearLayout.LayoutParams(match(), 34));
+		// Four 34px actions plus spacing/padding need more than the old 170px
+		// slot; keeping this explicit prevents the last action from being clipped.
+		side.addView(links, new LinearLayout.LayoutParams(match(), 194));
 
 		LinearLayout details = column(12);
 		details.setPadding(20, 16, 20, 18);
 		details.addView(label("Details", 15, TEXT));
-		details.addView(detailRow("Category", selected.category()));
-		details.addView(detailRow("Version", selected.version()));
+		details.addView(detailRow("Author", selected.author()));
+		details.addView(detailRow("Type", selected.category()));
 		details.addView(detailRow("Status", selected.status()));
-		details.addView(detailRow("Installed", selected.installed() ? "Yes" : "No"));
-		details.addView(detailRow("Favorite", selected.favorite() ? "Yes" : "No"));
-		TextView open = label("Open in Editor", 13, TEXT);
+		details.addView(detailRow("File", script == null ? "Not local" : script.getFileName().toString()));
+		details.addView(detailRow("Import", importSnippet.isBlank() ? "Unavailable" : importSnippet));
+		TextView open = label("Insert Import", 13, TEXT);
 		open.setGravity(Gravity.CENTER);
 		makeHover(open, glass(Color.argb(160, 93, 48, 168), Color.argb(128, 63, 34, 116), 8, PURPLE_SOFT),
 				glass(Color.argb(210, 126, 64, 220), Color.argb(160, 91, 46, 170), 8, STROKE_HOVER));
-		open.setOnClickListener(view -> openSelectedModuleInEditor(selected));
+		open.setOnClickListener(view -> insertModuleImport(selected));
 		details.addView(open, new LinearLayout.LayoutParams(match(), 38));
-		TextView uninstall = label("Uninstall", 13, Color.argb(255, 255, 72, 96));
-		uninstall.setGravity(Gravity.CENTER);
-		makeHover(uninstall, round(Color.argb(70, 120, 32, 44), 8, Color.argb(72, 255, 72, 96)),
-				round(Color.argb(110, 145, 40, 54), 8, Color.argb(130, 255, 72, 96)));
-		uninstall.setOnClickListener(view -> removeSelectedModule(selected));
-		details.addView(uninstall, new LinearLayout.LayoutParams(match(), 38));
 		side.addView(details, new LinearLayout.LayoutParams(match(), 0, 1.0F));
 		return side;
+	}
+
+	private String keybindLabel(int keybind) {
+		if (keybind == InputConstants.UNKNOWN.getValue()) {
+			return "Unbound";
+		}
+		try {
+			return InputConstants.Type.KEYSYM.getOrCreate(keybind).getDisplayName().getString();
+		} catch (Exception ignored) {
+			return "Key " + keybind;
+		}
+	}
+
+	private void toggleRuntimeModule(ModuleManager.RuntimeModuleSummary module) {
+		boolean changed = ModuleManager.get().setModuleEnabled(module.id(), !module.enabled());
+		if (!changed) {
+			saveUiMessage("Unable to toggle module.");
+			return;
+		}
+		saveUiMessage(module.name() + (module.enabled() ? " disabled." : " enabled."));
+		renderShell();
 	}
 
 	private void openSelectedModuleInEditor(ModuleItem module) {
@@ -1036,11 +1112,12 @@ public final class TritonModernFragment extends Fragment {
 	}
 
 	private List<ModuleItem> visibleModules(List<ModuleItem> allModules) {
-		if (moduleFilter.equals("All")) {
-			return allModules;
-		}
 		return allModules.stream()
-				.filter(module -> moduleFilter.equals("Installed") ? module.installed() : module.category().equalsIgnoreCase(moduleFilter))
+				.filter(module -> moduleFilter.equals("All")
+						|| (moduleFilter.equals("Installed") ? module.installed() : module.category().equalsIgnoreCase(moduleFilter)))
+				.filter(module -> moduleSearchQuery.isBlank()
+						|| (module.name() + " " + module.description() + " " + module.author() + " " + module.category())
+						.toLowerCase(Locale.ROOT).contains(moduleSearchQuery.toLowerCase(Locale.ROOT)))
 				.toList();
 	}
 
@@ -1065,7 +1142,7 @@ public final class TritonModernFragment extends Fragment {
 			return "";
 		}
 		String trimmed = description.trim();
-		return trimmed.length() > 64 ? trimmed.substring(0, 61) + "..." : trimmed;
+		return trimmed.length() > 88 ? trimmed.substring(0, 85) + "..." : trimmed;
 	}
 
 	private View templatesCenter() {
@@ -2129,7 +2206,7 @@ public final class TritonModernFragment extends Fragment {
 		header.addView(title, new LinearLayout.LayoutParams(0, wrap(), 1.0F));
 		header.addView(settingsStatus("Theme", settingsConfig.theme().replace(" glass", ""), "eye-dropper-solid.png"), new LinearLayout.LayoutParams(108, 60));
 		header.addView(settingsStatus("Config", "Synced", "check-double-solid.png"), new LinearLayout.LayoutParams(120, 60));
-		header.addView(settingsStatus("User", "EnderUser", "user-solid.png"), new LinearLayout.LayoutParams(132, 60));
+		header.addView(settingsStatus("User", currentProfile().displayName(), "user-solid.png"), new LinearLayout.LayoutParams(132, 60));
 		panel.addView(header, new LinearLayout.LayoutParams(match(), 74));
 
 		LinearLayout toolbar = row(8);
@@ -2156,6 +2233,46 @@ public final class TritonModernFragment extends Fragment {
 		dockLp.gravity = Gravity.CENTER_HORIZONTAL;
 		center.addView(dock, dockLp);
 		return center;
+	}
+
+	private View remoteViewerPage() {
+		LinearLayout page = column(18);
+		page.setPadding(20, 20, 20, 20);
+		page.setBackground(panel(16));
+
+		LinearLayout heading = row(14);
+		heading.setGravity(Gravity.CENTER_VERTICAL);
+		heading.addView(iconBadge("window-restore-regular.png", PURPLE, accentAlpha(48), 48, 12));
+		LinearLayout title = column(5);
+		title.addView(label("Remote Viewer", 24, TEXT));
+		title.addView(label("View and control this Minecraft client from the Shulkr web dashboard.", 13, MUTED));
+		heading.addView(title, new LinearLayout.LayoutParams(0, wrap(), 1.0F));
+		page.addView(heading, new LinearLayout.LayoutParams(match(), 60));
+
+		LinearLayout status = settingsCard("Connection status", "circle-info-solid.png");
+		status.addView(settingsValueRow("Backend", FluxusAppState.get().backendOnline() ? "Connected" : "Offline"), new LinearLayout.LayoutParams(match(), 38));
+		status.addView(settingsValueRow("Dashboard", "http://127.0.0.1:5177"), new LinearLayout.LayoutParams(match(), 38));
+		status.addView(settingsValueRow("Feed", "FFmpeg window capture"), new LinearLayout.LayoutParams(match(), 38));
+		page.addView(status, new LinearLayout.LayoutParams(match(), 170));
+
+		LinearLayout help = settingsCard("How to remote view", "circle-info-solid.png");
+		help.addView(label("1. Keep Minecraft and the backend running.\n2. Open the dashboard and choose Remote.\n3. Select this device, then press Restart feed if the picture is blank.\n4. Keep the Minecraft window visible; minimized windows cannot be captured by Windows.", 13, MUTED));
+		LinearLayout actions = row(10);
+		View open = primaryActionButton("window-restore-regular.png", "Open dashboard");
+		open.setOnClickListener(view -> {
+			try {
+				Desktop.getDesktop().browse(URI.create("http://127.0.0.1:5177"));
+			} catch (Exception ignored) {
+				copyToClipboard("http://127.0.0.1:5177");
+			}
+		});
+		actions.addView(open, new LinearLayout.LayoutParams(180, 42));
+		View copy = toolbarButton("code-solid.png", "Copy address");
+		copy.setOnClickListener(view -> copyToClipboard("http://127.0.0.1:5177"));
+		actions.addView(copy, new LinearLayout.LayoutParams(160, 42));
+		help.addView(actions, new LinearLayout.LayoutParams(match(), 48));
+		page.addView(help, new LinearLayout.LayoutParams(match(), 230));
+		return page;
 	}
 
 	private View settingsTabContent() {
@@ -2229,11 +2346,16 @@ public final class TritonModernFragment extends Fragment {
 
 	private View shortcutSettingsCard() {
 		LinearLayout card = settingsCard("Shortcuts", "keyboard");
-		card.addView(settingsKeyRow("Open Shulkr", "U"), new LinearLayout.LayoutParams(match(), 34));
-		card.addView(settingsKeyRow("Run script", "Ctrl R"), new LinearLayout.LayoutParams(match(), 34));
-		card.addView(settingsKeyRow("Command palette", "Ctrl K"), new LinearLayout.LayoutParams(match(), 34));
-		card.addView(settingsKeyRow("Quick inspect", "Alt I"), new LinearLayout.LayoutParams(match(), 34));
-		card.addView(textButton("Edit Keybinds"), new LinearLayout.LayoutParams(match(), 36));
+		card.addView(settingsKeyRow("Open Shulkr", SHORTCUT_OPEN_UI, "Open or close the Shulkr client"), new LinearLayout.LayoutParams(match(), 40));
+		card.addView(settingsKeyRow("Overlay edit mode", SHORTCUT_OVERLAY_EDIT, "Toggle the live HUD layout editor"), new LinearLayout.LayoutParams(match(), 40));
+		card.addView(settingsKeyRow("Run last script", SHORTCUT_RUN_LAST, "Run the most recently started Minescript"), new LinearLayout.LayoutParams(match(), 40));
+		View clear = settingsActionRow("Clear run-last history", "clock-rotate-left-solid.png");
+		clear.setOnClickListener(view -> {
+			TritonUIClient.rememberLastScript("");
+			settingsMessage = "Run-last history cleared.";
+			renderShell();
+		});
+		card.addView(clear, new LinearLayout.LayoutParams(match(), 42));
 		return card;
 	}
 
@@ -2383,7 +2505,10 @@ public final class TritonModernFragment extends Fragment {
 
 	private View shortcutHelperCard() {
 		LinearLayout card = settingsCard("Shortcut Notes", "keyboard");
-		card.addView(label("Minecraft owns keybinding changes, so this panel opens Controls for real rebinding. The UI still shows the intended Shulkr defaults.", 12, MUTED));
+		card.addView(label("Click any shortcut row, then press the key you want. Press Escape, Backspace, or Delete to clear a binding.", 12, MUTED));
+		card.addView(settingsValueRow("Last script", lastRunScriptLabel()), new LinearLayout.LayoutParams(match(), 38));
+		card.addView(settingsValueRow("Palette", "Ctrl + K"), new LinearLayout.LayoutParams(match(), 38));
+		card.addView(settingsValueRow("Rename in editor", "F2"), new LinearLayout.LayoutParams(match(), 38));
 		return card;
 	}
 
@@ -2416,6 +2541,8 @@ public final class TritonModernFragment extends Fragment {
 	}
 
 	private View settingsProfilePanel() {
+		FluxusAppState.Profile profileData = currentProfile();
+		boolean online = FluxusAppState.get().backendOnline();
 		LinearLayout panel = column(12);
 		panel.setPadding(20, 18, 20, 18);
 		panel.setBackground(panel(16));
@@ -2428,14 +2555,14 @@ public final class TritonModernFragment extends Fragment {
 		hero.setGravity(Gravity.CENTER_VERTICAL);
 		hero.addView(iconBadge("user-solid.png", GREEN, Color.argb(120, 28, 76, 48), 58, 12));
 		LinearLayout copy = column(5);
-		copy.addView(label("EnderUser", 18, TEXT));
-		copy.addView(label("Premium user", 12, PURPLE));
-		copy.addView(label("* Connected to local client", 12, GREEN));
+		copy.addView(label(profileData.displayName(), 18, TEXT));
+		copy.addView(label(profileData.tier() + " user", 12, PURPLE));
+		copy.addView(label(online ? "* Connected to local client" : "* Waiting for backend connection", 12, online ? GREEN : MUTED));
 		hero.addView(copy, new LinearLayout.LayoutParams(0, wrap(), 1.0F));
 		panel.addView(hero, new LinearLayout.LayoutParams(match(), 68));
-		panel.addView(watchRow("Loaded config", "shulkr-client.json"), new LinearLayout.LayoutParams(match(), 30));
-		panel.addView(watchRow("Last saved", "just now"), new LinearLayout.LayoutParams(match(), 30));
-		panel.addView(watchRow("UI scale", "100%"), new LinearLayout.LayoutParams(match(), 30));
+		panel.addView(watchRow("Loaded config", FluxusConfig.path().getFileName().toString()), new LinearLayout.LayoutParams(match(), 30));
+		panel.addView(watchRow("Last saved", configLastSavedLabel()), new LinearLayout.LayoutParams(match(), 30));
+		panel.addView(watchRow("UI scale", profileData.uiScale() + "%"), new LinearLayout.LayoutParams(match(), 30));
 		return panel;
 	}
 
@@ -2638,12 +2765,25 @@ public final class TritonModernFragment extends Fragment {
 		return row;
 	}
 
-	private View settingsKeyRow(String action, String key) {
+	private View settingsKeyRow(String action, String shortcutAction, String helperText) {
 		LinearLayout row = row(10);
 		row.setGravity(Gravity.CENTER_VERTICAL);
+		row.setPadding(12, 8, 12, 8);
+		boolean capturing = shortcutAction.equals(capturingShortcutAction);
+		makeHover(row,
+				capturing ? round(Color.argb(146, red(PURPLE), green(PURPLE), blue(PURPLE)), 10, STROKE_HOVER) : round(Color.argb(98, 18, 24, 39), 10, Color.argb(48, 105, 116, 150)),
+				round(Color.argb(150, 27, 33, 53), 10, STROKE_HOVER));
 		row.addView(label(action, 12, MUTED), new LinearLayout.LayoutParams(0, wrap(), 1.0F));
-		TextView keycap = keycap(key);
-		row.addView(keycap, new LinearLayout.LayoutParams(70, 24));
+		TextView helper = label(capturing ? "Press key..." : helperText, 11, capturing ? TEXT : FAINT);
+		helper.setSingleLine(true);
+		row.addView(helper, new LinearLayout.LayoutParams(0, wrap(), 1.0F));
+		TextView keycap = keycap(capturing ? "..." : keybindLabel(TritonUIClient.shortcutKey(shortcutAction)));
+		row.addView(keycap, new LinearLayout.LayoutParams(96, 24));
+		row.setOnClickListener(view -> {
+			capturingShortcutAction = shortcutAction;
+			settingsMessage = "Press a key for " + shortcutDisplayName(shortcutAction) + ".";
+			renderShell();
+		});
 		return row;
 	}
 
@@ -2660,20 +2800,30 @@ public final class TritonModernFragment extends Fragment {
 	}
 
 	private void cycleTheme() {
-		String next = settingsConfig.theme().equals("Dark glass") ? "Deep transparent" : settingsConfig.theme().equals("Deep transparent") ? "High contrast" : "Dark glass";
+		String next = nextOption(THEME_OPTIONS, settingsConfig.theme());
 		settingsConfig.setTheme(next);
 		saveSettingsConfig("Theme set to " + next + ".");
 	}
 
 	private void cycleAccent() {
-		String next = settingsConfig.accent().equals("Shulkr purple") ? "Neon violet" : settingsConfig.accent().equals("Neon violet") ? "Soft blue" : "Shulkr purple";
+		String next = nextOption(ACCENT_OPTIONS, settingsConfig.accent());
 		settingsConfig.setAccent(next);
 		saveSettingsConfig("Accent set to " + next + ".");
+	}
+
+	private String nextOption(String[] options, String current) {
+		for (int i = 0; i < options.length; i++) {
+			if (options[i].equals(current)) {
+				return options[(i + 1) % options.length];
+			}
+		}
+		return options[0];
 	}
 
 	private void saveSettingsConfig(String message) {
 		applyConfigPalette();
 		settingsConfig.save();
+		capturingShortcutAction = "";
 		settingsMessage = message;
 		renderShell();
 	}
@@ -2746,37 +2896,106 @@ public final class TritonModernFragment extends Fragment {
 		PURPLE_DARK = Color.argb(255, Math.max(0, red(PURPLE) - 54), Math.max(0, green(PURPLE) - 42), Math.max(0, blue(PURPLE) - 50));
 		PURPLE_SOFT = Color.argb(150, red(PURPLE), green(PURPLE), blue(PURPLE));
 		STROKE_HOVER = Color.argb(150, red(PURPLE), green(PURPLE), blue(PURPLE));
+		TEXT = Color.argb(255, 247, 244, 255);
+		MUTED = Color.argb(230, 171, 179, 204);
+		FAINT = Color.argb(180, 136, 145, 174);
+		GREEN = Color.argb(255, 62, 216, 99);
 
 		String theme = settingsConfig == null ? "Dark glass" : settingsConfig.theme();
-		if (theme.equals("Deep transparent")) {
+		if (theme.equals("Frontend Nova")) {
+			// Mirrors the browser dashboard tokens in web-client/src/styles.css.
+			BACKDROP = Color.argb(246, 8, 5, 12);
+			PANEL = Color.argb(232, 15, 10, 24);
+			PANEL_DARK = Color.argb(246, 8, 5, 12);
+			CARD = Color.argb(218, 22, 16, 34);
+			CARD_HOVER = Color.argb(232, 32, 24, 50);
+			STROKE = Color.argb(74, 139, 45, 255);
+			TEXT = Color.argb(255, 245, 242, 255);
+			MUTED = Color.argb(238, 157, 148, 176);
+			FAINT = Color.argb(205, 94, 86, 112);
+			GREEN = Color.argb(255, 61, 220, 132);
+		} else if (theme.equals("Deep transparent")) {
+			BACKDROP = Color.argb(148, 4, 9, 20);
 			PANEL = Color.argb(108, 10, 15, 27);
 			PANEL_DARK = Color.argb(132, 7, 12, 22);
 			CARD = Color.argb(92, 15, 21, 34);
 			CARD_HOVER = Color.argb(136, 24, 30, 48);
 			STROKE = Color.argb(84, 105, 116, 150);
 		} else if (theme.equals("High contrast")) {
+			BACKDROP = Color.argb(238, 3, 5, 12);
 			PANEL = Color.argb(242, 6, 9, 18);
 			PANEL_DARK = Color.argb(250, 2, 5, 12);
 			CARD = Color.argb(232, 9, 14, 26);
 			CARD_HOVER = Color.argb(248, 20, 25, 43);
 			STROKE = Color.argb(132, 105, 116, 150);
 		} else if (theme.equals("Blue dusk")) {
+			BACKDROP = Color.argb(186, 4, 10, 23);
 			PANEL = Color.argb(144, 11, 24, 42);
 			PANEL_DARK = Color.argb(170, 6, 15, 30);
 			CARD = Color.argb(122, 14, 29, 48);
 			CARD_HOVER = Color.argb(170, 24, 42, 68);
 			STROKE = Color.argb(112, 105, 142, 190);
 		} else {
-			PANEL = Color.argb(222, 7, 11, 22);
-			PANEL_DARK = Color.argb(238, 4, 8, 18);
-			CARD = Color.argb(204, 10, 15, 29);
-			CARD_HOVER = Color.argb(232, 20, 25, 43);
-			STROKE = Color.argb(94, 82, 92, 124);
+			BACKDROP = Color.argb(184, 6, 4, 12);
+			PANEL = Color.argb(228, 10, 8, 22);
+			PANEL_DARK = Color.argb(240, 7, 5, 16);
+			CARD = Color.argb(210, 18, 10, 31);
+			CARD_HOVER = Color.argb(235, 28, 14, 42);
+			STROKE = Color.argb(104, 102, 68, 156);
+			MUTED = Color.argb(232, 183, 168, 214);
+			FAINT = Color.argb(176, 143, 126, 178);
+		}
+	}
+
+	private FluxusAppState.Profile currentProfile() {
+		return FluxusAppState.get().profile().normalized();
+	}
+
+	private String shortcutDisplayName(String action) {
+		return switch (action) {
+			case SHORTCUT_OPEN_UI -> "Open Shulkr";
+			case SHORTCUT_OVERLAY_EDIT -> "Overlay edit mode";
+			case SHORTCUT_RUN_LAST -> "Run last script";
+			default -> "Shortcut";
+		};
+	}
+
+	private String lastRunScriptLabel() {
+		String path = TritonUIClient.lastRunScriptPath();
+		if (path == null || path.isBlank()) {
+			return "Nothing recorded yet";
+		}
+		Path saved = Path.of(path.replace('\\', '/'));
+		return saved.getFileName() == null ? path : saved.getFileName().toString();
+	}
+
+	private String configLastSavedLabel() {
+		try {
+			Instant modified = Files.getLastModifiedTime(FluxusConfig.path()).toInstant();
+			long seconds = Math.max(0, Duration.between(modified, Instant.now()).getSeconds());
+			if (seconds < 10) {
+				return "just now";
+			}
+			if (seconds < 60) {
+				return seconds + "s ago";
+			}
+			long minutes = seconds / 60;
+			if (minutes < 60) {
+				return minutes + "m ago";
+			}
+			long hours = minutes / 60;
+			if (hours < 24) {
+				return hours + "h ago";
+			}
+			return (hours / 24) + "d ago";
+		} catch (IOException ignored) {
+			return "unknown";
 		}
 	}
 
 	private int accentColor(String name) {
 		return switch (name) {
+			case "Nova purple" -> Color.argb(255, 157, 77, 255);
 			case "Soft blue" -> Color.argb(255, 93, 169, 255);
 			case "Electric cyan" -> Color.argb(255, 46, 218, 255);
 			case "Emerald" -> Color.argb(255, 62, 216, 132);
@@ -2954,6 +3173,7 @@ public final class TritonModernFragment extends Fragment {
 		settingsConfig = new FluxusConfig();
 		applyConfigPalette();
 		settingsConfig.save();
+		capturingShortcutAction = "";
 		repairMinescriptConfig();
 		settingsMessage = "Settings reset to defaults.";
 		renderShell();
@@ -3120,7 +3340,7 @@ public final class TritonModernFragment extends Fragment {
 		panel.addView(watchRow("Mod ID", "triton-ui"), new LinearLayout.LayoutParams(match(), 30));
 		panel.addView(watchRow("Version", "1.0.0"), new LinearLayout.LayoutParams(match(), 30));
 		panel.addView(watchRow("Renderer", "ModernUI + Arc3D"), new LinearLayout.LayoutParams(match(), 30));
-		panel.addView(watchRow("Open key", "U"), new LinearLayout.LayoutParams(match(), 30));
+		panel.addView(watchRow("Open key", keybindLabel(TritonUIClient.shortcutKey(SHORTCUT_OPEN_UI))), new LinearLayout.LayoutParams(match(), 30));
 		panel.addView(watchRow("Workspace", "Shulkr Client"), new LinearLayout.LayoutParams(match(), 30));
 		TextView copy = label("Copy Build Details", 13, TEXT);
 		copy.setGravity(Gravity.CENTER);
@@ -4146,6 +4366,9 @@ public final class TritonModernFragment extends Fragment {
 			if (shell != null) {
 				shell.post(() -> {
 					currentScriptRunning = handled;
+					if (handled) {
+						TritonUIClient.rememberLastScript(command);
+					}
 					appendEditorLog((handled ? "Started " : "Failed to start ") + fileName + ".");
 					renderShell();
 				});
@@ -4695,7 +4918,7 @@ public final class TritonModernFragment extends Fragment {
 			dirtyScripts.add(selectedScript);
 		}
 		editorDirty = true;
-		updatePythonLint(editorDraft);
+		scheduleEditorAnalysis(editorDraft);
 		updateCompletion(codeEditor);
 		appendEditorLog("Inserted library import: " + importLine + ".");
 		refreshConsoleLogList();
@@ -4720,7 +4943,7 @@ public final class TritonModernFragment extends Fragment {
 			dirtyScripts.add(selectedScript);
 		}
 		editorDirty = true;
-		updatePythonLint(editorDraft);
+		scheduleEditorAnalysis(editorDraft);
 		updateCompletion(codeEditor);
 		appendEditorLog("Inserted snippet.");
 		refreshConsoleLogList();
@@ -5058,6 +5281,8 @@ public final class TritonModernFragment extends Fragment {
 
 		EditText editor = new EditText(requireContext());
 		codeEditor = editor;
+		String initialEditorText = selectedScript == null ? "" : draftFor(selectedScript);
+		boolean deferInitialText = initialEditorText.length() > 20_000;
 		editor.setTextSize(12);
 		editor.setTextColor(Color.argb(242, 213, 220, 244));
 		editor.setHintTextColor(FAINT);
@@ -5069,7 +5294,7 @@ public final class TritonModernFragment extends Fragment {
 		editor.setGravity(Gravity.TOP | Gravity.LEFT);
 		editor.setPadding(24, 16, 24, 16);
 		editor.setMinLines(18);
-		editor.setText(selectedScript == null ? "" : draftFor(selectedScript));
+		editor.setText(deferInitialText ? "" : initialEditorText);
 		editor.setBackground(glass(Color.argb(72, 3, 8, 16), Color.argb(52, 5, 9, 17), 0, 0));
 		editor.setOnKeyListener((view, keyCode, event) -> {
 			if (event.getAction() == KeyEvent.ACTION_DOWN) {
@@ -5127,12 +5352,8 @@ public final class TritonModernFragment extends Fragment {
 						}
 					}
 					editorDirty = selectedScript == null || dirtyScripts.contains(selectedScript);
-					if (shouldRunRichEditorFeatures(text.length()) && !isPyjinnEditorScript()) {
-						styleEditorSyntax(editor.getText());
-					} else {
-						clearSyntaxSpans(editor.getText());
-					}
-					updatePythonLint(text.toString());
+					updateLineNumberGutter(text);
+					scheduleEditorAnalysis(text.toString());
 					updateCompletion(editor);
 				}
 			}
@@ -5142,6 +5363,15 @@ public final class TritonModernFragment extends Fragment {
 			}
 		});
 		LinearLayout editorBody = row(0);
+		editorLineNumbers = label("", 12, Color.argb(190, 94, 86, 112));
+		editorLineCount = 0;
+		editorLineNumbers.setGravity(Gravity.TOP | Gravity.RIGHT);
+		editorLineNumbers.setPadding(8, 16, 10, 16);
+		editorLineNumbers.setBackground(round(Color.argb(92, 8, 5, 12), 0, 0));
+		updateLineNumberGutter(editor.getText());
+		editor.setOnScrollChangeListener((view, scrollX, scrollY, oldScrollX, oldScrollY) ->
+				editorLineNumbers.scrollTo(0, scrollY));
+		editorBody.addView(editorLineNumbers, new LinearLayout.LayoutParams(58, match()));
 		FrameLayout editorStack = new FrameLayout(requireContext());
 		editorStack.addView(editor, new FrameLayout.LayoutParams(match(), match()));
 		completionGhost = label("", 12, Color.argb(150, 162, 173, 204));
@@ -5175,12 +5405,17 @@ public final class TritonModernFragment extends Fragment {
 		status.addView(label(selectedScript == null ? "Python" : extension(selectedScript.getFileName().toString()).replace(".", "").toUpperCase(Locale.ROOT), 12, MUTED));
 		status.addView(label(currentScriptRunning ? "* Running" : "Idle", 12, currentScriptRunning ? GREEN : MUTED));
 		panel.addView(status, new LinearLayout.LayoutParams(match(), 34));
-		if (shouldRunRichEditorFeatures(editor.getText().length()) && !isPyjinnEditorScript()) {
-			styleEditorSyntax(editor.getText());
+		if (deferInitialText) {
+			lintSummary.setText("Loading editor...");
+			editor.post(() -> {
+				if (codeEditor == editor) {
+					editor.setText(initialEditorText);
+					editor.setSelection(0);
+				}
+			});
 		} else {
-			clearSyntaxSpans(editor.getText());
+			scheduleEditorAnalysis(editor.getText().toString());
 		}
-		updatePythonLint(editor.getText().toString());
 		updateCompletion(editor);
 		return panel;
 	}
@@ -5249,13 +5484,17 @@ public final class TritonModernFragment extends Fragment {
 				+ "    sleep(0.5)\n";
 	}
 
-	private void updatePythonLint(String source) {
+	private void scheduleEditorAnalysis(String source) {
 		if (lintSummary == null || lintList == null) {
 			return;
 		}
 		int generation = ++lintGeneration;
-		clearErrorSpans();
+		if (editorAnalysisTask != null) {
+			editorAnalysisTask.cancel(false);
+		}
 		if (isPyjinnEditorScript()) {
+			clearSyntaxSpans(codeEditor == null ? null : codeEditor.getText());
+			clearErrorSpans();
 			if (ruffLintTask != null) {
 				ruffLintTask.cancel(false);
 				ruffLintTask = null;
@@ -5267,25 +5506,43 @@ public final class TritonModernFragment extends Fragment {
 			}
 			return;
 		}
-		if (!shouldRunRichEditorFeatures(source.length())) {
-			if (ruffLintTask != null) {
-				ruffLintTask.cancel(false);
-				ruffLintTask = null;
+		long delay = source.length() > 100_000 ? 500L : source.length() > 25_000 ? 300L : 140L;
+		editorAnalysisTask = lintExecutor.schedule(() -> {
+			List<SyntaxRange> ranges = scanSyntax(source);
+			List<String> issues = lintPython(source);
+			if (codeEditor != null) {
+				codeEditor.post(() -> {
+					if (generation != lintGeneration || codeEditor == null) {
+						return;
+					}
+					applySyntaxRanges(codeEditor.getText(), ranges);
+					renderLint("Built-in Python lint", issues, true);
+					if (settingsConfig == null || settingsConfig.ruffDiagnostics()) {
+						scheduleRuffLint(source, generation, List.copyOf(issues));
+					}
+				});
 			}
-			lintList.removeAllViews();
-			lintSummary.setText("Large file mode");
-			lintSummary.setTextColor(Color.argb(255, 255, 190, 88));
-			lintList.addView(label("Skipped live lint, syntax coloring, and autocomplete to keep the UI responsive.", 11, FAINT));
+		}, delay, TimeUnit.MILLISECONDS);
+	}
+
+	private void updateLineNumberGutter(CharSequence text) {
+		if (editorLineNumbers == null) {
 			return;
 		}
-		List<String> issues = lintPython(source);
-		renderLint("Built-in Python lint", issues, true);
-		if (settingsConfig == null || settingsConfig.ruffDiagnostics()) {
-			scheduleRuffLint(source, generation, List.copyOf(issues));
-		} else if (ruffLintTask != null) {
-			ruffLintTask.cancel(false);
-			ruffLintTask = null;
+		int lines = 1;
+		for (int i = 0; i < text.length(); i++) {
+			if (text.charAt(i) == '\n') lines++;
 		}
+		if (lines == editorLineCount) {
+			return;
+		}
+		editorLineCount = lines;
+		StringBuilder numbers = new StringBuilder(Math.max(16, lines * 5));
+		for (int line = 1; line <= lines; line++) {
+			if (line > 1) numbers.append('\n');
+			numbers.append(line);
+		}
+		editorLineNumbers.setText(numbers);
 	}
 
 	private boolean isPyjinnEditorScript() {
@@ -5432,9 +5689,39 @@ public final class TritonModernFragment extends Fragment {
 		stylingEditorText = false;
 	}
 
-	private boolean shouldRunRichEditorFeatures(int length) {
-		return !isPyjinnEditorScript() && length <= 8000;
+	private List<SyntaxRange> scanSyntax(String source) {
+		List<SyntaxRange> ranges = new ArrayList<>();
+		collectSyntaxRanges(ranges, source, "\\b(from|import|as|def|return|for|while|if|elif|else|try|except|finally|with|class|lambda|in|is|and|or|not|break|continue|pass|global|nonlocal)\\b",
+				Color.argb(255, 190, 132, 255));
+		collectSyntaxRanges(ranges, source, "\\b(True|False|None)\\b", Color.argb(255, 112, 197, 255));
+		collectSyntaxRanges(ranges, source, "\\b([A-Za-z_][A-Za-z0-9_]*)\\s*(?=\\()", Color.argb(255, 105, 214, 255));
+		collectSyntaxRanges(ranges, source, "\"(?:\\\\.|[^\"\\\\])*\"|'(?:\\\\.|[^'\\\\])*'", Color.argb(255, 150, 226, 126));
+		collectSyntaxRanges(ranges, source, "#[^\\n]*", Color.argb(255, 126, 139, 168));
+		return ranges;
 	}
+
+	private void collectSyntaxRanges(List<SyntaxRange> ranges, String source, String pattern, int color) {
+		Matcher matcher = Pattern.compile(pattern).matcher(source);
+		while (matcher.find()) {
+			ranges.add(new SyntaxRange(matcher.start(), matcher.end(), color));
+		}
+	}
+
+	private void applySyntaxRanges(Editable editable, List<SyntaxRange> ranges) {
+		if (editable == null || stylingEditorText) return;
+		stylingEditorText = true;
+		for (SyntaxColorSpan span : editable.getSpans(0, editable.length(), SyntaxColorSpan.class)) {
+			editable.removeSpan(span);
+		}
+		for (SyntaxRange range : ranges) {
+			if (range.start() >= 0 && range.end() <= editable.length()) {
+				editable.setSpan(new SyntaxColorSpan(range.color()), range.start(), range.end(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+			}
+		}
+		stylingEditorText = false;
+	}
+
+	private record SyntaxRange(int start, int end, int color) {}
 
 	private void clearSyntaxSpans(Editable editable) {
 		if (editable == null || stylingEditorText) {
@@ -5488,16 +5775,6 @@ public final class TritonModernFragment extends Fragment {
 
 	private void updateCompletion(EditText editor) {
 		if (completionHint == null) {
-			return;
-		}
-		if (!shouldRunRichEditorFeatures(editor.getText().length())) {
-			completionRemainder = "";
-			completionHint.setText("");
-			if (completionGhost != null) {
-				completionGhost.setText("");
-				completionGhost.setTranslationX(0.0F);
-				completionGhost.setTranslationY(0.0F);
-			}
 			return;
 		}
 		String token = currentToken(editor);
@@ -5611,7 +5888,7 @@ public final class TritonModernFragment extends Fragment {
 	}
 
 	private String currentToken(EditText editor) {
-		String text = editor.getText().toString();
+		Editable text = editor.getText();
 		int caret = Math.max(0, Math.min(editor.getSelectionStart(), text.length()));
 		int start = caret;
 		while (start > 0) {
@@ -5621,7 +5898,7 @@ public final class TritonModernFragment extends Fragment {
 			}
 			start--;
 		}
-		return text.substring(start, caret);
+		return text.subSequence(start, caret).toString();
 	}
 
 	private String completionFor(String token) {
@@ -7358,8 +7635,10 @@ public final class TritonModernFragment extends Fragment {
 	private View detailRow(String name, String value) {
 		LinearLayout row = row(8);
 		row.setGravity(Gravity.CENTER_VERTICAL);
-		row.addView(label(name, 12, MUTED), new LinearLayout.LayoutParams(0, wrap(), 1.0F));
-		row.addView(tag(value, false), new LinearLayout.LayoutParams(82, 24));
+		row.addView(label(name, 12, MUTED), new LinearLayout.LayoutParams(0, wrap(), 0.42F));
+		TextView valueView = tag(value, false);
+		valueView.setSingleLine(true);
+		row.addView(valueView, new LinearLayout.LayoutParams(0, 24, 0.58F));
 		return row;
 	}
 
@@ -7667,6 +7946,8 @@ public final class TritonModernFragment extends Fragment {
 			shell.setOnClickListener(view -> openPage(Page.TEMPLATES));
 		} else if (text.equals("WindowSpy")) {
 			shell.setOnClickListener(view -> openPage(Page.WINDOWSPY));
+		} else if (text.equals("Remote")) {
+			shell.setOnClickListener(view -> openPage(Page.REMOTE));
 		} else if (text.equals("Overlays")) {
 			shell.setOnClickListener(view -> openPage(Page.OVERLAYS));
 		} else if (text.equals("Settings")) {

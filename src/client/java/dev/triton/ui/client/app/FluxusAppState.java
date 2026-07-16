@@ -4,6 +4,7 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.reflect.TypeToken;
 import dev.triton.ui.client.config.FluxusConfig;
+import dev.triton.ui.client.module.ModuleManager;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -17,8 +18,11 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -48,6 +52,8 @@ public final class FluxusAppState {
 	private static final FluxusAppState INSTANCE = new FluxusAppState();
 	private static final String BACKEND_URL = System.getProperty("shulkr.backend.url",
 			System.getProperty("shulk.backend.url", "http://127.0.0.1:50991"));
+	private static final String DEVICE_ID = resolveDeviceId();
+	private static final String DEVICE_NAME = resolveDeviceName();
 
 	private final Path backendDataDir = Path.of(System.getProperty("user.dir"), "shulkr-backend");
 	private final Path appDir = backendDataDir;
@@ -56,6 +62,7 @@ public final class FluxusAppState {
 	private final Path moduleScriptsPath = backendDataDir.resolve("module-scripts.json");
 	private final Path templatesPath = backendDataDir.resolve("templates.json");
 	private final Path libraryScriptsPath = backendDataDir.resolve("library-scripts.json");
+	private final Path deviceTokenPath = backendDataDir.resolve(".device-token");
 	private final Path scriptDir = Path.of(System.getProperty("user.dir"), "minescript");
 	private final HttpClient httpClient = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(2)).build();
 	private final ScheduledExecutorService backendHeartbeat = Executors.newSingleThreadScheduledExecutor(runnable -> {
@@ -71,8 +78,10 @@ public final class FluxusAppState {
 	private List<LibraryScriptItem> libraryScripts = List.of();
 	private Set<String> moduleScriptPaths = Set.of();
 	private boolean heartbeatStarted;
+	private volatile boolean licenseBlocked;
 	private final ConcurrentLinkedQueue<RemoteCommand> remoteCommands = new ConcurrentLinkedQueue<>();
 	private volatile Map<String, Object> clientTelemetry = Map.of();
+	private volatile String deviceToken = "";
 
 	public static FluxusAppState get() {
 		return INSTANCE;
@@ -83,6 +92,7 @@ public final class FluxusAppState {
 			Files.createDirectories(appDir);
 			Files.createDirectories(backendDataDir);
 			Files.createDirectories(scriptDir);
+			if (Files.exists(deviceTokenPath)) deviceToken = Files.readString(deviceTokenPath, StandardCharsets.UTF_8).trim();
 			seedIfMissing(profilePath, "/assets/triton-ui/data/profile.json");
 			seedIfMissing(modulesPath, "/assets/triton-ui/data/modules.json");
 			seedJsonIfMissing(moduleScriptsPath, defaultUtilityModulePaths());
@@ -180,6 +190,11 @@ public final class FluxusAppState {
 	}
 
 	public synchronized List<ModuleItem> modules() {
+		// The backend catalog is authoritative so the in-client Libraries page,
+		// dashboard, and downloads all show the same modules.
+		if (!modules.isEmpty()) {
+			return List.copyOf(modules);
+		}
 		List<ModuleItem> result = new ArrayList<>();
 		for (ScriptSummary script : localScripts()) {
 			if (moduleScriptPaths.contains(normalizeRelative(script.path()))) {
@@ -187,9 +202,9 @@ public final class FluxusAppState {
 				result.add(new ModuleItem(
 						"local:" + script.path(),
 						moduleName,
-						"local module",
+						"Local library",
 						script.extension().toUpperCase(Locale.ROOT),
-						script.description().isBlank() ? "Marked as a reusable Shulkr module." : script.description(),
+						script.description().isBlank() ? "Marked as a reusable Shulkr library." : script.description(),
 						script.extension().equalsIgnoreCase("pyj") ? "Pyjinn" : "Python",
 						script.extension().equalsIgnoreCase("pyj") ? "route-solid.png" : "code-solid.png",
 						"Installed",
@@ -225,7 +240,7 @@ public final class FluxusAppState {
 	}
 
 	private Set<String> defaultUtilityModulePaths() {
-		return Set.of();
+		return Set.of("camera_controller.py", "title_bridge.py", "VanillaPathfinding.pyj");
 	}
 
 	private Set<String> legacyAutoModulePaths() {
@@ -449,10 +464,7 @@ public final class FluxusAppState {
 		if (response != null) {
 			return response.content() == null ? "" : response.content();
 		}
-		Path path = scriptDir.resolve(relativePath).normalize();
-		if (!path.startsWith(scriptDir)) {
-			throw new IOException("Script path must stay inside " + scriptDir);
-		}
+		Path path = safeUserScriptPath(relativePath);
 		return Files.readString(path, StandardCharsets.UTF_8);
 	}
 
@@ -473,10 +485,7 @@ public final class FluxusAppState {
 		}
 		Files.createDirectories(scriptDir);
 		String safeName = safeScriptName(requestedName == null || requestedName.isBlank() ? "UploadedScript.py" : requestedName);
-		Path target = scriptDir.resolve(safeName).normalize();
-		if (!target.startsWith(scriptDir)) {
-			throw new IOException("Script path must stay inside " + scriptDir);
-		}
+		Path target = safeUserScriptPath(safeName);
 		if (!overwrite) {
 			target = scriptDir.resolve(uniqueScriptName(target.getFileName().toString()));
 		}
@@ -500,7 +509,8 @@ public final class FluxusAppState {
 		Set<Path> existing = snapshotLocalScriptFiles();
 		long requestStartedAt = System.currentTimeMillis();
 		ScriptSummary backendSummary = backendPost("/api/scripts", Map.of(
-				"sourcePath", source.toAbsolutePath().toString(),
+				"name", source.getFileName().toString(),
+				"content", Files.readString(source, StandardCharsets.UTF_8),
 				"overwrite", overwrite
 		), ScriptSummary.class);
 		if (backendSummary != null) {
@@ -512,7 +522,7 @@ public final class FluxusAppState {
 		}
 		Files.createDirectories(scriptDir);
 		String safeName = safeScriptName(source.getFileName().toString());
-		Path target = scriptDir.resolve(overwrite ? safeName : uniqueScriptName(safeName));
+		Path target = safeUserScriptPath(overwrite ? safeName : uniqueScriptName(safeName));
 		Files.copy(source, target, StandardCopyOption.REPLACE_EXISTING);
 		return summaryFor(target);
 	}
@@ -522,10 +532,7 @@ public final class FluxusAppState {
 			return true;
 		}
 		try {
-			Path target = scriptDir.resolve(relativePath).normalize();
-			if (!target.startsWith(scriptDir)) {
-				return false;
-			}
+			Path target = safeUserScriptPath(relativePath);
 			return Files.deleteIfExists(target);
 		} catch (IOException e) {
 			return false;
@@ -537,11 +544,8 @@ public final class FluxusAppState {
 		if (backendSummary != null) {
 			return backendSummary;
 		}
-		Path source = scriptDir.resolve(relativePath).normalize();
-		Path target = source.resolveSibling(requestedName);
-		if (!source.startsWith(scriptDir) || !target.startsWith(scriptDir)) {
-			throw new IOException("Script path must stay inside " + scriptDir);
-		}
+		Path source = safeUserScriptPath(relativePath);
+		Path target = safeUserScriptPath(scriptDir.toAbsolutePath().normalize().relativize(source.resolveSibling(requestedName).normalize()).toString());
 		Files.move(source, target);
 		return summaryFor(target);
 	}
@@ -551,12 +555,9 @@ public final class FluxusAppState {
 		if (backendSummary != null) {
 			return backendSummary;
 		}
-		Path target = scriptDir.resolve(relativePath).normalize();
-		if (!target.startsWith(scriptDir)) {
-			throw new IOException("Folder path must stay inside " + scriptDir);
-		}
+		Path target = safeUserScriptPath(relativePath);
 		Files.createDirectories(target);
-		return new FolderSummary(scriptDir.relativize(target).toString().replace('\\', '/'), target.getFileName().toString());
+		return new FolderSummary(relativeToScriptDir(target), target.getFileName().toString());
 	}
 
 	public synchronized FolderSummary renameFolder(String relativePath, String requestedName) throws IOException {
@@ -564,13 +565,10 @@ public final class FluxusAppState {
 		if (backendSummary != null) {
 			return backendSummary;
 		}
-		Path source = scriptDir.resolve(relativePath).normalize();
-		Path target = source.resolveSibling(requestedName);
-		if (!source.startsWith(scriptDir) || !target.startsWith(scriptDir)) {
-			throw new IOException("Folder path must stay inside " + scriptDir);
-		}
+		Path source = safeUserScriptPath(relativePath);
+		Path target = safeUserScriptPath(scriptDir.toAbsolutePath().normalize().relativize(source.resolveSibling(requestedName).normalize()).toString());
 		Files.move(source, target);
-		return new FolderSummary(scriptDir.relativize(target).toString().replace('\\', '/'), target.getFileName().toString());
+		return new FolderSummary(relativeToScriptDir(target), target.getFileName().toString());
 	}
 
 	public AppStats stats() {
@@ -617,19 +615,46 @@ public final class FluxusAppState {
 
 	public void acknowledgeRemoteCommand(RemoteCommand command, boolean ok, String message) {
 		if (command == null) return;
-		HttpRequest request = HttpRequest.newBuilder()
+		HttpRequest.Builder builder = HttpRequest.newBuilder()
 				.uri(backendUri("/api/control/commands/" + url(command.id()) + "/ack"))
 				.timeout(Duration.ofSeconds(3))
-				.header("Content-Type", "application/json")
-				.POST(HttpRequest.BodyPublishers.ofString(GSON.toJson(Map.of("ok", ok, "message", message == null ? "" : message)), StandardCharsets.UTF_8))
-				.build();
+				.header("Content-Type", "application/json");
+		if (!deviceToken.isBlank()) builder.header("Authorization", "Device " + deviceToken);
+		HttpRequest request = builder.POST(HttpRequest.BodyPublishers.ofString(GSON.toJson(Map.of("ok", ok, "message", message == null ? "" : message)), StandardCharsets.UTF_8)).build();
 		httpClient.sendAsync(request, HttpResponse.BodyHandlers.discarding());
 	}
 
 	private void fetchRemoteCommands() {
-		if (!backendOnline) return;
-		List<RemoteCommand> fetched = backendList("/api/control/commands?clientId=" + url(profile.id()), REMOTE_COMMAND_LIST, List.of());
-		remoteCommands.addAll(fetched);
+		if (licenseBlocked) {
+			return;
+		}
+		if (!backendOnline) {
+			backendOnline = probeBackend();
+			if (!backendOnline) {
+				return;
+			}
+		}
+		try {
+			HttpRequest.Builder builder = HttpRequest.newBuilder()
+					.uri(backendUri("/api/control/commands?clientId=" + url(DEVICE_ID)))
+					.timeout(Duration.ofSeconds(2));
+			if (!deviceToken.isBlank()) builder.header("Authorization", "Device " + deviceToken);
+			HttpResponse<String> response = httpClient.send(builder.GET().build(), HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+			if (response.statusCode() == 401) {
+				clearDeviceToken();
+				return;
+			}
+			if (response.statusCode() >= 200 && response.statusCode() < 300) {
+				List<RemoteCommand> fetched = GSON.fromJson(response.body(), REMOTE_COMMAND_LIST);
+				if (fetched != null) remoteCommands.addAll(fetched);
+			}
+		} catch (IOException | InterruptedException | RuntimeException ignored) {
+			if (ignored instanceof InterruptedException) Thread.currentThread().interrupt();
+		}
+	}
+
+	public synchronized List<ModuleManager.RuntimeModuleSummary> runtimeModules() {
+		return ModuleManager.get().summaries();
 	}
 
 	private void sendBackendHeartbeat() {
@@ -640,18 +665,72 @@ public final class FluxusAppState {
 			writeJson(profilePath, profile);
 		}
 		Map<String, Object> payload = new HashMap<>(clientTelemetry);
-		payload.put("id", current.id());
-		payload.put("displayName", current.displayName());
+		payload.put("id", DEVICE_ID);
+		payload.put("displayName", DEVICE_NAME);
+		payload.put("deviceId", DEVICE_ID);
+		payload.put("deviceName", DEVICE_NAME);
+		payload.put("hardwareId", DEVICE_ID);
+		payload.put("accountName", current.displayName());
+		payload.put("licenseUserId", current.id());
 		payload.put("tier", current.tier());
 		payload.put("status", "Connected");
 		payload.put("minecraft", "Minecraft " + System.getProperty("minecraft.version", "26.1.2"));
-		HttpRequest request = HttpRequest.newBuilder()
+		HttpRequest.Builder builder = HttpRequest.newBuilder()
 				.uri(URI.create(BACKEND_URL + "/api/clients/heartbeat"))
 				.timeout(Duration.ofSeconds(3))
 				.header("Content-Type", "application/json")
-				.POST(HttpRequest.BodyPublishers.ofString(GSON.toJson(payload), StandardCharsets.UTF_8))
-				.build();
-		httpClient.sendAsync(request, HttpResponse.BodyHandlers.discarding());
+				.header("X-Shulkr-Device-Bootstrap", "1");
+		if (!deviceToken.isBlank()) builder.header("Authorization", "Device " + deviceToken);
+		HttpRequest request = builder.POST(HttpRequest.BodyPublishers.ofString(GSON.toJson(payload), StandardCharsets.UTF_8)).build();
+		httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8))
+				.thenAccept(response -> {
+					backendOnline = response.statusCode() >= 200 && response.statusCode() < 300;
+					if (!backendOnline) {
+						licenseBlocked = false;
+						return;
+					}
+					try {
+						Map<?, ?> heartbeat = GSON.fromJson(response.body(), Map.class);
+						if (heartbeat != null && heartbeat.get("deviceToken") != null) rememberDeviceToken(String.valueOf(heartbeat.get("deviceToken")));
+						boolean connected = heartbeat != null && Boolean.TRUE.equals(heartbeat.get("connected"));
+						String hardwareMessage = heartbeat != null && heartbeat.get("hardwareMessage") != null ? String.valueOf(heartbeat.get("hardwareMessage")) : "";
+						licenseBlocked = !connected;
+						synchronized (this) {
+							if (licenseBlocked) {
+								profile = profile.withStatus(hardwareMessage == null || hardwareMessage.isBlank() ? "Hardware ID not licensed" : hardwareMessage);
+							} else if (profile.status() != null && profile.status().toLowerCase(Locale.ROOT).contains("hardware")) {
+								profile = profile.withStatus("Ready");
+							}
+							writeJson(profilePath, profile);
+						}
+					} catch (RuntimeException ignored) {
+						licenseBlocked = false;
+					}
+				})
+				.exceptionally(error -> {
+					backendOnline = false;
+					licenseBlocked = false;
+					return null;
+				});
+	}
+
+	private synchronized void rememberDeviceToken(String token) {
+		String value = token == null ? "" : token.trim();
+		if (value.isBlank() || value.equals(deviceToken)) return;
+		deviceToken = value;
+		try {
+			Files.createDirectories(deviceTokenPath.getParent());
+			Files.writeString(deviceTokenPath, value, StandardCharsets.UTF_8);
+		} catch (IOException ignored) {
+		}
+	}
+
+	private synchronized void clearDeviceToken() {
+		deviceToken = "";
+		try {
+			Files.deleteIfExists(deviceTokenPath);
+		} catch (IOException ignored) {
+		}
 	}
 
 	private boolean probeBackend() {
@@ -669,6 +748,87 @@ public final class FluxusAppState {
 			}
 			return false;
 		}
+	}
+
+	private static String resolveDeviceName() {
+		String configured = safe(System.getProperty("shulkr.device.name"));
+		if (!configured.isBlank()) return configured;
+		String env = safe(System.getenv("COMPUTERNAME"));
+		if (!env.isBlank()) return env;
+		String host = safe(System.getenv("HOSTNAME"));
+		if (!host.isBlank()) return host;
+		return "This PC";
+	}
+
+	private static String resolveDeviceId() {
+		String configured = safe(System.getProperty("shulkr.device.id"));
+		if (!configured.isBlank()) return normalizeDeviceId(configured);
+		List<String> parts = new ArrayList<>();
+		parts.add(safe(readWindowsMachineGuid()));
+		parts.add(safe(System.getenv("COMPUTERNAME")));
+		parts.add(safe(System.getProperty("os.name")));
+		parts.add(safe(System.getProperty("os.arch")));
+		parts.add(safe(System.getProperty("user.home")));
+		String seed = String.join("|", parts);
+		if (seed.replace("|", "").isBlank()) {
+			seed = "shulkr-local-device";
+		}
+		return "hwid-" + sha256(seed).substring(0, 20);
+	}
+
+	private static String normalizeDeviceId(String value) {
+		String cleaned = safe(value).toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9]+", "-").replaceAll("(^-|-$)", "");
+		return cleaned.isBlank() ? "hwid-local-device" : cleaned;
+	}
+
+	private static String readWindowsMachineGuid() {
+		if (!System.getProperty("os.name", "").toLowerCase(Locale.ROOT).contains("win")) return "";
+		Process process = null;
+		try {
+			process = new ProcessBuilder("reg", "query",
+					"HKLM\\SOFTWARE\\Microsoft\\Cryptography",
+					"/v", "MachineGuid")
+					.redirectErrorStream(true)
+					.start();
+			String output = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+			process.waitFor(2, TimeUnit.SECONDS);
+			for (String line : output.split("\\R")) {
+				if (line.contains("MachineGuid")) {
+					String[] parts = line.trim().split("\\s+");
+					if (parts.length > 0) {
+						return parts[parts.length - 1].trim();
+					}
+				}
+			}
+		} catch (IOException | InterruptedException ignored) {
+			if (ignored instanceof InterruptedException) {
+				Thread.currentThread().interrupt();
+			}
+		} finally {
+			if (process != null) {
+				process.destroyForcibly();
+			}
+		}
+		return "";
+	}
+
+	private static String sha256(String value) {
+		try {
+			MessageDigest digest = MessageDigest.getInstance("SHA-256");
+			byte[] bytes = digest.digest(value.getBytes(StandardCharsets.UTF_8));
+			StringBuilder builder = new StringBuilder(bytes.length * 2);
+			for (byte current : bytes) {
+				builder.append(Character.forDigit((current >> 4) & 0xF, 16));
+				builder.append(Character.forDigit(current & 0xF, 16));
+			}
+			return builder.toString();
+		} catch (NoSuchAlgorithmException e) {
+			return Integer.toHexString(value.hashCode()) + Integer.toHexString((value + "-shulkr").hashCode());
+		}
+	}
+
+	private static String safe(String value) {
+		return value == null ? "" : value.trim();
 	}
 
 	private URI backendUri(String path) {
@@ -777,7 +937,7 @@ public final class FluxusAppState {
 
 	private ScriptSummary summaryFor(Path path) {
 		try {
-			Path relative = scriptDir.relativize(path);
+			Path relative = scriptDir.toAbsolutePath().normalize().relativize(path.toAbsolutePath().normalize());
 			long modified = Files.getLastModifiedTime(path).toMillis();
 			long size = Files.size(path);
 			return new ScriptSummary(relative.toString().replace('\\', '/'), path.getFileName().toString(), extension(path.getFileName().toString()), size, modified, descriptionFor(path));
@@ -863,16 +1023,42 @@ public final class FluxusAppState {
 	}
 
 	private boolean isHiddenScriptPath(Path path) {
-		Path relative = scriptDir.relativize(path);
+		Path base = scriptDir.toAbsolutePath().normalize();
+		Path candidate = path.toAbsolutePath().normalize();
+		if (!candidate.startsWith(base)) return true;
+		Path relative = base.relativize(candidate);
 		if (relative.getNameCount() == 0) {
 			return false;
 		}
 		String root = relative.getName(0).toString().toLowerCase(Locale.ROOT);
 		if (root.equals("system") || root.equals("templates") || root.equals("plugins")
-				|| root.equals("plugins_disabled") || root.equals("exports") || root.equals("blockpacks")) {
+				|| root.equals("plugins_disabled") || root.equals("exports") || root.equals("blockpacks") || root.equals("automations")) {
 			return true;
 		}
 		return relative.getFileName().toString().equalsIgnoreCase("config.txt");
+	}
+
+	private Path safeUserScriptPath(String relativePath) throws IOException {
+		if (relativePath == null || relativePath.isBlank() || relativePath.indexOf('\0') >= 0) {
+			throw new IOException("A script path is required.");
+		}
+		Path base = scriptDir.toAbsolutePath().normalize();
+		Path target = base.resolve(relativePath).normalize();
+		if (!target.startsWith(base) || isHiddenScriptPath(target)) {
+			throw new IOException("Script path must stay inside the user script workspace.");
+		}
+		Path current = base;
+		for (Path segment : base.relativize(target)) {
+			current = current.resolve(segment);
+			if (Files.exists(current, LinkOption.NOFOLLOW_LINKS) && Files.isSymbolicLink(current)) {
+				throw new IOException("Symbolic links are not allowed in the user script workspace.");
+			}
+		}
+		return target;
+	}
+
+	private String relativeToScriptDir(Path path) {
+		return scriptDir.toAbsolutePath().normalize().relativize(path.toAbsolutePath().normalize()).toString().replace('\\', '/');
 	}
 
 	private String extension(String name) {
