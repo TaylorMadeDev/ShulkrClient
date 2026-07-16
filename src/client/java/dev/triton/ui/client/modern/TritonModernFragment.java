@@ -17,6 +17,11 @@ import dev.triton.ui.client.app.FluxusAppState.TemplateItem;
 import dev.triton.ui.client.config.FluxusConfig;
 import dev.triton.ui.client.module.ModuleManager;
 import dev.triton.ui.client.privacy.PrivacyService;
+import dev.triton.ui.client.files.FileSettingsService;
+import dev.triton.ui.client.files.FileSettingsService.Backup;
+import dev.triton.ui.client.files.FileSettingsService.FolderKind;
+import dev.triton.ui.client.files.FileSettingsService.FolderState;
+import dev.triton.ui.client.files.FileSettingsService.Health;
 import dev.triton.ui.client.privacy.PrivacyService.Assessment;
 import dev.triton.ui.client.privacy.PrivacyService.Decision;
 import dev.triton.ui.client.privacy.PrivacyService.Permission;
@@ -242,6 +247,12 @@ public final class TritonModernFragment extends Fragment {
 	private String environmentDiagnosticText = "";
 	private AdvancedSettingsService advancedService;
 	private PrivacyService privacyService;
+	private FileSettingsService fileSettingsService;
+	private Health folderHealth;
+	private List<Backup> fileBackups = List.of();
+	private boolean folderScanRunning;
+	private String pendingFileAction = "";
+	private long pendingFileActionExpiresAt;
 	private StorageSnapshot advancedStorageSnapshot;
 	private List<Diagnostic> advancedDiagnostics = List.of();
 	private List<ConfigBackup> advancedConfigBackups = List.of();
@@ -2550,9 +2561,9 @@ public final class TritonModernFragment extends Fragment {
 			right.addView(environmentDiagnosticsCard(), new LinearLayout.LayoutParams(match(), 0, 1.0F));
 		} else if (settingsTab == SettingsTab.FILES) {
 			body.addView(right, new LinearLayout.LayoutParams(0, match(), 1.0F));
-			left.addView(fileSettingsCard(), new LinearLayout.LayoutParams(match(), 300));
-			left.addView(fileBackupSettingsCard(), new LinearLayout.LayoutParams(match(), 0, 1.0F));
-			right.addView(settingsLiveStatusCard(), new LinearLayout.LayoutParams(match(), 0, 1.0F));
+			left.addView(fileSettingsCard(), new LinearLayout.LayoutParams(match(), 390));
+			left.addView(fileBackupSettingsCard(), new LinearLayout.LayoutParams(match(), 650));
+			right.addView(settingsLiveStatusCard(), new LinearLayout.LayoutParams(match(), 670));
 		} else if (settingsTab == SettingsTab.EDITOR) {
 			body.addView(right, new LinearLayout.LayoutParams(0, match(), 1.0F));
 			ScrollView leftScroll = layoutScrollView();
@@ -2620,9 +2631,9 @@ public final class TritonModernFragment extends Fragment {
 			content.addView(pythonHelpCard(), new LinearLayout.LayoutParams(match(), 300));
 			content.addView(environmentDiagnosticsCard(), new LinearLayout.LayoutParams(match(), 520));
 		} else if (settingsTab == SettingsTab.FILES) {
-			content.addView(fileSettingsCard(), new LinearLayout.LayoutParams(match(), 300));
-			content.addView(fileBackupSettingsCard(), new LinearLayout.LayoutParams(match(), 260));
-			content.addView(settingsLiveStatusCard(), new LinearLayout.LayoutParams(match(), 320));
+			content.addView(fileSettingsCard(), new LinearLayout.LayoutParams(match(), 390));
+			content.addView(fileBackupSettingsCard(), new LinearLayout.LayoutParams(match(), 650));
+			content.addView(settingsLiveStatusCard(), new LinearLayout.LayoutParams(match(), 670));
 		} else if (settingsTab == SettingsTab.EDITOR) {
 			content.addView(editorEditingSettingsCard(), new LinearLayout.LayoutParams(match(), wrap()));
 			content.addView(editorAppearanceSettingsCard(), new LinearLayout.LayoutParams(match(), wrap()));
@@ -2714,13 +2725,13 @@ public final class TritonModernFragment extends Fragment {
 	}
 
 	private View fileSettingsCard() {
-		LinearLayout card = settingsCard("File Settings", "folder-open-solid.png");
-		View scriptFolder = settingsValueRow("Script folder", scriptDir.toString());
-		scriptFolder.setOnClickListener(view -> openScriptFolder());
-		card.addView(scriptFolder, new LinearLayout.LayoutParams(match(), 38));
-		View templateFolder = settingsValueRow("Template folder", scriptDir.resolve("templates").toString());
-		templateFolder.setOnClickListener(view -> openFolder(scriptDir.resolve("templates"), "Template folder"));
-		card.addView(templateFolder, new LinearLayout.LayoutParams(match(), 38));
+		LinearLayout card = settingsCard("Folder Settings", "folder-open-solid.png");
+		card.addView(folderSetting("Script folder", FolderKind.SCRIPT, scriptDir), new LinearLayout.LayoutParams(match(), 104));
+		card.addView(folderSetting("Template folder", FolderKind.TEMPLATE, fileSettingsService.templates(settingsConfig)), new LinearLayout.LayoutParams(match(), 104));
+		card.addView(settingsSwitchRow("Autosave scripts", !settingsConfig.autosaveMode().equals("Off"), checked -> {
+			settingsConfig.setAutosaveMode(checked ? "After Delay" : "Off");
+			updateFileSetting("Autosave scripts");
+		}), rowParams());
 		String selectedRelative = selectedScriptRelativePath();
 		boolean canFlagModule = selectedScript != null && Files.isRegularFile(selectedScript);
 		card.addView(settingsSwitchRow("Selected script is module", canFlagModule && FluxusAppState.get().isScriptModule(selectedRelative), checked -> {
@@ -2729,9 +2740,37 @@ public final class TritonModernFragment extends Fragment {
 				return;
 			}
 			FluxusAppState.get().setScriptModule(selectedRelative, checked);
+			settingsConfig.setSelectedScriptIsModule(checked);
+			settingsConfig.save();
 			saveUiMessage((checked ? "Marked " : "Unmarked ") + selectedScript.getFileName() + " as a module.");
 		}), new LinearLayout.LayoutParams(match(), 38));
+		card.addView(settingsSwitchRow("Create backups before run", settingsConfig.backupBeforeRun(), checked -> {
+			settingsConfig.setBackupBeforeRun(checked);
+			updateFileSetting("Backup before run");
+		}), rowParams());
 		return card;
+	}
+
+	private View folderSetting(String label, FolderKind kind, Path path) {
+		LinearLayout group = column(5);
+		FolderState state = fileSettingsService.validate(path, kind, false);
+		TextView value = label(path.toString(), 11, state.healthy() ? TEXT : Color.argb(255, 255, 160, 90));
+		value.setSingleLine(true);
+		value.setContentDescription(path.toString());
+		group.addView(label(label + " · " + state.message(), 12, state.healthy() ? GREEN : Color.argb(255, 255, 160, 90)));
+		group.addView(value, new LinearLayout.LayoutParams(match(), 22));
+		LinearLayout actions = row(8);
+		actions.addView(folderButton("Browse", () -> browseFolder(kind)), new LinearLayout.LayoutParams(0, 32, 1));
+		actions.addView(folderButton("Open", () -> openFolder(path, label)), new LinearLayout.LayoutParams(0, 32, 1));
+		actions.addView(folderButton("Reset", () -> applyFolder(kind, fileSettingsService.defaultPath(kind), true)), new LinearLayout.LayoutParams(0, 32, 1));
+		group.addView(actions, new LinearLayout.LayoutParams(match(), 32));
+		return group;
+	}
+
+	private View folderButton(String text, Runnable action) {
+		TextView button = textButton(text);
+		button.setOnClickListener(view -> action.run());
+		return button;
 	}
 
 	private View editorEditingSettingsCard() {
@@ -3204,23 +3243,62 @@ public final class TritonModernFragment extends Fragment {
 	}
 
 	private View settingsLiveStatusCard() {
-		LinearLayout card = settingsCard("Status", "check-double-solid.png");
-		card.addView(label(settingsMessage, 12, settingsMessage.toLowerCase(Locale.ROOT).contains("failed") ? Color.argb(255, 255, 120, 140) : GREEN));
-		card.addView(settingsValueRow("Local config", FluxusConfig.path().toString()), new LinearLayout.LayoutParams(match(), 38));
-		card.addView(settingsValueRow("Minescript config", minescriptConfigFile.toString()), new LinearLayout.LayoutParams(match(), 38));
+		LinearLayout card = settingsCard("Folder Health", "check-double-solid.png");
+		card.addView(label(settingsMessage, 12, settingsMessage.toLowerCase(Locale.ROOT).contains("fail") ? Color.argb(255, 255, 120, 140) : GREEN));
+		if (folderScanRunning || folderHealth == null) {
+			card.addView(label("Scanning folders asynchronously…", 12, MUTED));
+		} else {
+			addFolderHealth(card, "Script folder exists", folderHealth.scripts().exists());
+			addFolderHealth(card, "Script folder readable", folderHealth.scripts().readable());
+			addFolderHealth(card, "Script folder writable", folderHealth.scripts().writable());
+			addFolderHealth(card, "Template folder exists", folderHealth.templates().exists());
+			addFolderHealth(card, "Template folder readable", folderHealth.templates().readable());
+			addFolderHealth(card, "Template folder writable", folderHealth.templates().writable());
+			addFolderHealth(card, "Backup folder exists", folderHealth.backups().exists());
+			addFolderHealth(card, "Backup folder writable", folderHealth.backups().writable());
+			addFolderHealth(card, "Minescript path matches", folderHealth.minescriptPathMatches());
+			card.addView(settingsValueRow("Discovered scripts", Integer.toString(folderHealth.scriptCount())), rowParams());
+			card.addView(settingsValueRow("Discovered templates", Integer.toString(folderHealth.templateCount())), rowParams());
+			card.addView(settingsValueRow("Backups", Integer.toString(folderHealth.backupCount())), rowParams());
+			card.addView(settingsValueRow("Backup storage", formatBytes(folderHealth.backupBytes())), rowParams());
+			card.addView(settingsValueRow("Last scan", folderHealth.scannedAt().toString()), rowParams());
+		}
+		card.addView(fileAction("Rescan folders", () -> rescanFolders(true)), new LinearLayout.LayoutParams(match(), 42));
+		card.addView(fileAction("Repair missing folders", this::repairMissingFolders), new LinearLayout.LayoutParams(match(), 42));
+		card.addView(fileAction("Fix Minescript path", this::fixConfiguredMinescriptPath), new LinearLayout.LayoutParams(match(), 42));
+		card.addView(fileAction("Copy folder diagnostic report", this::copyFolderDiagnostics), new LinearLayout.LayoutParams(match(), 42));
 		return card;
+	}
+
+	private void addFolderHealth(LinearLayout card, String name, boolean healthy) {
+		card.addView(settingsValueRow(name, healthy ? "Ready" : "Issue"), new LinearLayout.LayoutParams(match(), 32));
 	}
 
 	private View fileBackupSettingsCard() {
 		LinearLayout card = settingsCard("Backups", "folder-open-solid.png");
-		card.addView(settingsValueRow("Export folder", scriptDir.resolve("exports").toString()), new LinearLayout.LayoutParams(match(), 38));
-		View open = settingsActionRow("Open script folder", "folder-open-solid.png");
-		open.setOnClickListener(view -> openScriptFolder());
-		card.addView(open, new LinearLayout.LayoutParams(match(), 42));
-		View export = settingsActionRow("Export config snapshot", "download-solid.png");
-		export.setOnClickListener(view -> exportConfigSnapshot());
-		card.addView(export, new LinearLayout.LayoutParams(match(), 42));
+		Path backupFolder = fileSettingsService.backups(settingsConfig);
+		card.addView(folderSetting("Backup folder", FolderKind.BACKUP, backupFolder), new LinearLayout.LayoutParams(match(), 104));
+		card.addView(settingsSwitchRow("Automatic backups", settingsConfig.automaticBackups(), checked -> { settingsConfig.setAutomaticBackups(checked); updateFileSetting("Automatic backups"); }), rowParams());
+		card.addView(settingsSwitchRow("Backup before save", settingsConfig.createBackupBeforeSaving(), checked -> { settingsConfig.setCreateBackupBeforeSaving(checked); updateFileSetting("Backup before save"); }), rowParams());
+		card.addView(settingsSwitchRow("Backup before run", settingsConfig.backupBeforeRun(), checked -> { settingsConfig.setBackupBeforeRun(checked); updateFileSetting("Backup before run"); }), rowParams());
+		card.addView(settingsIntSliderRow("Maximum backups per script", 1, 100, Math.max(1, settingsConfig.maximumBackupCount()), "", value -> {
+			settingsConfig.setMaximumBackupCount(value); updateFileSetting("Maximum backups per script");
+		}), sliderParams());
+		card.addView(settingsDropdownRow("backup-retention", "Backup retention", settingsConfig.backupRetention(), new String[]{"Never", "7 days", "30 days", "90 days"}, value -> {}), rowParams());
+		card.addView(settingsValueRow("Current backup count", Integer.toString(folderHealth == null ? fileBackups.size() : folderHealth.backupCount())), rowParams());
+		card.addView(settingsValueRow("Total backup storage", formatBytes(folderHealth == null ? fileBackups.stream().mapToLong(Backup::bytes).sum() : folderHealth.backupBytes())), rowParams());
+		if (!fileBackups.isEmpty()) card.addView(settingsValueRow("Newest backup", fileBackups.getFirst().script().getFileName() + " · " + fileBackups.getFirst().createdAt()), rowParams());
+		card.addView(fileAction("View backups", () -> openFolder(backupFolder, "Backup folder")), new LinearLayout.LayoutParams(match(), 42));
+		card.addView(fileAction("Restore newest backup", this::restoreNewestBackup), new LinearLayout.LayoutParams(match(), 42));
+		card.addView(fileAction("Delete old backups", this::deleteOldBackups), new LinearLayout.LayoutParams(match(), 42));
+		card.addView(fileAction("Export config snapshot", this::exportConfigSnapshot), new LinearLayout.LayoutParams(match(), 42));
 		return card;
+	}
+
+	private View fileAction(String title, Runnable action) {
+		View row = settingsActionRow(title, "folder-open-solid.png");
+		row.setOnClickListener(view -> action.run());
+		return row;
 	}
 
 	private View shortcutHelperCard() {
@@ -4545,17 +4623,176 @@ public final class TritonModernFragment extends Fragment {
 	}
 
 	private void exportConfigSnapshot() {
-		try {
-			Path exportDir = scriptDir.resolve("exports");
-			Files.createDirectories(exportDir);
-			Files.copy(FluxusConfig.path(), exportDir.resolve("shulkr-client.json"), StandardCopyOption.REPLACE_EXISTING);
-			Files.copy(minescriptConfigFile, exportDir.resolve("minescript-config.txt"), StandardCopyOption.REPLACE_EXISTING);
-			settingsMessage = "Exported config snapshot.";
-		} catch (IOException e) {
-			settingsMessage = "Export failed: " + e.getMessage();
-		}
+		settingsMessage = "Exporting config snapshot…";
+		renderShell();
+		lintExecutor.execute(() -> {
+			try {
+				Path snapshot = fileSettingsService.exportConfigSnapshot(settingsConfig, minescriptConfigFile);
+				postFileMessage("Exported " + snapshot.getFileName() + ".", true);
+			} catch (Exception error) {
+				TritonUI.LOGGER.error("Config snapshot export failed", error);
+				postFileMessage("Export failed: " + safeErrorMessage(error), false);
+			}
+		});
+	}
+
+	private void updateFileSetting(String name) {
+		settingsConfig.save();
+		TritonUIClient.reloadConfig();
+		settingsConfig = TritonUIClient.config();
+		settingsMessage = name + " updated and saved.";
+		rescanFolders(false);
 		renderShell();
 	}
+
+	private void browseFolder(FolderKind kind) {
+		settingsMessage = "Opening folder picker…";
+		renderShell();
+		lintExecutor.execute(() -> {
+			try {
+				Path chosen = chooseNativeFolder();
+				if (chosen == null) postFileMessage("Folder selection cancelled.", true);
+				else if (shell != null) shell.post(() -> applyFolder(kind, chosen, false));
+			} catch (Exception error) {
+				TritonUI.LOGGER.error("Folder picker failed", error);
+				postFileMessage("Folder picker failed: " + safeErrorMessage(error), false);
+			}
+		});
+	}
+
+	private Path chooseNativeFolder() throws IOException, InterruptedException {
+		if (!System.getProperty("os.name", "").toLowerCase(Locale.ROOT).contains("win")) {
+			throw new IOException("Native folder selection is currently available on Windows only");
+		}
+		String script = "$shell=New-Object -ComObject Shell.Application;"
+				+ "$folder=$shell.BrowseForFolder(0,'Choose a folder for Shulkr',0,0);"
+				+ "if($folder){$folder.Self.Path}";
+		Process process = new ProcessBuilder("powershell.exe", "-NoProfile", "-STA", "-Command", script)
+				.redirectErrorStream(true).start();
+		String output = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8).trim();
+		int exit = process.waitFor();
+		if (exit != 0) throw new IOException(output.isBlank() ? "Windows folder picker exited with code " + exit : output);
+		if (output.isBlank()) return null;
+		try { return Path.of(output.lines().toList().getLast()).toAbsolutePath().normalize(); }
+		catch (RuntimeException error) { throw new IOException("Folder picker returned an invalid path", error); }
+	}
+
+	private void applyFolder(FolderKind kind, Path selected, boolean reset) {
+		folderScanRunning = true;
+		settingsMessage = "Validating " + kind.name().toLowerCase(Locale.ROOT) + " folder…";
+		renderShell();
+		lintExecutor.execute(() -> {
+			FolderState state = fileSettingsService.validate(selected, kind, true);
+			if (!state.healthy()) { postFileMessage("Folder rejected: " + state.message(), false); return; }
+			if (shell != null) shell.post(() -> {
+				folderScanRunning = false;
+				switch (kind) {
+					case SCRIPT -> settingsConfig.setScriptFolderPath(reset ? "" : state.path().toString());
+					case TEMPLATE -> settingsConfig.setTemplateFolderPath(reset ? "" : state.path().toString());
+					case BACKUP -> settingsConfig.setBackupFolderPath(reset ? "" : state.path().toString());
+				}
+				settingsConfig.save();
+				TritonUIClient.reloadConfig();
+				settingsConfig = TritonUIClient.config();
+				scriptDir = fileSettingsService.scripts(settingsConfig);
+				FluxusAppState.get().configureFolders(scriptDir, fileSettingsService.templates(settingsConfig));
+				selectedFolder = scriptDir;
+				refreshEditorScripts();
+				settingsMessage = kind.name().substring(0, 1) + kind.name().substring(1).toLowerCase(Locale.ROOT) + " folder updated. Discovery refreshed.";
+				if (kind == FolderKind.SCRIPT) lintExecutor.execute(() -> {
+					try { fileSettingsService.fixMinescriptPath(settingsConfig); if (shell != null) shell.post(() -> rescanFolders(false)); }
+					catch (IOException error) { TritonUI.LOGGER.error("Unable to update Minescript path after script-folder change", error); postFileMessage("Folder saved, but Minescript path update failed: " + safeErrorMessage(error), false); }
+				});
+				else rescanFolders(false);
+				renderShell();
+			});
+		});
+	}
+
+	private void rescanFolders(boolean announce) {
+		if (fileSettingsService == null || folderScanRunning) return;
+		folderScanRunning = true;
+		if (announce) { settingsMessage = "Scanning folders…"; renderShell(); }
+		FluxusConfig snapshot = settingsConfig;
+		lintExecutor.execute(() -> {
+			try {
+				Health health = fileSettingsService.scan(snapshot);
+				List<Backup> backups = fileSettingsService.listBackups(snapshot);
+				if (shell != null) shell.post(() -> {
+					folderHealth = health; fileBackups = backups; folderScanRunning = false;
+					if (announce) settingsMessage = "Folder scan completed.";
+					renderShell();
+				});
+			} catch (Exception error) {
+				folderScanRunning = false;
+				TritonUI.LOGGER.error("Folder scan failed", error);
+				postFileMessage("Folder scan failed: " + safeErrorMessage(error), false);
+			}
+		});
+	}
+
+	private void repairMissingFolders() {
+		lintExecutor.execute(() -> {
+			for (FolderKind kind : FolderKind.values()) {
+				Path path = switch (kind) { case SCRIPT -> fileSettingsService.scripts(settingsConfig); case TEMPLATE -> fileSettingsService.templates(settingsConfig); case BACKUP -> fileSettingsService.backups(settingsConfig); };
+				FolderState state = fileSettingsService.validate(path, kind, true);
+				if (!state.healthy()) { postFileMessage("Repair failed for " + kind.name().toLowerCase(Locale.ROOT) + ": " + state.message(), false); return; }
+			}
+			postFileMessage("Missing folders repaired and access verified.", true);
+			if (shell != null) shell.post(() -> rescanFolders(false));
+		});
+	}
+
+	private void fixConfiguredMinescriptPath() {
+		lintExecutor.execute(() -> {
+			try { fileSettingsService.fixMinescriptPath(settingsConfig); postFileMessage("Minescript script path updated.", true); if (shell != null) shell.post(() -> rescanFolders(false)); }
+			catch (Exception error) { TritonUI.LOGGER.error("Minescript path repair failed", error); postFileMessage("Minescript path repair failed: " + safeErrorMessage(error), false); }
+		});
+	}
+
+	private void copyFolderDiagnostics() {
+		if (folderHealth == null) { settingsMessage = "Run a folder scan first."; renderShell(); return; }
+		String report = "Shulkr Folder Diagnostic\n" +
+				"Scripts: " + folderHealth.scripts() + "\nTemplates: " + folderHealth.templates() + "\nBackups: " + folderHealth.backups() +
+				"\nMinescript path: " + (folderHealth.minescriptPathMatches() ? "matches" : "mismatch") +
+				"\nCounts: " + folderHealth.scriptCount() + " scripts, " + folderHealth.templateCount() + " templates, " + folderHealth.backupCount() + " backups\nStorage: " + formatBytes(folderHealth.backupBytes()) + "\nScanned: " + folderHealth.scannedAt();
+		copyToClipboard(report);
+		settingsMessage = "Folder diagnostic report copied.";
+		renderShell();
+	}
+
+	private void restoreNewestBackup() {
+		if (fileBackups.isEmpty()) { settingsMessage = "No backups are available to restore."; renderShell(); return; }
+		Backup backup = fileBackups.getFirst();
+		String key = "restore:" + backup.path();
+		if (!confirmFileAction(key, "Restore " + backup.script().getFileName() + " from " + backup.createdAt())) return;
+		lintExecutor.execute(() -> {
+			try { Path restored = fileSettingsService.restore(settingsConfig, backup); if (shell != null) shell.post(() -> { refreshEditorScripts(); selectEditorScript(restored); settingsMessage = "Restored " + restored.getFileName() + " after creating a safety backup."; rescanFolders(false); renderShell(); }); }
+			catch (Exception error) { TritonUI.LOGGER.error("Backup restore failed", error); postFileMessage("Restore failed: " + safeErrorMessage(error), false); }
+		});
+	}
+
+	private void deleteOldBackups() {
+		if (!confirmFileAction("delete-old-backups", "Delete backups older than " + settingsConfig.backupRetention())) return;
+		lintExecutor.execute(() -> {
+			try { int count = fileSettingsService.deleteExpired(settingsConfig); postFileMessage("Deleted " + count + " expired backup(s).", true); if (shell != null) shell.post(() -> rescanFolders(false)); }
+			catch (Exception error) { TritonUI.LOGGER.error("Old backup deletion failed", error); postFileMessage("Backup cleanup failed: " + safeErrorMessage(error), false); }
+		});
+	}
+
+	private boolean confirmFileAction(String key, String description) {
+		boolean confirmed = key.equals(pendingFileAction) && System.currentTimeMillis() <= pendingFileActionExpiresAt;
+		if (confirmed) { pendingFileAction = ""; return true; }
+		pendingFileAction = key; pendingFileActionExpiresAt = System.currentTimeMillis() + 10_000L;
+		settingsMessage = "Confirm: click again within 10 seconds to " + description + ".";
+		renderShell();
+		return false;
+	}
+
+	private void postFileMessage(String message, boolean success) {
+		if (shell != null) shell.post(() -> { folderScanRunning = false; settingsMessage = message; renderShell(); });
+	}
+
 
 	private void resetSettingsToDefaults() {
 		settingsConfig = new FluxusConfig();
@@ -4570,18 +4807,17 @@ public final class TritonModernFragment extends Fragment {
 	}
 
 	private void openFolder(Path folder, String name) {
-		try {
-			Files.createDirectories(folder);
-			if (Desktop.isDesktopSupported()) {
+		lintExecutor.execute(() -> {
+			try {
+				if (!Files.isDirectory(folder)) throw new IOException("Folder does not exist: " + folder);
+				if (!Desktop.isDesktopSupported() || !Desktop.getDesktop().isSupported(Desktop.Action.OPEN)) throw new IOException("Desktop folder opening is not supported");
 				Desktop.getDesktop().open(folder.toFile());
-				settingsMessage = "Opened " + name + ".";
-			} else {
-				settingsMessage = name + ": " + folder;
+				postFileMessage("Opened " + name + ".", true);
+			} catch (Exception error) {
+				TritonUI.LOGGER.error("Unable to open {} at {}", name, folder, error);
+				postFileMessage("Open folder failed: " + safeErrorMessage(error), false);
 			}
-		} catch (IOException e) {
-			settingsMessage = "Open folder failed: " + e.getMessage();
-		}
-		renderShell();
+		});
 	}
 
 	private View aboutCenter() {
@@ -5149,9 +5385,11 @@ public final class TritonModernFragment extends Fragment {
 	}
 
 	private void ensureEditorScriptsReady() {
-		scriptDir = Paths.get(System.getProperty("user.dir"), "minescript");
-		minescriptConfigFile = scriptDir.resolve("config.txt");
 		settingsConfig = FluxusConfig.load();
+		fileSettingsService = new FileSettingsService(Paths.get(System.getProperty("user.dir")));
+		scriptDir = fileSettingsService.scripts(settingsConfig);
+		minescriptConfigFile = Paths.get(System.getProperty("user.dir"), "minescript", "config.txt").toAbsolutePath().normalize();
+		FluxusAppState.get().configureFolders(scriptDir, fileSettingsService.templates(settingsConfig));
 		applyConfigPalette();
 		page = pageFromConfig(initialPage == null ? settingsConfig.defaultPage() : initialPage);
 		selectedFolder = scriptDir;
@@ -5162,6 +5400,7 @@ public final class TritonModernFragment extends Fragment {
 			appendEditorLog("Failed to prepare minescript folder: " + e.getMessage());
 		}
 		refreshEditorScripts();
+		rescanFolders(false);
 		restoreRecoveryDrafts();
 		if (editorLogs.isEmpty()) {
 			appendEditorLog("Editor connected to " + scriptDir);
@@ -5815,17 +6054,8 @@ public final class TritonModernFragment extends Fragment {
 	}
 
 	private void createEditorBackup(Path script) throws IOException {
-		if (script == null || Files.notExists(script) || settingsConfig.maximumBackupCount() <= 0) return;
-		Path relative = script.startsWith(scriptDir) ? scriptDir.relativize(script) : Path.of(script.getFileName().toString());
-		Path folder = scriptDir.resolve(".shulkr-backups").resolve(relative.getParent() == null ? Path.of("") : relative.getParent()).normalize();
-		Files.createDirectories(folder);
-		String prefix = script.getFileName() + ".";
-		Path backup = folder.resolve(prefix + System.currentTimeMillis() + ".bak");
-		Files.copy(script, backup, StandardCopyOption.REPLACE_EXISTING);
-		try (var backups = Files.list(folder)) {
-			List<Path> matching = backups.filter(path -> path.getFileName().toString().startsWith(prefix)).sorted(Comparator.comparingLong(this::backupModifiedMillis).reversed()).toList();
-			for (int i = settingsConfig.maximumBackupCount(); i < matching.size(); i++) Files.deleteIfExists(matching.get(i));
-		}
+		if (script == null || Files.notExists(script) || settingsConfig.maximumBackupCount() <= 0 || !settingsConfig.automaticBackups()) return;
+		fileSettingsService.createBackup(settingsConfig, script, "save");
 	}
 
 	private long backupModifiedMillis(Path path) {
@@ -5844,6 +6074,10 @@ public final class TritonModernFragment extends Fragment {
 			return;
 		}
 		if (settingsConfig.saveBeforeRunning() && codeEditor != null && !saveCurrentScript(false)) return;
+		if (settingsConfig.backupBeforeRun() && settingsConfig.automaticBackups()) {
+			try { fileSettingsService.createBackup(settingsConfig, selectedScript, "run"); }
+			catch (IOException error) { handleRunError(selectedScript.getFileName().toString(), "Backup before run failed: " + error.getMessage()); return; }
+		}
 		String fileName = selectedScript.getFileName().toString();
 		if (".pyj".equalsIgnoreCase(extension(fileName))) {
 			appendEditorLog(fileName + " is a Pyjinn module. Import it from a Python runner instead of running it directly.");
@@ -8979,7 +9213,7 @@ public final class TritonModernFragment extends Fragment {
 				|| key.equals("editor-tab-size") || key.equals("editor-cursor-style")
 				|| key.equals("editor-autosave") || key.equals("editor-working-directory") || key.equals("telemetry")
 				|| key.equals("advanced-thread-priority") || key.equals("privacy-telemetry")
-				|| key.equals("privacy-log-retention") || key.startsWith("privacy-permission-");
+				|| key.equals("privacy-log-retention") || key.equals("backup-retention") || key.startsWith("privacy-permission-");
 	}
 
 	private View settingsFloatingDropdown() {
@@ -9040,6 +9274,7 @@ public final class TritonModernFragment extends Fragment {
 		if (key.equals("advanced-thread-priority")) return settingsConfig.executionThreadPriority();
 		if (key.equals("privacy-telemetry")) return settingsConfig.telemetryMode();
 		if (key.equals("privacy-log-retention")) return settingsConfig.logRetention();
+		if (key.equals("backup-retention")) return settingsConfig.backupRetention();
 		if (key.startsWith("privacy-permission-")) return settingsConfig.permissionPolicy(permissionNameForKey(key));
 		return "";
 	}
@@ -9088,11 +9323,17 @@ public final class TritonModernFragment extends Fragment {
 		if (key.equals("advanced-thread-priority")) return new String[]{"Low", "Normal", "High"};
 		if (key.equals("privacy-telemetry")) return new String[]{"Off", "Local diagnostics only", "Anonymous diagnostics"};
 		if (key.equals("privacy-log-retention")) return new String[]{"Session only", "1 day", "7 days", "30 days"};
+		if (key.equals("backup-retention")) return new String[]{"Never", "7 days", "30 days", "90 days"};
 		if (key.startsWith("privacy-permission-")) return PERMISSION_POLICY_OPTIONS;
 		return new String[0];
 	}
 
 	private void applySettingsDropdownSelection(String key, String option) {
+		if (key.equals("backup-retention")) {
+			settingsConfig.setBackupRetention(option);
+			updateFileSetting("Backup retention");
+			return;
+		}
 		if (key.equals("privacy-telemetry")) {
 			updatePrivacySetting("Telemetry", () -> settingsConfig.setTelemetryMode(option));
 			return;

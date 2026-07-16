@@ -63,7 +63,8 @@ public final class FluxusAppState {
 	private final Path templatesPath = backendDataDir.resolve("templates.json");
 	private final Path libraryScriptsPath = backendDataDir.resolve("library-scripts.json");
 	private final Path deviceTokenPath = backendDataDir.resolve(".device-token");
-	private final Path scriptDir = Path.of(System.getProperty("user.dir"), "minescript");
+	private volatile Path scriptDir = Path.of(System.getProperty("user.dir"), "minescript").toAbsolutePath().normalize();
+	private volatile Path templateDir = scriptDir.resolve("templates").normalize();
 	private final HttpClient httpClient = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(2)).build();
 	private final ScheduledExecutorService backendHeartbeat = Executors.newSingleThreadScheduledExecutor(runnable -> {
 		Thread thread = new Thread(runnable, "Shulkr Backend Heartbeat");
@@ -75,6 +76,7 @@ public final class FluxusAppState {
 	private List<ModuleItem> modules = List.of();
 	private List<ClientModuleItem> clientModules = List.of();
 	private List<TemplateItem> templates = List.of();
+	private List<TemplateItem> catalogTemplates = List.of();
 	private List<LibraryScriptItem> libraryScripts = List.of();
 	private Set<String> moduleScriptPaths = Set.of();
 	private boolean heartbeatStarted;
@@ -111,6 +113,28 @@ public final class FluxusAppState {
 		}
 	}
 
+	public synchronized void configureFolders(Path scripts, Path templates) {
+		if (scripts != null) scriptDir = scripts.toAbsolutePath().normalize();
+		if (templates != null) templateDir = templates.toAbsolutePath().normalize();
+		reloadConfiguredTemplates();
+	}
+
+	private void reloadConfiguredTemplates() {
+		if (!Files.isDirectory(templateDir)) return;
+		List<TemplateItem> merged = new ArrayList<>(catalogTemplates.isEmpty() ? templates : catalogTemplates);
+		try (var stream = Files.walk(templateDir, 4)) {
+			for (Path file : stream.filter(Files::isRegularFile)
+					.filter(path -> path.getFileName().toString().toLowerCase(Locale.ROOT).endsWith(".json")).toList()) {
+				TemplateItem item = readJson(file, TemplateItem.class, null);
+				if (item == null) continue;
+				TemplateItem normalized = item.normalized();
+				merged.removeIf(existing -> existing.id().equals(normalized.id()));
+				merged.add(normalized);
+			}
+		} catch (IOException ignored) {}
+		templates = List.copyOf(merged);
+	}
+
 	public synchronized void reload() {
 		profile = readJson(profilePath, Profile.class, Profile.defaults()).normalized();
 		backendOnline = probeBackend();
@@ -128,6 +152,8 @@ public final class FluxusAppState {
 			writeJson(moduleScriptsPath, moduleScriptPaths);
 		}
 		templates = backendList("/api/templates", TEMPLATE_LIST, readJson(templatesPath, TEMPLATE_LIST, List.of()));
+		catalogTemplates = List.copyOf(templates);
+		reloadConfiguredTemplates();
 		libraryScripts = backendList("/api/library/scripts", LIBRARY_SCRIPT_LIST, readJson(libraryScriptsPath, LIBRARY_SCRIPT_LIST, List.<LibraryScriptItem>of())).stream()
 				.map(LibraryScriptItem::normalized)
 				.sorted(Comparator.comparingLong(LibraryScriptItem::publishedAt).reversed())
@@ -367,7 +393,7 @@ public final class FluxusAppState {
 	}
 
 	public synchronized ScriptSummary installLibraryScript(String id) throws IOException {
-		ScriptSummary installed = backendPost("/api/library/scripts/" + id + "/install", Map.of(), ScriptSummary.class);
+		ScriptSummary installed = usingDefaultScriptDirectory() ? backendPost("/api/library/scripts/" + id + "/install", Map.of(), ScriptSummary.class) : null;
 		if (installed != null) {
 			return installed;
 		}
@@ -437,7 +463,11 @@ public final class FluxusAppState {
 	}
 
 	public List<ScriptSummary> scripts() {
-		return backendList("/api/scripts", SCRIPT_LIST, localScripts());
+		return usingDefaultScriptDirectory() ? backendList("/api/scripts", SCRIPT_LIST, localScripts()) : localScripts();
+	}
+
+	private boolean usingDefaultScriptDirectory() {
+		return scriptDir.equals(Path.of(System.getProperty("user.dir"), "minescript").toAbsolutePath().normalize());
 	}
 
 	private List<ScriptSummary> localScripts() {
@@ -457,7 +487,7 @@ public final class FluxusAppState {
 	}
 
 	public List<FolderSummary> scriptFolders() {
-		return backendList("/api/scripts/folders", FOLDER_LIST, localScriptFolders());
+		return usingDefaultScriptDirectory() ? backendList("/api/scripts/folders", FOLDER_LIST, localScriptFolders()) : localScriptFolders();
 	}
 
 	private List<FolderSummary> localScriptFolders() {
@@ -477,7 +507,7 @@ public final class FluxusAppState {
 	}
 
 	public synchronized String readScript(String relativePath) throws IOException {
-		ReadScriptResponse response = backendGet("/api/scripts/read?path=" + url(relativePath), ReadScriptResponse.class);
+		ReadScriptResponse response = usingDefaultScriptDirectory() ? backendGet("/api/scripts/read?path=" + url(relativePath), ReadScriptResponse.class) : null;
 		if (response != null) {
 			return response.content() == null ? "" : response.content();
 		}
@@ -488,11 +518,11 @@ public final class FluxusAppState {
 	public synchronized ScriptSummary writeScript(String requestedName, String content, boolean overwrite) throws IOException {
 		Set<Path> existing = snapshotLocalScriptFiles();
 		long requestStartedAt = System.currentTimeMillis();
-		ScriptSummary backendSummary = backendPost("/api/scripts", Map.of(
+		ScriptSummary backendSummary = usingDefaultScriptDirectory() ? backendPost("/api/scripts", Map.of(
 				"name", requestedName == null || requestedName.isBlank() ? "UploadedScript.py" : requestedName,
 				"content", content == null ? "" : content,
 				"overwrite", overwrite
-		), ScriptSummary.class);
+		), ScriptSummary.class) : null;
 		if (backendSummary != null) {
 			return backendSummary;
 		}

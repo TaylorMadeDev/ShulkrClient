@@ -75,6 +75,13 @@ public final class FluxusConfig {
 	private boolean insertFinalNewline = true;
 	private boolean createBackupBeforeSaving = true;
 	private int maximumBackupCount = 25;
+	private String scriptFolderPath = "";
+	private String templateFolderPath = "";
+	private String backupFolderPath = "";
+	private boolean selectedScriptIsModule;
+	private boolean automaticBackups = true;
+	private boolean backupBeforeRun = true;
+	private String backupRetention = "30 days";
 	private boolean restoreUnsavedTabs = true;
 	private boolean confirmCloseUnsaved = true;
 	private boolean saveBeforeRunning = true;
@@ -215,6 +222,14 @@ public final class FluxusConfig {
 			config.insertFinalNewline = readBoolean(json, "insertFinalNewline", config.insertFinalNewline);
 			config.createBackupBeforeSaving = readBoolean(json, "createBackupBeforeSaving", config.createBackupBeforeSaving);
 			config.maximumBackupCount = clamp(readInt(json, "maximumBackupCount", readInt(json, "backupHistory", config.maximumBackupCount)), 0, 100);
+			config.scriptFolderPath = readString(json, "scriptFolderPath", config.scriptFolderPath);
+			config.templateFolderPath = readString(json, "templateFolderPath", config.templateFolderPath);
+			config.backupFolderPath = readString(json, "backupFolderPath", config.backupFolderPath);
+			config.selectedScriptIsModule = readBoolean(json, "selectedScriptIsModule", config.selectedScriptIsModule);
+			config.automaticBackups = readBoolean(json, "automaticBackups", config.automaticBackups);
+			config.backupBeforeRun = readBoolean(json, "backupBeforeRun", config.backupBeforeRun);
+			config.backupRetention = choice(readString(json, "backupRetention", config.backupRetention), config.backupRetention,
+					"Never", "7 days", "30 days", "90 days");
 			config.restoreUnsavedTabs = readBoolean(json, "restoreUnsavedTabs", config.restoreUnsavedTabs);
 			config.confirmCloseUnsaved = readBoolean(json, "confirmCloseUnsaved", config.confirmCloseUnsaved);
 			config.saveBeforeRunning = readBoolean(json, "saveBeforeRunning", config.saveBeforeRunning);
@@ -421,6 +436,13 @@ public final class FluxusConfig {
 	public boolean insertFinalNewline() { return insertFinalNewline; }
 	public boolean createBackupBeforeSaving() { return createBackupBeforeSaving; }
 	public int maximumBackupCount() { return maximumBackupCount; }
+	public String scriptFolderPath() { return scriptFolderPath; }
+	public String templateFolderPath() { return templateFolderPath; }
+	public String backupFolderPath() { return backupFolderPath; }
+	public boolean selectedScriptIsModule() { return selectedScriptIsModule; }
+	public boolean automaticBackups() { return automaticBackups; }
+	public boolean backupBeforeRun() { return backupBeforeRun; }
+	public String backupRetention() { return backupRetention; }
 	public boolean restoreUnsavedTabs() { return restoreUnsavedTabs; }
 	public boolean confirmCloseUnsaved() { return confirmCloseUnsaved; }
 	public boolean saveBeforeRunning() { return saveBeforeRunning; }
@@ -649,6 +671,13 @@ public final class FluxusConfig {
 	public void setInsertFinalNewline(boolean value) { insertFinalNewline = value; }
 	public void setCreateBackupBeforeSaving(boolean value) { createBackupBeforeSaving = value; }
 	public void setMaximumBackupCount(int value) { maximumBackupCount = clamp(value, 0, 100); }
+	public void setScriptFolderPath(String value) { scriptFolderPath = value == null ? "" : value; }
+	public void setTemplateFolderPath(String value) { templateFolderPath = value == null ? "" : value; }
+	public void setBackupFolderPath(String value) { backupFolderPath = value == null ? "" : value; }
+	public void setSelectedScriptIsModule(boolean value) { selectedScriptIsModule = value; }
+	public void setAutomaticBackups(boolean value) { automaticBackups = value; }
+	public void setBackupBeforeRun(boolean value) { backupBeforeRun = value; }
+	public void setBackupRetention(String value) { backupRetention = validChoice(value, "Never", "7 days", "30 days", "90 days") ? value : "30 days"; }
 	public void setRestoreUnsavedTabs(boolean value) { restoreUnsavedTabs = value; }
 	public void setConfirmCloseUnsaved(boolean value) { confirmCloseUnsaved = value; }
 	public void setSaveBeforeRunning(boolean value) { saveBeforeRunning = value; }
@@ -814,6 +843,13 @@ public final class FluxusConfig {
 				+ "  \"insertFinalNewline\": " + insertFinalNewline + ",\n"
 				+ "  \"createBackupBeforeSaving\": " + createBackupBeforeSaving + ",\n"
 				+ "  \"maximumBackupCount\": " + maximumBackupCount + ",\n"
+				+ "  \"scriptFolderPath\": \"" + escape(scriptFolderPath) + "\",\n"
+				+ "  \"templateFolderPath\": \"" + escape(templateFolderPath) + "\",\n"
+				+ "  \"backupFolderPath\": \"" + escape(backupFolderPath) + "\",\n"
+				+ "  \"selectedScriptIsModule\": " + selectedScriptIsModule + ",\n"
+				+ "  \"automaticBackups\": " + automaticBackups + ",\n"
+				+ "  \"backupBeforeRun\": " + backupBeforeRun + ",\n"
+				+ "  \"backupRetention\": \"" + escape(backupRetention) + "\",\n"
 				+ "  \"restoreUnsavedTabs\": " + restoreUnsavedTabs + ",\n"
 				+ "  \"confirmCloseUnsaved\": " + confirmCloseUnsaved + ",\n"
 				+ "  \"saveBeforeRunning\": " + saveBeforeRunning + ",\n"

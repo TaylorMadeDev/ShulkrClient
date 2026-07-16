@@ -7,6 +7,7 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.google.gson.reflect.TypeToken;
 import dev.triton.ui.script.ScriptSettingsParser;
+import dev.triton.ui.client.config.FluxusConfig;
 import net.minecraft.client.Minecraft;
 
 import java.io.IOException;
@@ -27,7 +28,12 @@ public final class ScriptSettingsRuntime {
 	public record Prepared(String scriptId, String commandPath, boolean configured, int settingCount) {}
 
 	public static Path scriptDirectory() {
-		return Minecraft.getInstance().gameDirectory.toPath().resolve("minescript").normalize();
+		FluxusConfig config = FluxusConfig.load();
+		if (!config.scriptFolderPath().isBlank()) {
+			try { return Path.of(config.scriptFolderPath()).toAbsolutePath().normalize(); }
+			catch (RuntimeException ignored) {}
+		}
+		return Minecraft.getInstance().gameDirectory.toPath().resolve("minescript").toAbsolutePath().normalize();
 	}
 
 	private static Path dataDirectory() {
