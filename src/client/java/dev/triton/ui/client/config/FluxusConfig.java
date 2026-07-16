@@ -1,5 +1,9 @@
 package dev.triton.ui.client.config;
 
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParseException;
+import com.google.gson.JsonParser;
 import dev.triton.ui.script.ShortcutBinding;
 import net.fabricmc.loader.api.FabricLoader;
 
@@ -8,6 +12,8 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Base64;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.regex.Matcher;
@@ -19,6 +25,8 @@ public final class FluxusConfig {
 	private static final Pattern INT_FIELD = Pattern.compile("\"%s\"\\s*:\\s*(\\d+)");
 	private static final Path CONFIG_PATH = FabricLoader.getInstance().getConfigDir().resolve("shulkr-client.json");
 	private static final Path LEGACY_CONFIG_PATH = FabricLoader.getInstance().getConfigDir().resolve("shulk-client.json");
+
+	public static Path configPath() { return CONFIG_PATH; }
 
 	private String theme = "Dark glass";
 	private String accent = "Shulkr purple";
@@ -79,6 +87,23 @@ public final class FluxusConfig {
 	private String customWorkingDirectory = "";
 	private boolean confirmDangerousScripts = true;
 	private boolean stopScriptsOnWorldLeave = true;
+	private boolean developerMode;
+	private boolean showInternalScriptIds;
+	private boolean showAdvancedRuntimeDetails;
+	private boolean showDebugTooltips;
+	private boolean verboseClientLogging;
+	private boolean verboseMinescriptLogging;
+	private int scriptWorkerLimit = 2;
+	private int maximumConcurrentScripts = 4;
+	private String executionThreadPriority = "Normal";
+	private boolean backgroundScriptThrottling = true;
+	private boolean pauseBackgroundScriptsWhenUnfocused;
+	private int maximumRuntimeLogEntries = 500;
+	private int runtimeLogBufferSizeKb = 1024;
+	private int scriptStartupTimeoutSeconds = 15;
+	private int clientBridgeReconnectDelaySeconds = 5;
+	private boolean autoReconnectDashboard = true;
+	private boolean reduceUiUpdatesWhileScriptRunning = true;
 	private boolean blockNetworkByDefault = true;
 	private int openMenuKey = 85;
 	private int overlayEditKey = -1;
@@ -171,6 +196,24 @@ public final class FluxusConfig {
 			config.customWorkingDirectory = readString(json, "customWorkingDirectory", config.customWorkingDirectory);
 			config.confirmDangerousScripts = readBoolean(json, "confirmDangerousScripts", readBoolean(json, "confirmDestructiveScripts", config.confirmDangerousScripts));
 			config.stopScriptsOnWorldLeave = readBoolean(json, "stopScriptsOnWorldLeave", config.stopScriptsOnWorldLeave);
+			config.developerMode = readBoolean(json, "developerMode", config.developerMode);
+			config.showInternalScriptIds = readBoolean(json, "showInternalScriptIds", config.showInternalScriptIds);
+			config.showAdvancedRuntimeDetails = readBoolean(json, "showAdvancedRuntimeDetails", config.showAdvancedRuntimeDetails);
+			config.showDebugTooltips = readBoolean(json, "showDebugTooltips", config.showDebugTooltips);
+			config.verboseClientLogging = readBoolean(json, "verboseClientLogging", config.verboseClientLogging);
+			config.verboseMinescriptLogging = readBoolean(json, "verboseMinescriptLogging", config.verboseMinescriptLogging);
+			config.scriptWorkerLimit = clamp(readInt(json, "scriptWorkerLimit", config.scriptWorkerLimit), 1, 8);
+			config.maximumConcurrentScripts = clamp(readInt(json, "maximumConcurrentScripts", config.maximumConcurrentScripts), 1, 16);
+			config.executionThreadPriority = readString(json, "executionThreadPriority", config.executionThreadPriority);
+			if (!validChoice(config.executionThreadPriority, "Low", "Normal", "High")) config.executionThreadPriority = "Normal";
+			config.backgroundScriptThrottling = readBoolean(json, "backgroundScriptThrottling", config.backgroundScriptThrottling);
+			config.pauseBackgroundScriptsWhenUnfocused = readBoolean(json, "pauseBackgroundScriptsWhenUnfocused", config.pauseBackgroundScriptsWhenUnfocused);
+			config.maximumRuntimeLogEntries = clamp(readInt(json, "maximumRuntimeLogEntries", config.maximumRuntimeLogEntries), 100, 5000);
+			config.runtimeLogBufferSizeKb = clamp(readInt(json, "runtimeLogBufferSizeKb", config.runtimeLogBufferSizeKb), 64, 8192);
+			config.scriptStartupTimeoutSeconds = clamp(readInt(json, "scriptStartupTimeoutSeconds", config.scriptStartupTimeoutSeconds), 1, 120);
+			config.clientBridgeReconnectDelaySeconds = clamp(readInt(json, "clientBridgeReconnectDelaySeconds", config.clientBridgeReconnectDelaySeconds), 1, 60);
+			config.autoReconnectDashboard = readBoolean(json, "autoReconnectDashboard", config.autoReconnectDashboard);
+			config.reduceUiUpdatesWhileScriptRunning = readBoolean(json, "reduceUiUpdatesWhileScriptRunning", config.reduceUiUpdatesWhileScriptRunning);
 			config.blockNetworkByDefault = readBoolean(json, "blockNetworkByDefault", config.blockNetworkByDefault);
 			config.openMenuKey = readInt(json, "openMenuKey", config.openMenuKey);
 			config.overlayEditKey = readInt(json, "overlayEditKey", config.overlayEditKey);
@@ -323,6 +366,23 @@ public final class FluxusConfig {
 	public String customWorkingDirectory() { return customWorkingDirectory; }
 	public boolean confirmDangerousScripts() { return confirmDangerousScripts; }
 	public boolean stopScriptsOnWorldLeave() { return stopScriptsOnWorldLeave; }
+	public boolean developerMode() { return developerMode; }
+	public boolean showInternalScriptIds() { return showInternalScriptIds; }
+	public boolean showAdvancedRuntimeDetails() { return showAdvancedRuntimeDetails; }
+	public boolean showDebugTooltips() { return showDebugTooltips; }
+	public boolean verboseClientLogging() { return verboseClientLogging; }
+	public boolean verboseMinescriptLogging() { return verboseMinescriptLogging; }
+	public int scriptWorkerLimit() { return scriptWorkerLimit; }
+	public int maximumConcurrentScripts() { return maximumConcurrentScripts; }
+	public String executionThreadPriority() { return executionThreadPriority; }
+	public boolean backgroundScriptThrottling() { return backgroundScriptThrottling; }
+	public boolean pauseBackgroundScriptsWhenUnfocused() { return pauseBackgroundScriptsWhenUnfocused; }
+	public int maximumRuntimeLogEntries() { return maximumRuntimeLogEntries; }
+	public int runtimeLogBufferSizeKb() { return runtimeLogBufferSizeKb; }
+	public int scriptStartupTimeoutSeconds() { return scriptStartupTimeoutSeconds; }
+	public int clientBridgeReconnectDelaySeconds() { return clientBridgeReconnectDelaySeconds; }
+	public boolean autoReconnectDashboard() { return autoReconnectDashboard; }
+	public boolean reduceUiUpdatesWhileScriptRunning() { return reduceUiUpdatesWhileScriptRunning; }
 
 	public boolean blockNetworkByDefault() {
 		return blockNetworkByDefault;
@@ -499,6 +559,23 @@ public final class FluxusConfig {
 	public void setCustomWorkingDirectory(String value) { customWorkingDirectory = value == null ? "" : value; }
 	public void setConfirmDangerousScripts(boolean value) { confirmDangerousScripts = value; }
 	public void setStopScriptsOnWorldLeave(boolean value) { stopScriptsOnWorldLeave = value; }
+	public void setDeveloperMode(boolean value) { developerMode = value; }
+	public void setShowInternalScriptIds(boolean value) { showInternalScriptIds = value; }
+	public void setShowAdvancedRuntimeDetails(boolean value) { showAdvancedRuntimeDetails = value; }
+	public void setShowDebugTooltips(boolean value) { showDebugTooltips = value; }
+	public void setVerboseClientLogging(boolean value) { verboseClientLogging = value; }
+	public void setVerboseMinescriptLogging(boolean value) { verboseMinescriptLogging = value; }
+	public void setScriptWorkerLimit(int value) { scriptWorkerLimit = clamp(value, 1, 8); }
+	public void setMaximumConcurrentScripts(int value) { maximumConcurrentScripts = clamp(value, 1, 16); }
+	public void setExecutionThreadPriority(String value) { executionThreadPriority = validChoice(value, "Low", "Normal", "High") ? value : "Normal"; }
+	public void setBackgroundScriptThrottling(boolean value) { backgroundScriptThrottling = value; }
+	public void setPauseBackgroundScriptsWhenUnfocused(boolean value) { pauseBackgroundScriptsWhenUnfocused = value; }
+	public void setMaximumRuntimeLogEntries(int value) { maximumRuntimeLogEntries = clamp(value, 100, 5000); }
+	public void setRuntimeLogBufferSizeKb(int value) { runtimeLogBufferSizeKb = clamp(value, 64, 8192); }
+	public void setScriptStartupTimeoutSeconds(int value) { scriptStartupTimeoutSeconds = clamp(value, 1, 120); }
+	public void setClientBridgeReconnectDelaySeconds(int value) { clientBridgeReconnectDelaySeconds = clamp(value, 1, 60); }
+	public void setAutoReconnectDashboard(boolean value) { autoReconnectDashboard = value; }
+	public void setReduceUiUpdatesWhileScriptRunning(boolean value) { reduceUiUpdatesWhileScriptRunning = value; }
 
 	public void setBlockNetworkByDefault(boolean blockNetworkByDefault) {
 		this.blockNetworkByDefault = blockNetworkByDefault;
@@ -609,6 +686,23 @@ public final class FluxusConfig {
 				+ "  \"customWorkingDirectory\": \"" + escape(customWorkingDirectory) + "\",\n"
 				+ "  \"confirmDangerousScripts\": " + confirmDangerousScripts + ",\n"
 				+ "  \"stopScriptsOnWorldLeave\": " + stopScriptsOnWorldLeave + ",\n"
+				+ "  \"developerMode\": " + developerMode + ",\n"
+				+ "  \"showInternalScriptIds\": " + showInternalScriptIds + ",\n"
+				+ "  \"showAdvancedRuntimeDetails\": " + showAdvancedRuntimeDetails + ",\n"
+				+ "  \"showDebugTooltips\": " + showDebugTooltips + ",\n"
+				+ "  \"verboseClientLogging\": " + verboseClientLogging + ",\n"
+				+ "  \"verboseMinescriptLogging\": " + verboseMinescriptLogging + ",\n"
+				+ "  \"scriptWorkerLimit\": " + scriptWorkerLimit + ",\n"
+				+ "  \"maximumConcurrentScripts\": " + maximumConcurrentScripts + ",\n"
+				+ "  \"executionThreadPriority\": \"" + escape(executionThreadPriority) + "\",\n"
+				+ "  \"backgroundScriptThrottling\": " + backgroundScriptThrottling + ",\n"
+				+ "  \"pauseBackgroundScriptsWhenUnfocused\": " + pauseBackgroundScriptsWhenUnfocused + ",\n"
+				+ "  \"maximumRuntimeLogEntries\": " + maximumRuntimeLogEntries + ",\n"
+				+ "  \"runtimeLogBufferSizeKb\": " + runtimeLogBufferSizeKb + ",\n"
+				+ "  \"scriptStartupTimeoutSeconds\": " + scriptStartupTimeoutSeconds + ",\n"
+				+ "  \"clientBridgeReconnectDelaySeconds\": " + clientBridgeReconnectDelaySeconds + ",\n"
+				+ "  \"autoReconnectDashboard\": " + autoReconnectDashboard + ",\n"
+				+ "  \"reduceUiUpdatesWhileScriptRunning\": " + reduceUiUpdatesWhileScriptRunning + ",\n"
 				+ "  \"blockNetworkByDefault\": " + blockNetworkByDefault + ",\n"
 				+ "  \"openMenuKey\": " + openMenuKey + ",\n"
 				+ "  \"overlayEditKey\": " + overlayEditKey + ",\n"
@@ -619,6 +713,64 @@ public final class FluxusConfig {
 				+ "  \"scriptShortcutData\": \"" + escape(scriptShortcutData) + "\",\n"
 				+ "  \"lastScriptPath\": \"" + escape(lastScriptPath) + "\"\n"
 				+ "}\n";
+	}
+
+	public static List<String> validateJson(String json) {
+		List<String> errors = new ArrayList<>();
+		try {
+			JsonElement parsed = JsonParser.parseString(json);
+			if (!parsed.isJsonObject()) {
+				errors.add("Line 1: configuration root must be a JSON object.");
+				return errors;
+			}
+			JsonObject object = parsed.getAsJsonObject();
+			validateInt(json, object, "scriptWorkerLimit", 1, 8, errors);
+			validateInt(json, object, "maximumConcurrentScripts", 1, 16, errors);
+			validateInt(json, object, "maximumRuntimeLogEntries", 100, 5000, errors);
+			validateInt(json, object, "runtimeLogBufferSizeKb", 64, 8192, errors);
+			validateInt(json, object, "scriptStartupTimeoutSeconds", 1, 120, errors);
+			validateInt(json, object, "clientBridgeReconnectDelaySeconds", 1, 60, errors);
+			for (String key : List.of("developerMode", "showInternalScriptIds", "showAdvancedRuntimeDetails", "showDebugTooltips",
+					"verboseClientLogging", "verboseMinescriptLogging", "backgroundScriptThrottling", "pauseBackgroundScriptsWhenUnfocused",
+					"autoReconnectDashboard", "reduceUiUpdatesWhileScriptRunning")) validateBoolean(json, object, key, errors);
+			if (object.has("executionThreadPriority") && !validChoice(object.get("executionThreadPriority").getAsString(), "Low", "Normal", "High")) {
+				errors.add("Line " + lineForKey(json, "executionThreadPriority") + ": executionThreadPriority must be Low, Normal, or High.");
+			}
+		} catch (JsonParseException | IllegalStateException | UnsupportedOperationException error) {
+			errors.add(error.getMessage() == null ? "Invalid JSON." : error.getMessage());
+		}
+		return errors;
+	}
+
+	private static void validateInt(String json, JsonObject object, String key, int min, int max, List<String> errors) {
+		if (!object.has(key)) return;
+		try {
+			int value = object.get(key).getAsInt();
+			if (value < min || value > max) errors.add("Line " + lineForKey(json, key) + ": " + key + " must be between " + min + " and " + max + ".");
+		} catch (RuntimeException error) {
+			errors.add("Line " + lineForKey(json, key) + ": " + key + " must be an integer.");
+		}
+	}
+
+	private static void validateBoolean(String json, JsonObject object, String key, List<String> errors) {
+		if ((object.has(key) && !object.get(key).isJsonPrimitive())
+				|| (object.has(key) && !object.get(key).getAsJsonPrimitive().isBoolean())) {
+			errors.add("Line " + lineForKey(json, key) + ": " + key + " must be true or false.");
+		}
+	}
+
+	private static int lineForKey(String json, String key) {
+		int index = json.indexOf('"' + key + '"');
+		if (index < 0) return 1;
+		int line = 1;
+		for (int i = 0; i < index; i++) if (json.charAt(i) == '\n') line++;
+		return line;
+	}
+
+	private static boolean validChoice(String value, String... choices) {
+		if (value == null) return false;
+		for (String choice : choices) if (choice.equals(value)) return true;
+		return false;
 	}
 
 	private static String readString(String json, String field, String fallback) {

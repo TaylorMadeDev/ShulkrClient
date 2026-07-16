@@ -41,6 +41,8 @@ public final class TritonUIClient implements ClientModInitializer {
 	private static String remoteActiveScript = "";
 	private static ModuleManager moduleManager;
 	private static boolean wasInWorld;
+	private static boolean wasWindowActive = true;
+	private static boolean suspendedForWindowFocus;
 	private static final Set<String> runningShortcutScripts = new HashSet<>();
 
 	@Override
@@ -48,6 +50,7 @@ public final class TritonUIClient implements ClientModInitializer {
 		config = FluxusConfig.load();
 		appState = FluxusAppState.get();
 		appState.initialize();
+		applyAdvancedRuntimeConfig();
 		moduleManager = ModuleManager.get();
 		moduleManager.initialize();
 		openDemo = KeyMappingHelper.registerKeyMapping(new KeyMapping(
@@ -80,6 +83,15 @@ public final class TritonUIClient implements ClientModInitializer {
 				});
 			}
 			wasInWorld = inWorld;
+			boolean windowActive = client.isWindowActive();
+			if (config.pauseBackgroundScriptsWhenUnfocused() && wasWindowActive && !windowActive && Minescript.activeJobCount() > 0) {
+				suspendedForWindowFocus = true;
+				Minescript.runEditorCommandAsync("suspend", handled -> verboseLog("Suspended Minescript jobs while Minecraft is unfocused: {}", handled));
+			} else if (suspendedForWindowFocus && windowActive) {
+				suspendedForWindowFocus = false;
+				Minescript.runEditorCommandAsync("resume", handled -> verboseLog("Resumed Minescript jobs after Minecraft regained focus: {}", handled));
+			}
+			wasWindowActive = windowActive;
 			moduleManager.onClientTick(client);
 			if (++telemetryTicks >= 20) {
 				telemetryTicks = 0;
@@ -167,6 +179,10 @@ public final class TritonUIClient implements ClientModInitializer {
 				String commandName = path.replace('\\', '/');
 				int dot = commandName.lastIndexOf('.');
 				if (dot > 0) commandName = commandName.substring(0, dot);
+				if (Minescript.activeJobCount() >= config.maximumConcurrentScripts()) {
+					appState.acknowledgeRemoteCommand(command, false, "Blocked: maximum concurrent script limit reached");
+					break;
+				}
 				Minescript.runEditorCommandAsync(commandName, handled -> {
 					if (handled) rememberLastScript(path);
 					appState.acknowledgeRemoteCommand(command, handled, handled ? "Started " + path : "Failed to start " + path);
@@ -214,6 +230,26 @@ public final class TritonUIClient implements ClientModInitializer {
 	public static void reloadConfig() {
 		config = FluxusConfig.load();
 		applySavedKeybindings();
+		applyAdvancedRuntimeConfig();
+	}
+
+	private static void applyAdvancedRuntimeConfig() {
+		if (config == null) return;
+		if (appState != null) appState.applyRuntimeConfig(config);
+		if (Minescript.config != null) {
+			Minescript.config.setDebugOutptut(config.verboseMinescriptLogging());
+			Minescript.enableDebugPyjinnLogging(config.verboseMinescriptLogging());
+		}
+		if (!config.pauseBackgroundScriptsWhenUnfocused() && suspendedForWindowFocus) {
+			suspendedForWindowFocus = false;
+			Minescript.runEditorCommandAsync("resume", handled -> verboseLog("Resumed jobs after disabling focus pause: {}", handled));
+		}
+		verboseLog("Applied advanced runtime configuration (workers={}, concurrent={}, reconnect={}s).",
+				config.scriptWorkerLimit(), config.maximumConcurrentScripts(), config.clientBridgeReconnectDelaySeconds());
+	}
+
+	public static void verboseLog(String message, Object... arguments) {
+		if (config != null && config.verboseClientLogging()) LOGGER.info(message, arguments);
 	}
 
 	public static FluxusAppState appState() {
@@ -352,6 +388,10 @@ public final class TritonUIClient implements ClientModInitializer {
 	}
 
 	private static void runScriptShortcut(Minecraft client, String scriptId) {
+		if (Minescript.activeJobCount() >= config.maximumConcurrentScripts()) {
+			notifyClient(client, "Script blocked: maximum concurrent script limit reached.");
+			return;
+		}
 		synchronized (runningShortcutScripts) {
 			if (!runningShortcutScripts.add(scriptId)) {
 				notifyClient(client, "That script shortcut is already starting.");

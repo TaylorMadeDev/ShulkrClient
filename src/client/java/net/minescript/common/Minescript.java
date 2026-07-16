@@ -2024,6 +2024,10 @@ public class Minescript {
         });
   }
 
+  public static int activeJobCount() {
+    return jobs.getMap().size();
+  }
+
   private static class ServerBlockList {
     private final Path serverBlockListPath;
     private boolean lastCheckedValue = true;

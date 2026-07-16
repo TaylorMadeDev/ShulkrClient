@@ -3,6 +3,11 @@ package dev.triton.ui.client.modern;
 import com.mojang.blaze3d.platform.InputConstants;
 import dev.triton.ui.TritonUI;
 import dev.triton.ui.client.TritonUIClient;
+import dev.triton.ui.client.advanced.AdvancedSettingsService;
+import dev.triton.ui.client.advanced.AdvancedSettingsService.ConfigBackup;
+import dev.triton.ui.client.advanced.AdvancedSettingsService.Diagnostic;
+import dev.triton.ui.client.advanced.AdvancedSettingsService.OperationResult;
+import dev.triton.ui.client.advanced.AdvancedSettingsService.StorageSnapshot;
 import dev.triton.ui.client.app.FluxusAppState;
 import dev.triton.ui.client.app.FluxusAppState.FolderSummary;
 import dev.triton.ui.client.app.FluxusAppState.LibraryScriptItem;
@@ -25,6 +30,7 @@ import icyllis.modernui.graphics.drawable.GradientDrawable;
 import icyllis.modernui.graphics.drawable.ShapeDrawable;
 import icyllis.modernui.mc.BlurHandler;
 import icyllis.modernui.mc.ImageStore;
+import icyllis.modernui.mc.MuiModApi;
 import icyllis.modernui.text.Editable;
 import icyllis.modernui.text.Layout;
 import icyllis.modernui.text.Spanned;
@@ -94,6 +100,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.Callable;
 import java.util.function.Consumer;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -226,6 +233,17 @@ public final class TritonModernFragment extends Fragment {
 	private EnvironmentDiagnosticReport environmentDiagnosticReport;
 	private boolean environmentDiagnosticRunning;
 	private String environmentDiagnosticText = "";
+	private AdvancedSettingsService advancedService;
+	private StorageSnapshot advancedStorageSnapshot;
+	private List<Diagnostic> advancedDiagnostics = List.of();
+	private List<ConfigBackup> advancedConfigBackups = List.of();
+	private boolean advancedStorageLoading;
+	private boolean advancedDiagnosticsRunning;
+	private String rawConfigDraft = "";
+	private String rawConfigError = "";
+	private boolean rawConfigApplyArmed;
+	private String pendingAdvancedAction = "";
+	private long pendingAdvancedActionExpiresAt;
 	private String completionRemainder = "";
 	private String openDropdownKey = "";
 	private boolean dropdownClosing;
@@ -289,11 +307,8 @@ public final class TritonModernFragment extends Fragment {
 	private boolean localCompletionDirty = true;
 	private long lastEditorClickAt;
 	private long lastEditorTextClickAt;
-	private final ScheduledExecutorService lintExecutor = Executors.newSingleThreadScheduledExecutor(runnable -> {
-		Thread thread = new Thread(runnable, "Shulkr Editor Worker");
-		thread.setDaemon(true);
-		return thread;
-	});
+	private long lastReducedEditorUiUpdateAt;
+	private final ScheduledExecutorService lintExecutor = createWorkerExecutor();
 	private ScheduledFuture<?> editorAnalysisTask;
 	private ScheduledFuture<?> editorAutosaveTask;
 	private ScheduledFuture<?> editorRunTimeoutTask;
@@ -321,6 +336,21 @@ public final class TritonModernFragment extends Fragment {
 	private TritonModernFragment(String initialPage, boolean initialGlobalSearch) {
 		this.initialPage = initialPage;
 		this.initialGlobalSearch = initialGlobalSearch;
+	}
+
+	private static ScheduledExecutorService createWorkerExecutor() {
+		FluxusConfig config = FluxusConfig.load();
+		int priority = switch (config.executionThreadPriority()) {
+			case "Low" -> Thread.MIN_PRIORITY;
+			case "High" -> Math.min(Thread.MAX_PRIORITY, Thread.NORM_PRIORITY + 2);
+			default -> Thread.NORM_PRIORITY;
+		};
+		return Executors.newScheduledThreadPool(config.scriptWorkerLimit(), runnable -> {
+			Thread thread = new Thread(runnable, "Shulkr Client Worker");
+			thread.setDaemon(true);
+			thread.setPriority(priority);
+			return thread;
+		});
 	}
 
 	public static TritonModernFragment forGlobalSearch() {
@@ -374,6 +404,7 @@ public final class TritonModernFragment extends Fragment {
 		shell.setBackground(round(BACKDROP, 0, 0));
 		TritonUIClient.setActiveModernFragment(this);
 		ensureEditorScriptsReady();
+		advancedService = new AdvancedSettingsService(Minecraft.getInstance().gameDirectory.toPath(), FluxusConfig.configPath());
 		if (initialGlobalSearch) {
 			globalSearchQuery = "";
 			openDropdownKey = "command-palette";
@@ -2531,9 +2562,21 @@ public final class TritonModernFragment extends Fragment {
 			left.addView(privacySettingsCard(), new LinearLayout.LayoutParams(match(), 270));
 			right.addView(safetyRuntimeCard(), new LinearLayout.LayoutParams(match(), 0, 1.0F));
 		} else {
-			body.addView(right, new LinearLayout.LayoutParams(0, match(), 1.0F));
-			left.addView(advancedSettingsCard(), new LinearLayout.LayoutParams(match(), 340));
-			right.addView(settingsLiveStatusCard(), new LinearLayout.LayoutParams(match(), 0, 1.0F));
+			body.removeAllViews();
+			ScrollView leftScroll = layoutScrollView();
+			LinearLayout leftCards = column(14);
+			leftCards.addView(developerOptionsCard(), new LinearLayout.LayoutParams(match(), wrap()));
+			leftCards.addView(runtimePerformanceCard(), new LinearLayout.LayoutParams(match(), wrap()));
+			leftCards.addView(experimentalFeaturesCard(), new LinearLayout.LayoutParams(match(), wrap()));
+			leftScroll.addView(leftCards, new ScrollView.LayoutParams(match(), wrap()));
+			body.addView(leftScroll, new LinearLayout.LayoutParams(0, match(), 1.0F));
+			ScrollView rightScroll = layoutScrollView();
+			LinearLayout rightCards = column(14);
+			rightCards.addView(cacheStorageCard(), new LinearLayout.LayoutParams(match(), wrap()));
+			rightCards.addView(diagnosticsRecoveryCard(), new LinearLayout.LayoutParams(match(), wrap()));
+			rightCards.addView(configurationManagementCard(), new LinearLayout.LayoutParams(match(), wrap()));
+			rightScroll.addView(rightCards, new ScrollView.LayoutParams(match(), wrap()));
+			body.addView(rightScroll, new LinearLayout.LayoutParams(0, match(), 1.0F));
 		}
 		return body;
 	}
@@ -2568,8 +2611,12 @@ public final class TritonModernFragment extends Fragment {
 			content.addView(privacySettingsCard(), new LinearLayout.LayoutParams(match(), 270));
 			content.addView(safetyRuntimeCard(), new LinearLayout.LayoutParams(match(), 300));
 		} else {
-			content.addView(advancedSettingsCard(), new LinearLayout.LayoutParams(match(), 340));
-			content.addView(settingsLiveStatusCard(), new LinearLayout.LayoutParams(match(), 320));
+			content.addView(developerOptionsCard(), new LinearLayout.LayoutParams(match(), wrap()));
+			content.addView(runtimePerformanceCard(), new LinearLayout.LayoutParams(match(), wrap()));
+			content.addView(cacheStorageCard(), new LinearLayout.LayoutParams(match(), wrap()));
+			content.addView(diagnosticsRecoveryCard(), new LinearLayout.LayoutParams(match(), wrap()));
+			content.addView(configurationManagementCard(), new LinearLayout.LayoutParams(match(), wrap()));
+			content.addView(experimentalFeaturesCard(), new LinearLayout.LayoutParams(match(), wrap()));
 		}
 		scroll.addView(content, new ScrollView.LayoutParams(match(), wrap()));
 		int savedScroll = settingsScrollPositions.getOrDefault(settingsTab, 0);
@@ -3076,18 +3123,393 @@ public final class TritonModernFragment extends Fragment {
 		return card;
 	}
 
-	private View advancedSettingsCard() {
-		LinearLayout card = settingsCard("Advanced", "gear-solid.png");
-		View repair = settingsActionRow("Repair Minescript config", "arrows-rotate-solid.png");
-		repair.setOnClickListener(view -> repairMinescriptConfig());
-		card.addView(repair, new LinearLayout.LayoutParams(match(), 42));
-		View cache = settingsActionRow("Clear UI cache", "broom-solid.png");
-		cache.setOnClickListener(view -> clearUiCache());
-		card.addView(cache, new LinearLayout.LayoutParams(match(), 42));
-		View defaults = settingsActionRow("Reset settings to defaults", "check-double-solid.png");
-		defaults.setOnClickListener(view -> resetSettingsToDefaults());
-		card.addView(defaults, new LinearLayout.LayoutParams(match(), 42));
+	private View developerOptionsCard() {
+		LinearLayout card = settingsCard("Developer Options", "code-solid.png");
+		card.addView(settingsSwitchRow("Developer mode", settingsConfig.developerMode(), value -> updateAdvancedSetting("Developer mode", () -> settingsConfig.setDeveloperMode(value))), rowParams());
+		card.addView(settingsSwitchRow("Show internal script IDs", settingsConfig.showInternalScriptIds(), value -> updateAdvancedSetting("Internal script IDs", () -> settingsConfig.setShowInternalScriptIds(value))), rowParams());
+		card.addView(settingsSwitchRow("Show advanced runtime details", settingsConfig.showAdvancedRuntimeDetails(), value -> updateAdvancedSetting("Runtime details", () -> settingsConfig.setShowAdvancedRuntimeDetails(value))), rowParams());
+		card.addView(settingsSwitchRow("Show debug tooltips", settingsConfig.showDebugTooltips(), value -> updateAdvancedSetting("Debug tooltips", () -> settingsConfig.setShowDebugTooltips(value))), rowParams());
+		card.addView(settingsSwitchRow("Verbose client logging", settingsConfig.verboseClientLogging(), value -> updateAdvancedSetting("Verbose client logging", () -> settingsConfig.setVerboseClientLogging(value))), rowParams());
+		card.addView(settingsSwitchRow("Verbose Minescript logging", settingsConfig.verboseMinescriptLogging(), value -> updateAdvancedSetting("Verbose Minescript logging", () -> settingsConfig.setVerboseMinescriptLogging(value))), rowParams());
+		if (settingsConfig.developerMode() && settingsConfig.showInternalScriptIds()) {
+			String identifier = selectedScript == null ? "No selected script" : Integer.toUnsignedString(selectedScript.toAbsolutePath().normalize().toString().hashCode(), 16);
+			card.addView(settingsValueRow("Selected script ID", identifier), rowParams());
+		}
+		if (settingsConfig.developerMode() && settingsConfig.showAdvancedRuntimeDetails()) {
+			card.addView(settingsValueRow("Active script jobs", Integer.toString(Minescript.activeJobCount())), rowParams());
+			card.addView(settingsValueRow("Dashboard bridge", FluxusAppState.get().backendOnline() ? "Connected" : "Offline"), rowParams());
+		}
+		card.addView(advancedAction("Open logs folder", "folder-open-solid.png", () -> openAdvancedPath(advancedService.logFolder(), false, "Logs folder")));
+		card.addView(advancedAction("Copy diagnostic information", "clipboard-solid.png", this::copyAdvancedDiagnostics));
+		card.addView(advancedAction("Reload UI", "arrows-rotate-solid.png", this::reloadAdvancedUi));
 		return card;
+	}
+
+	private View runtimePerformanceCard() {
+		LinearLayout card = settingsCard("Runtime & Performance", "play-solid.png");
+		card.addView(label("Worker count and priority apply when Reload UI recreates the client worker pool.", 11, FAINT));
+		card.addView(settingsIntSliderRow("Script worker limit", 1, 8, settingsConfig.scriptWorkerLimit(), "", value -> updateAdvancedSetting("Worker limit — Reload UI to apply", () -> settingsConfig.setScriptWorkerLimit(value))), sliderParams());
+		card.addView(settingsIntSliderRow("Concurrent scripts", 1, 16, settingsConfig.maximumConcurrentScripts(), "", value -> updateAdvancedSetting("Maximum concurrent scripts", () -> settingsConfig.setMaximumConcurrentScripts(value))), sliderParams());
+		card.addView(settingsDropdownRow("advanced-thread-priority", "Execution priority", settingsConfig.executionThreadPriority(), new String[]{"Low", "Normal", "High"}, value -> {}), rowParams());
+		card.addView(settingsSwitchRow("Background script throttling", settingsConfig.backgroundScriptThrottling(), value -> updateAdvancedSetting("Background throttling", () -> settingsConfig.setBackgroundScriptThrottling(value))), rowParams());
+		card.addView(settingsSwitchRow("Pause scripts while unfocused", settingsConfig.pauseBackgroundScriptsWhenUnfocused(), value -> updateAdvancedSetting("Pause while unfocused", () -> settingsConfig.setPauseBackgroundScriptsWhenUnfocused(value))), rowParams());
+		card.addView(settingsIntSliderRow("Runtime log entries", 100, 5000, settingsConfig.maximumRuntimeLogEntries(), "", value -> updateAdvancedSetting("Runtime log entry limit", () -> settingsConfig.setMaximumRuntimeLogEntries(value))), sliderParams());
+		card.addView(settingsIntSliderRow("Log buffer", 64, 8192, settingsConfig.runtimeLogBufferSizeKb(), " KB", value -> updateAdvancedSetting("Runtime log buffer", () -> settingsConfig.setRuntimeLogBufferSizeKb(value))), sliderParams());
+		card.addView(settingsIntSliderRow("Script startup timeout", 1, 120, settingsConfig.scriptStartupTimeoutSeconds(), " s", value -> updateAdvancedSetting("Script startup timeout", () -> settingsConfig.setScriptStartupTimeoutSeconds(value))), sliderParams());
+		card.addView(settingsIntSliderRow("Bridge reconnect delay", 1, 60, settingsConfig.clientBridgeReconnectDelaySeconds(), " s", value -> updateAdvancedSetting("Bridge reconnect delay", () -> settingsConfig.setClientBridgeReconnectDelaySeconds(value))), sliderParams());
+		card.addView(settingsSwitchRow("Auto-reconnect dashboard", settingsConfig.autoReconnectDashboard(), value -> updateAdvancedSetting("Dashboard auto-reconnect", () -> settingsConfig.setAutoReconnectDashboard(value))), rowParams());
+		card.addView(settingsSwitchRow("Reduce UI updates during scripts", settingsConfig.reduceUiUpdatesWhileScriptRunning(), value -> updateAdvancedSetting("Reduced runtime UI updates", () -> settingsConfig.setReduceUiUpdatesWhileScriptRunning(value))), rowParams());
+		return card;
+	}
+
+	private View cacheStorageCard() {
+		LinearLayout card = settingsCard("Cache & Storage", "box-solid.png");
+		ensureAdvancedStorageLoaded();
+		if (advancedStorageSnapshot == null) {
+			card.addView(label(advancedStorageLoading ? "Measuring local storage asynchronously…" : "Storage size is unavailable.", 12, MUTED));
+		} else {
+			advancedStorageSnapshot.categories().forEach((name, bytes) -> card.addView(settingsValueRow(name, formatBytes(bytes)), rowParams()));
+			card.addView(settingsValueRow("Total Shulkr local storage", formatBytes(advancedStorageSnapshot.totalBytes())), rowParams());
+		}
+		card.addView(label("Clear actions only touch the named Shulkr-managed category. Active log files and recent backups are preserved.", 11, FAINT));
+		card.addView(confirmAdvancedAction("clear-ui", "Clear UI cache", "UI render cache", advancedService::clearUiCache));
+		card.addView(confirmAdvancedAction("clear-script", "Clear script cache", "generated runtime wrappers and Python bytecode", advancedService::clearScriptCache));
+		card.addView(confirmAdvancedAction("clear-icons", "Clear thumbnails and icon cache", "downloaded thumbnails and cached icons", advancedService::clearThumbnailAndIconCache));
+		card.addView(confirmAdvancedAction("clear-logs", "Clear runtime logs", "rotated and telemetry logs; active logs stay open", advancedService::clearRuntimeLogs));
+		card.addView(confirmAdvancedAction("clear-backups", "Clear old script backups", "script backups older than seven days", advancedService::clearOldScriptBackups));
+		card.addView(advancedAction("Open cache folder", "folder-open-solid.png", () -> runAdvancedTask("Opening cache folder…", () -> {
+			Path folder = advancedService.cacheFolder();
+			openPathNow(folder, false);
+			return new OperationResult(true, "Opened cache folder.", 0, 0);
+		})));
+		return card;
+	}
+
+	private View diagnosticsRecoveryCard() {
+		LinearLayout card = settingsCard("Diagnostics & Recovery", "check-double-solid.png");
+		card.addView(label(advancedDiagnosticsRunning ? "Running real client checks…" : "Checks use the current files, processes, packaged assets, and dashboard health endpoint.", 11, MUTED));
+		card.addView(advancedAction(advancedDiagnosticsRunning ? "Diagnostic running…" : "Run Full Diagnostic", "arrows-rotate-solid.png", this::runFullAdvancedDiagnostic));
+		card.addView(advancedAction("Test dashboard connection", "cloud-solid.png", () -> runAdvancedDiagnostic(advancedService::testDashboardConnection)));
+		card.addView(advancedAction("Test Minescript connection", "code-solid.png", () -> runAdvancedDiagnostic(advancedService::testMinescriptConnection)));
+		card.addView(advancedAction("Test configured Python", "play-solid.png", () -> runAdvancedDiagnostic(advancedService::testPython)));
+		card.addView(advancedAction("Validate local configuration", "clipboard-solid.png", () -> runAdvancedDiagnostic(advancedService::validateConfiguration)));
+		card.addView(advancedAction("Validate script directories", "folder-open-solid.png", () -> runAdvancedDiagnostic(advancedService::validateScriptDirectories)));
+		card.addView(advancedAction("Validate required assets", "puzzle-piece-solid.png", () -> runAdvancedDiagnostic(advancedService::validateAssets)));
+		for (Diagnostic diagnostic : advancedDiagnostics) card.addView(advancedDiagnosticRow(diagnostic), new LinearLayout.LayoutParams(match(), wrap()));
+		card.addView(advancedAction("Repair missing directories", "arrows-rotate-solid.png", () -> runAdvancedTask("Repairing directories…", advancedService::repairMissingDirectories)));
+		card.addView(confirmAdvancedAction("repair-config-values", "Repair invalid config values", "invalid configuration values after creating a backup", advancedService::repairInvalidConfigValues));
+		card.addView(advancedAction("Export redacted diagnostic report", "download-solid.png", this::exportAdvancedDiagnostics));
+		return card;
+	}
+
+	private View configurationManagementCard() {
+		LinearLayout card = settingsCard("Configuration Management", "gear-solid.png");
+		card.addView(label("Raw edits are validated before an atomic replace. A backup is created before every replacement or restore.", 11, MUTED));
+		card.addView(advancedAction("View or edit raw configuration", "code-solid.png", this::openRawConfigEditor));
+		card.addView(advancedAction("Copy configuration JSON", "clipboard-solid.png", this::copyRawConfig));
+		card.addView(advancedAction("Open configuration file", "folder-open-solid.png", () -> openAdvancedPath(advancedService.configFile(), true, "Configuration file")));
+		card.addView(advancedAction("Validate configuration", "check-double-solid.png", () -> runAdvancedDiagnostic(advancedService::validateConfiguration)));
+		card.addView(advancedAction("Reload configuration", "arrows-rotate-solid.png", this::reloadAdvancedConfiguration));
+		card.addView(advancedAction("Create configuration backup", "clone-solid.png", this::createAdvancedConfigBackup));
+		card.addView(confirmAdvancedAction("restore-config", "Restore latest backup", "the latest validated configuration backup", advancedService::restoreLatestConfigBackup));
+		if (advancedConfigBackups.isEmpty()) card.addView(label("No configuration backups loaded yet.", 11, FAINT));
+		else for (ConfigBackup backup : advancedConfigBackups) {
+			card.addView(confirmAdvancedAction("restore-" + backup.path().getFileName(),
+					"Restore " + backup.path().getFileName() + " (" + formatBytes(backup.size()) + ")",
+					"configuration backup " + backup.path().getFileName(), () -> advancedService.restoreConfigBackup(backup)));
+		}
+		return card;
+	}
+
+	private View experimentalFeaturesCard() {
+		LinearLayout card = settingsCard("Experimental Features", "puzzle-piece-solid.png");
+		card.addView(label("No experimental features are available in this build. Preview controls will appear here only when a real runtime feature is registered.", 12, MUTED));
+		return card;
+	}
+
+	private LinearLayout.LayoutParams rowParams() {
+		return new LinearLayout.LayoutParams(match(), settingsRowHeight());
+	}
+
+	private LinearLayout.LayoutParams sliderParams() {
+		return new LinearLayout.LayoutParams(match(), 46);
+	}
+
+	private View advancedAction(String label, String iconFile, Runnable action) {
+		View row = settingsActionRow(label, iconFile);
+		row.setOnClickListener(view -> action.run());
+		return withActionHeight(row);
+	}
+
+	private View withActionHeight(View view) {
+		LinearLayout holder = column(0);
+		holder.addView(view, new LinearLayout.LayoutParams(match(), 42));
+		return holder;
+	}
+
+	private View confirmAdvancedAction(String key, String label, String detail, Callable<OperationResult> operation) {
+		boolean armed = pendingAdvancedAction.equals(key) && System.currentTimeMillis() < pendingAdvancedActionExpiresAt;
+		return advancedAction(armed ? "Confirm: " + label : label, armed ? "check-double-solid.png" : "broom-solid.png", () -> {
+			if (!armed) {
+				pendingAdvancedAction = key;
+				pendingAdvancedActionExpiresAt = System.currentTimeMillis() + 10_000L;
+				settingsMessage = "Confirm removal of " + detail + " by clicking the action again within 10 seconds.";
+				renderShell();
+				return;
+			}
+			pendingAdvancedAction = "";
+			runAdvancedTask("Removing " + detail + "…", operation);
+		});
+	}
+
+	private void updateAdvancedSetting(String name, Runnable mutation) {
+		mutation.run();
+		settingsConfig.save();
+		TritonUIClient.reloadConfig();
+		settingsConfig = TritonUIClient.config();
+		settingsMessage = name + " updated.";
+		renderShell();
+	}
+
+	private void ensureAdvancedStorageLoaded() {
+		if (advancedStorageSnapshot != null || advancedStorageLoading || advancedService == null) return;
+		advancedStorageLoading = true;
+		lintExecutor.execute(() -> {
+			try {
+				StorageSnapshot snapshot = advancedService.measureStorage();
+				List<ConfigBackup> backups = advancedService.configBackups();
+				postAdvancedResult(() -> {
+					advancedStorageSnapshot = snapshot;
+					advancedConfigBackups = backups;
+					advancedStorageLoading = false;
+					renderShell();
+				});
+			} catch (Exception error) {
+				TritonUI.LOGGER.error("Failed to measure Shulkr storage", error);
+				postAdvancedResult(() -> {
+					advancedStorageLoading = false;
+					settingsMessage = "Storage measurement failed: " + safeErrorMessage(error);
+					renderShell();
+				});
+			}
+		});
+	}
+
+	private View advancedDiagnosticRow(Diagnostic diagnostic) {
+		LinearLayout row = column(4);
+		row.setPadding(10, 8, 10, 8);
+		int color = switch (diagnostic.state()) {
+			case SUCCESS -> GREEN;
+			case WARNING -> Color.argb(255, 255, 190, 88);
+			case FAILURE -> Color.argb(255, 255, 105, 130);
+			case REPAIR_AVAILABLE -> PURPLE;
+		};
+		LinearLayout title = row(8);
+		title.setGravity(Gravity.CENTER_VERTICAL);
+		title.addView(icon(diagnostic.state() == AdvancedSettingsService.State.SUCCESS ? "check-solid.png" : "circle-info-solid.png", color), new LinearLayout.LayoutParams(14, 14));
+		title.addView(label(diagnostic.name(), 12, TEXT), new LinearLayout.LayoutParams(0, wrap(), 1.0F));
+		if (!diagnostic.repairKey().isBlank()) {
+			TextView fix = label("Fix", 11, PURPLE);
+			fix.setPadding(10, 4, 10, 4);
+			fix.setBackground(round(accentAlpha(45), 7, STROKE_HOVER));
+			fix.setOnClickListener(view -> {
+				if (diagnostic.repairKey().equals("directories")) runAdvancedTask("Repairing directories…", advancedService::repairMissingDirectories);
+				else runAdvancedTask("Repairing configuration…", advancedService::repairInvalidConfigValues);
+			});
+			title.addView(fix, new LinearLayout.LayoutParams(wrap(), wrap()));
+		}
+		row.addView(title, new LinearLayout.LayoutParams(match(), wrap()));
+		row.addView(label(diagnostic.detail(), 11, MUTED));
+		row.setBackground(round(Color.argb(80, 18, 24, 39), 8, Color.argb(55, red(color), green(color), blue(color))));
+		return row;
+	}
+
+	private void runFullAdvancedDiagnostic() {
+		if (advancedDiagnosticsRunning) return;
+		advancedDiagnosticsRunning = true;
+		settingsMessage = "Running full diagnostic…";
+		renderShell();
+		lintExecutor.execute(() -> {
+			try {
+				List<Diagnostic> results = advancedService.runFullDiagnostic();
+				postAdvancedResult(() -> {
+					advancedDiagnostics = results;
+					advancedDiagnosticsRunning = false;
+					settingsMessage = "Full diagnostic completed at " + java.time.LocalTime.now().withNano(0) + ".";
+					renderShell();
+				});
+			} catch (RuntimeException error) {
+				TritonUI.LOGGER.error("Full advanced diagnostic failed", error);
+				postAdvancedResult(() -> { advancedDiagnosticsRunning = false; settingsMessage = "Diagnostic failed: " + safeErrorMessage(error); renderShell(); });
+			}
+		});
+	}
+
+	private void runAdvancedDiagnostic(Callable<Diagnostic> check) {
+		if (advancedDiagnosticsRunning) return;
+		advancedDiagnosticsRunning = true;
+		renderShell();
+		lintExecutor.execute(() -> {
+			try {
+				Diagnostic result = check.call();
+				postAdvancedResult(() -> {
+					List<Diagnostic> next = new ArrayList<>(advancedDiagnostics);
+					next.removeIf(item -> item.name().equals(result.name()));
+					next.add(result);
+					advancedDiagnostics = List.copyOf(next);
+					advancedDiagnosticsRunning = false;
+					settingsMessage = result.name() + " check completed.";
+					renderShell();
+				});
+			} catch (Exception error) {
+				TritonUI.LOGGER.error("Advanced diagnostic failed", error);
+				postAdvancedResult(() -> {
+					advancedDiagnosticsRunning = false;
+					settingsMessage = "Diagnostic failed: " + safeErrorMessage(error);
+					renderShell();
+				});
+			}
+		});
+	}
+
+	private void runAdvancedTask(String progress, Callable<OperationResult> task) {
+		settingsMessage = progress;
+		renderShell();
+		lintExecutor.execute(() -> {
+			try {
+				OperationResult result = task.call();
+				postAdvancedResult(() -> {
+					advancedStorageSnapshot = null;
+					advancedStorageLoading = false;
+					settingsMessage = result.message();
+					if (result.success()) {
+						TritonUIClient.reloadConfig();
+						settingsConfig = TritonUIClient.config();
+					}
+					renderShell();
+				});
+			} catch (Exception error) {
+				TritonUI.LOGGER.error("Advanced operation failed", error);
+				postAdvancedResult(() -> {
+					settingsMessage = "Operation failed: " + safeErrorMessage(error);
+					renderShell();
+				});
+			}
+		});
+	}
+
+	private void openAdvancedPath(Path path, boolean file, String label) {
+		runAdvancedTask("Opening " + label.toLowerCase(Locale.ROOT) + "…", () -> {
+			openPathNow(path, file);
+			return new OperationResult(true, "Opened " + label + ".", 0, 0);
+		});
+	}
+
+	private void openPathNow(Path path, boolean file) throws IOException {
+		Path normalized = path.toAbsolutePath().normalize();
+		if (file && !Files.isRegularFile(normalized)) throw new IOException("File does not exist: " + normalized.getFileName());
+		if (!file && !Files.isDirectory(normalized)) throw new IOException("Directory does not exist: " + normalized.getFileName());
+		if (Desktop.isDesktopSupported()) {
+			Desktop.getDesktop().open(normalized.toFile());
+			return;
+		}
+		if (System.getProperty("os.name", "").toLowerCase(Locale.ROOT).contains("win")) {
+			ProcessBuilder explorer = file
+					? new ProcessBuilder("explorer.exe", "/select,", normalized.toString())
+					: new ProcessBuilder("explorer.exe", normalized.toString());
+			explorer.start();
+			return;
+		}
+		throw new IOException("No platform file explorer is available.");
+	}
+
+	private void copyAdvancedDiagnostics() {
+		StringBuilder report = new StringBuilder("Shulkr Advanced Diagnostics\n");
+		for (Diagnostic item : advancedDiagnostics) report.append(item.state()).append(" | ").append(item.name()).append(" | ").append(item.detail()).append('\n');
+		if (advancedDiagnostics.isEmpty()) report.append("No diagnostic run has completed yet.\n");
+		copyToClipboard(advancedService.redact(report.toString()));
+		settingsMessage = "Copied redacted diagnostic information.";
+		renderShell();
+	}
+
+	private void exportAdvancedDiagnostics() {
+		runAdvancedTask("Exporting redacted diagnostic report…", () -> {
+			List<Diagnostic> results = advancedDiagnostics.isEmpty() ? advancedService.runFullDiagnostic() : advancedDiagnostics;
+			Path destination = advancedService.exportDiagnosticReport(results, advancedStorageSnapshot, settingsConfig);
+			return new OperationResult(true, "Exported redacted report to " + destination.getFileName() + ".", Files.size(destination), 1);
+		});
+	}
+
+	private void reloadAdvancedUi() {
+		TritonModernFragment replacement = new TritonModernFragment("Settings");
+		replacement.settingsTab = SettingsTab.ADVANCED;
+		MuiModApi.openScreen(replacement);
+	}
+
+	private void openRawConfigEditor() {
+		lintExecutor.execute(() -> {
+			try {
+				String json = Files.readString(advancedService.configFile(), StandardCharsets.UTF_8);
+				try { json = advancedService.formatConfigurationJson(json); } catch (RuntimeException ignored) { /* Keep invalid source editable. */ }
+				String editorJson = json;
+				postAdvancedResult(() -> {
+					rawConfigDraft = editorJson;
+					rawConfigError = "";
+					rawConfigApplyArmed = false;
+					openDropdownKey = "raw-config-modal";
+					renderShell();
+				});
+			} catch (Exception error) {
+				TritonUI.LOGGER.error("Could not open raw configuration editor", error);
+				postAdvancedResult(() -> { settingsMessage = "Could not read configuration: " + safeErrorMessage(error); renderShell(); });
+			}
+		});
+	}
+
+	private void copyRawConfig() {
+		lintExecutor.execute(() -> {
+			try {
+				String json = Files.readString(advancedService.configFile(), StandardCharsets.UTF_8);
+				postAdvancedResult(() -> { copyToClipboard(json); settingsMessage = "Copied configuration JSON."; renderShell(); });
+			} catch (Exception error) {
+				TritonUI.LOGGER.error("Could not copy configuration", error);
+				postAdvancedResult(() -> { settingsMessage = "Could not copy configuration: " + safeErrorMessage(error); renderShell(); });
+			}
+		});
+	}
+
+	private void reloadAdvancedConfiguration() {
+		lintExecutor.execute(() -> postAdvancedResult(() -> {
+			TritonUIClient.reloadConfig();
+			settingsConfig = TritonUIClient.config();
+			settingsMessage = "Configuration reloaded from disk.";
+			renderShell();
+		}));
+	}
+
+	private void createAdvancedConfigBackup() {
+		runAdvancedTask("Creating configuration backup…", () -> {
+			ConfigBackup backup = advancedService.createConfigBackup();
+			advancedConfigBackups = advancedService.configBackups();
+			return new OperationResult(true, "Created backup " + backup.path().getFileName() + ".", backup.size(), 1);
+		});
+	}
+
+	private void postAdvancedResult(Runnable action) {
+		if (shell != null) shell.post(action);
+	}
+
+	private static String safeErrorMessage(Exception error) {
+		return error.getMessage() == null || error.getMessage().isBlank() ? error.getClass().getSimpleName() : error.getMessage();
+	}
+
+	private static String formatBytes(long bytes) {
+		if (bytes < 1024) return bytes + " B";
+		double value = bytes;
+		String[] units = {"KB", "MB", "GB", "TB"};
+		int unit = -1;
+		do { value /= 1024.0; unit++; } while (value >= 1024.0 && unit < units.length - 1);
+		return String.format(Locale.ROOT, value >= 10 ? "%.1f %s" : "%.2f %s", value, units[unit]);
 	}
 
 	private View settingsSidePanel() {
@@ -3293,6 +3715,7 @@ public final class TritonModernFragment extends Fragment {
 
 	private View settingsSwitchRow(String name, boolean checked, Consumer<Boolean> onChanged) {
 		LinearLayout row = row(10);
+		if (settingsConfig != null && settingsConfig.showDebugTooltips()) row.setContentDescription("setting:boolean:" + name + "; current=" + checked);
 		row.setGravity(Gravity.CENTER_VERTICAL);
 		row.addView(label(name, 12, MUTED), new LinearLayout.LayoutParams(0, wrap(), 1.0F));
 		Switch toggle = animatedSwitch(checked, 50, onChanged, true);
@@ -3414,6 +3837,7 @@ public final class TritonModernFragment extends Fragment {
 
 	private View settingsActionRow(String text, String iconFile) {
 		LinearLayout row = row(10);
+		if (settingsConfig != null && settingsConfig.showDebugTooltips()) row.setContentDescription("setting:action:" + text);
 		row.setGravity(Gravity.CENTER_VERTICAL);
 		row.setPadding(12, 0, 12, 0);
 		makeHover(row, round(Color.argb(98, 18, 24, 39), 8, Color.argb(48, 105, 116, 150)),
@@ -5296,6 +5720,11 @@ public final class TritonModernFragment extends Fragment {
 			refreshConsoleLogList();
 			return;
 		}
+		if (Minescript.activeJobCount() >= settingsConfig.maximumConcurrentScripts()) {
+			appendEditorLog("Cannot start another script: the configured concurrent-script limit (" + settingsConfig.maximumConcurrentScripts() + ") is active.");
+			refreshConsoleLogList();
+			return;
+		}
 		if (settingsConfig.saveBeforeRunning() && codeEditor != null && !saveCurrentScript(false)) return;
 		String fileName = selectedScript.getFileName().toString();
 		if (".pyj".equalsIgnoreCase(extension(fileName))) {
@@ -5349,7 +5778,7 @@ public final class TritonModernFragment extends Fragment {
 		CompletableFuture.supplyAsync(() -> {
 			try { return ScriptSettingsRuntime.prepare(scriptToRun, workingDirectory); }
 			catch (IOException error) { throw new RuntimeException(error); }
-		}).whenComplete((prepared, error) -> {
+		}, lintExecutor).orTimeout(settingsConfig.scriptStartupTimeoutSeconds(), TimeUnit.SECONDS).whenComplete((prepared, error) -> {
 			if (shell == null) return;
 			shell.post(() -> {
 				if (generation != runGeneration) return;
@@ -6083,7 +6512,9 @@ public final class TritonModernFragment extends Fragment {
 	private void appendEditorLog(String message) {
 		String timestamp = java.time.LocalTime.now().withNano(0).toString();
 		editorLogs.add("[" + timestamp + "] " + message);
-		while (editorLogs.size() > 80) {
+		int maxEntries = settingsConfig == null ? 500 : settingsConfig.maximumRuntimeLogEntries();
+		int maxCharacters = (settingsConfig == null ? 1024 : settingsConfig.runtimeLogBufferSizeKb()) * 1024;
+		while (editorLogs.size() > maxEntries || editorLogs.stream().mapToInt(String::length).sum() > maxCharacters) {
 			editorLogs.removeFirst();
 		}
 	}
@@ -6586,6 +7017,7 @@ public final class TritonModernFragment extends Fragment {
 			return;
 		}
 		long delay = source.length() > 100_000 ? 500L : source.length() > 25_000 ? 300L : 140L;
+		if (settingsConfig.backgroundScriptThrottling() && currentScriptRunning) delay = Math.max(delay, 650L);
 		editorAnalysisTask = lintExecutor.schedule(() -> {
 			List<SyntaxRange> ranges = scanSyntax(source);
 			List<String> issues = lintPython(source);
@@ -6793,10 +7225,15 @@ public final class TritonModernFragment extends Fragment {
 			editorSaveStatus.setTextColor(editorDirty ? Color.argb(255, 255, 190, 88) : GREEN);
 		}
 		updateLineNumberGutter(editor.getText());
-		updateEditorMinimap(editor.getText());
+		boolean reduceUpdate = settingsConfig.reduceUiUpdatesWhileScriptRunning() && currentScriptRunning
+				&& System.currentTimeMillis() - lastReducedEditorUiUpdateAt < 250L;
+		if (!reduceUpdate) {
+			updateEditorMinimap(editor.getText());
+			lastReducedEditorUiUpdateAt = System.currentTimeMillis();
+		}
 		scheduleEditorAnalysis(editorDraft);
 		updateCompletion(editor);
-		updateEditorAssistance(editor);
+		if (!reduceUpdate) updateEditorAssistance(editor);
 		scheduleEditorAutosave();
 		persistRecoveryDraft(selectedScript, editorDraft);
 	}
@@ -7618,7 +8055,7 @@ public final class TritonModernFragment extends Fragment {
 			clickAway.setBackground(round(Color.TRANSPARENT, 0, 0));
 			clickAway.setOnClickListener(view -> closeFloatingDropdown(null));
 			outer.addView(clickAway, new FrameLayout.LayoutParams(match(), match()));
-			animateFloatingSurface(dropdown, openDropdownKey.equals("publish-modal"));
+			animateFloatingSurface(dropdown, isModalSurface());
 			outer.addView(dropdown, floatingDropdownLayoutParams());
 		}
 		return outer;
@@ -7841,6 +8278,7 @@ public final class TritonModernFragment extends Fragment {
 		if (openDropdownKey.equals("publish-modal")) {
 			return publishScriptModal();
 		}
+		if (openDropdownKey.equals("raw-config-modal")) return rawConfigModal();
 		if (openDropdownKey.equals("new-script") && (page == Page.SCRIPTS || page == Page.EDITOR)) {
 			return newScriptDropdownMenu();
 		}
@@ -7866,11 +8304,13 @@ public final class TritonModernFragment extends Fragment {
 	}
 
 	private FrameLayout.LayoutParams floatingDropdownLayoutParams() {
-		if (openDropdownKey.equals("publish-modal")) {
-			int frameWidth = currentPageFrame == null ? viewportWidth() : currentPageFrame.getWidth();
-			int frameHeight = currentPageFrame == null ? viewportHeight() : currentPageFrame.getHeight();
-			return new FrameLayout.LayoutParams(Math.min(720, Math.max(320, frameWidth - 16)),
-					Math.min(520, Math.max(300, frameHeight - 16)), Gravity.CENTER);
+		if (isModalSurface()) {
+			int frameWidth = currentPageFrame == null || currentPageFrame.getWidth() <= 0 ? viewportWidth() : currentPageFrame.getWidth();
+			int frameHeight = currentPageFrame == null || currentPageFrame.getHeight() <= 0 ? viewportHeight() : currentPageFrame.getHeight();
+			int modalWidth = openDropdownKey.equals("raw-config-modal") ? 780 : 720;
+			int modalHeight = openDropdownKey.equals("raw-config-modal") ? 620 : 520;
+			return new FrameLayout.LayoutParams(Math.min(modalWidth, Math.max(320, frameWidth - 16)),
+					Math.min(modalHeight, Math.max(300, frameHeight - 16)), Gravity.CENTER);
 		}
 		int preferredWidth = openDropdownKey.equals("new-script") ? 220
 				: openDropdownKey.equals("script-actions") ? 224
@@ -8126,6 +8566,101 @@ public final class TritonModernFragment extends Fragment {
 		return modal;
 	}
 
+	private View rawConfigModal() {
+		LinearLayout modal = column(12);
+		modal.setPadding(22, 20, 22, 20);
+		modal.setBackground(glass(Color.argb(235, 12, 17, 30), Color.argb(220, 7, 12, 22), 18, STROKE_HOVER));
+		LinearLayout title = row(12);
+		title.setGravity(Gravity.CENTER_VERTICAL);
+		title.addView(iconBadge("code-solid.png", PURPLE, accentDarkAlpha(118), 46, 11));
+		LinearLayout copy = column(3);
+		copy.addView(label("Raw Configuration", 21, TEXT));
+		copy.addView(label("Validated JSON editor — saves create a backup and replace the file atomically.", 12, MUTED));
+		title.addView(copy, new LinearLayout.LayoutParams(0, wrap(), 1.0F));
+		View close = iconButton("ellipsis-solid.png", MUTED);
+		close.setOnClickListener(view -> closeFloatingDropdown(null));
+		title.addView(close, new LinearLayout.LayoutParams(38, 38));
+		modal.addView(title, new LinearLayout.LayoutParams(match(), 54));
+
+		EditText editor = new EditText(requireContext());
+		editor.setText(rawConfigDraft);
+		editor.setSingleLine(false);
+		editor.setGravity(Gravity.TOP | Gravity.LEFT);
+		editor.setTextSize(12);
+		editor.setTextColor(TEXT);
+		editor.setPadding(12, 10, 12, 10);
+		editor.setBackground(round(Color.argb(160, 7, 11, 22), 10, STROKE));
+		editor.addTextChangedListener(new TextWatcher() {
+			public void beforeTextChanged(CharSequence value, int start, int count, int after) {}
+			public void onTextChanged(CharSequence value, int start, int before, int count) {
+				rawConfigDraft = value.toString();
+				rawConfigApplyArmed = false;
+			}
+			public void afterTextChanged(Editable value) {}
+		});
+		modal.addView(editor, new LinearLayout.LayoutParams(match(), 0, 1.0F));
+		TextView validation = label(rawConfigError.isBlank() ? "Changes are not written until validation and confirmation succeed." : rawConfigError,
+				11, rawConfigError.isBlank() ? FAINT : Color.argb(255, 255, 170, 100));
+		modal.addView(validation, new LinearLayout.LayoutParams(match(), 32));
+
+		LinearLayout actions = row(10);
+		actions.setGravity(Gravity.CENTER_VERTICAL | Gravity.RIGHT);
+		View cancel = textButton("Cancel");
+		cancel.setOnClickListener(view -> closeFloatingDropdown(null));
+		actions.addView(cancel, new LinearLayout.LayoutParams(100, 40));
+		View validate = textButton("Validate JSON");
+		validate.setOnClickListener(view -> validateRawConfigDraft());
+		actions.addView(validate, new LinearLayout.LayoutParams(130, 40));
+		View apply = primaryActionButton("check-double-solid.png", rawConfigApplyArmed ? "Confirm Apply" : "Apply Changes");
+		apply.setOnClickListener(view -> applyRawConfigDraft());
+		actions.addView(apply, new LinearLayout.LayoutParams(150, 40));
+		modal.addView(actions, new LinearLayout.LayoutParams(match(), 44));
+		return modal;
+	}
+
+	private void validateRawConfigDraft() {
+		List<String> errors = FluxusConfig.validateJson(rawConfigDraft);
+		rawConfigError = errors.isEmpty() ? "JSON is valid. Apply Changes will ask for confirmation." : String.join(" ", errors);
+		rawConfigApplyArmed = false;
+		renderShell();
+	}
+
+	private void applyRawConfigDraft() {
+		List<String> errors = FluxusConfig.validateJson(rawConfigDraft);
+		if (!errors.isEmpty()) {
+			rawConfigError = String.join(" ", errors);
+			rawConfigApplyArmed = false;
+			renderShell();
+			return;
+		}
+		if (!rawConfigApplyArmed) {
+			rawConfigApplyArmed = true;
+			rawConfigError = "Valid configuration. Click Confirm Apply to back up and replace the current file.";
+			renderShell();
+			return;
+		}
+		String json = rawConfigDraft;
+		rawConfigError = "Applying validated configuration…";
+		renderShell();
+		lintExecutor.execute(() -> {
+			try {
+				OperationResult result = advancedService.applyRawConfiguration(json);
+				postAdvancedResult(() -> {
+					TritonUIClient.reloadConfig();
+					settingsConfig = TritonUIClient.config();
+					openDropdownKey = "";
+					rawConfigApplyArmed = false;
+					settingsMessage = result.message();
+					advancedStorageSnapshot = null;
+					renderShell();
+				});
+			} catch (Exception error) {
+				TritonUI.LOGGER.error("Could not apply raw configuration", error);
+				postAdvancedResult(() -> { rawConfigError = "Apply failed: " + safeErrorMessage(error); rawConfigApplyArmed = false; renderShell(); });
+			}
+		});
+	}
+
 	private View publishInput(String title, String value, boolean multiline, Consumer<String> onChange) {
 		LinearLayout box = column(4);
 		box.addView(label(title, 12, MUTED), new LinearLayout.LayoutParams(match(), 16));
@@ -8229,7 +8764,8 @@ public final class TritonModernFragment extends Fragment {
 				|| key.equals("right-panel") || key.equals("page-spacing") || key.equals("header-behaviour")
 				|| key.equals("corner-radius") || key.equals("border-strength") || key.equals("animation-speed")
 				|| key.equals("editor-tab-size") || key.equals("editor-cursor-style")
-				|| key.equals("editor-autosave") || key.equals("editor-working-directory") || key.equals("telemetry");
+				|| key.equals("editor-autosave") || key.equals("editor-working-directory") || key.equals("telemetry")
+				|| key.equals("advanced-thread-priority");
 	}
 
 	private View settingsFloatingDropdown() {
@@ -8283,6 +8819,7 @@ public final class TritonModernFragment extends Fragment {
 		if (key.equals("editor-cursor-style")) return settingsConfig.cursorStyle();
 		if (key.equals("editor-autosave")) return settingsConfig.autosaveMode();
 		if (key.equals("editor-working-directory")) return settingsConfig.workingDirectoryMode();
+		if (key.equals("advanced-thread-priority")) return settingsConfig.executionThreadPriority();
 		if (key.equals("telemetry")) {
 			return "Local only";
 		}
@@ -8330,6 +8867,7 @@ public final class TritonModernFragment extends Fragment {
 		if (key.equals("editor-cursor-style")) return new String[]{"Line", "Block", "Underline"};
 		if (key.equals("editor-autosave")) return new String[]{"Off", "After Delay", "On Focus Change"};
 		if (key.equals("editor-working-directory")) return new String[]{"Script Folder", "Minescript Folder", "Custom"};
+		if (key.equals("advanced-thread-priority")) return new String[]{"Low", "Normal", "High"};
 		if (key.equals("telemetry")) {
 			return new String[]{"Local only", "Off", "Diagnostics only"};
 		}
@@ -8427,6 +8965,11 @@ public final class TritonModernFragment extends Fragment {
 		if (key.equals("editor-working-directory")) {
 			settingsConfig.setWorkingDirectoryMode(option);
 			saveSettingsConfig("Working directory set to " + option + ".");
+			return;
+		}
+		if (key.equals("advanced-thread-priority")) {
+			settingsConfig.setExecutionThreadPriority(option);
+			saveSettingsConfig("Execution priority set to " + option + ". Reload UI to apply it to worker threads.");
 			return;
 		}
 		if (key.equals("telemetry")) {
@@ -9785,6 +10328,10 @@ public final class TritonModernFragment extends Fragment {
 		});
 	}
 
+	private boolean isModalSurface() {
+		return openDropdownKey.equals("publish-modal") || openDropdownKey.equals("raw-config-modal");
+	}
+
 	private void closeFloatingDropdown(Runnable afterClose) {
 		if (dropdownClosing) {
 			return;
@@ -9800,7 +10347,7 @@ public final class TritonModernFragment extends Fragment {
 		}
 		dropdownClosing = true;
 		animateDropdownArrow(currentDropdownArrow, false);
-		boolean modal = openDropdownKey.equals("publish-modal");
+		boolean modal = isModalSurface();
 		float endScale = modal ? 0.985F : 0.965F;
 		float endY = modal ? 10.0F : -5.0F;
 		AnimatorSet set = new AnimatorSet();

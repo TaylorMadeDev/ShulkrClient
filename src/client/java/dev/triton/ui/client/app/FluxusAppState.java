@@ -82,6 +82,9 @@ public final class FluxusAppState {
 	private final ConcurrentLinkedQueue<RemoteCommand> remoteCommands = new ConcurrentLinkedQueue<>();
 	private volatile Map<String, Object> clientTelemetry = Map.of();
 	private volatile String deviceToken = "";
+	private volatile boolean autoReconnectDashboard = true;
+	private volatile int reconnectDelaySeconds = 5;
+	private volatile long nextReconnectAttemptMillis;
 
 	public static FluxusAppState get() {
 		return INSTANCE;
@@ -241,6 +244,20 @@ public final class FluxusAppState {
 
 	private Set<String> defaultUtilityModulePaths() {
 		return Set.of("camera_controller.py", "title_bridge.py", "VanillaPathfinding.pyj");
+	}
+
+	public void applyRuntimeConfig(FluxusConfig config) {
+		if (config == null) return;
+		autoReconnectDashboard = config.autoReconnectDashboard();
+		reconnectDelaySeconds = config.clientBridgeReconnectDelaySeconds();
+		if (autoReconnectDashboard) nextReconnectAttemptMillis = 0L;
+	}
+
+	public boolean testBackendConnection() {
+		boolean connected = probeBackend();
+		backendOnline = connected;
+		if (!connected) scheduleReconnect();
+		return connected;
 	}
 
 	private Set<String> legacyAutoModulePaths() {
@@ -629,8 +646,10 @@ public final class FluxusAppState {
 			return;
 		}
 		if (!backendOnline) {
+			if (!canAttemptReconnect()) return;
 			backendOnline = probeBackend();
 			if (!backendOnline) {
+				scheduleReconnect();
 				return;
 			}
 		}
@@ -650,6 +669,8 @@ public final class FluxusAppState {
 			}
 		} catch (IOException | InterruptedException | RuntimeException ignored) {
 			if (ignored instanceof InterruptedException) Thread.currentThread().interrupt();
+			backendOnline = false;
+			scheduleReconnect();
 		}
 	}
 
@@ -658,6 +679,7 @@ public final class FluxusAppState {
 	}
 
 	private void sendBackendHeartbeat() {
+		if (!backendOnline && !canAttemptReconnect()) return;
 		Profile current;
 		synchronized (this) {
 			current = profile.normalized().withLastSeen(Instant.now().toString());
@@ -686,6 +708,7 @@ public final class FluxusAppState {
 				.thenAccept(response -> {
 					backendOnline = response.statusCode() >= 200 && response.statusCode() < 300;
 					if (!backendOnline) {
+						scheduleReconnect();
 						licenseBlocked = false;
 						return;
 					}
@@ -709,9 +732,18 @@ public final class FluxusAppState {
 				})
 				.exceptionally(error -> {
 					backendOnline = false;
+					scheduleReconnect();
 					licenseBlocked = false;
 					return null;
 				});
+	}
+
+	private boolean canAttemptReconnect() {
+		return autoReconnectDashboard && System.currentTimeMillis() >= nextReconnectAttemptMillis;
+	}
+
+	private void scheduleReconnect() {
+		nextReconnectAttemptMillis = System.currentTimeMillis() + TimeUnit.SECONDS.toMillis(Math.max(1, reconnectDelaySeconds));
 	}
 
 	private synchronized void rememberDeviceToken(String token) {
