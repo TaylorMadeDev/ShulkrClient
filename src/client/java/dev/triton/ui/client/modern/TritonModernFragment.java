@@ -3923,7 +3923,7 @@ public final class TritonModernFragment extends Fragment {
 				}
 				return false;
 			});
-			menu.addView(row, new LinearLayout.LayoutParams(match(), 48));
+			menu.addView(row, new LinearLayout.LayoutParams(match(), 40));
 		}
 		scroll.addView(menu, new ScrollView.LayoutParams(match(), wrap()));
 		surface.addView(scroll, new FrameLayout.LayoutParams(match(), match()));
@@ -3935,7 +3935,7 @@ public final class TritonModernFragment extends Fragment {
 	}
 
 	private int dropdownOptionsHeight(int options) {
-		return 16 + options * 52;
+		return 12 + options * 44;
 	}
 
 	private View settingsSwitchRow(String name, boolean checked) {
@@ -8741,8 +8741,10 @@ public final class TritonModernFragment extends Fragment {
 				: openDropdownKey.equals("editor-script-context") ? 188
 				: openDropdownKey.equals("command-palette") ? 340
 				: dropdownOptionsHeight(settingsDropdownOptions(openDropdownKey).length);
-		int frameWidth = currentPageFrame == null ? viewportWidth() : currentPageFrame.getWidth();
-		int frameHeight = currentPageFrame == null ? viewportHeight() : currentPageFrame.getHeight();
+		int frameWidth = currentPageFrame == null || currentPageFrame.getWidth() <= 0
+				? viewportWidth() : currentPageFrame.getWidth();
+		int frameHeight = currentPageFrame == null || currentPageFrame.getHeight() <= 0
+				? viewportHeight() : currentPageFrame.getHeight();
 		int width = Math.min(preferredWidth, Math.max(220, frameWidth - 16));
 		int height = Math.min(preferredHeight, Math.max(80, frameHeight - 16));
 		FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(width, height, Gravity.TOP | Gravity.LEFT);
