@@ -293,6 +293,9 @@ public final class TritonModernFragment extends Fragment {
 	private int dropdownAnchorX;
 	private int dropdownAnchorY;
 	private int dropdownAnchorWidth = 220;
+	private int dropdownAnchorTopInWindow;
+	private int dropdownAnchorBottomInWindow;
+	private int dropdownAnchorLeftInWindow;
 	private String consoleTab = "Console";
 	private String renamingDraft = "";
 	private boolean stylingEditorText;
@@ -3822,6 +3825,12 @@ public final class TritonModernFragment extends Fragment {
 	private View settingsSelectRow(String key, String name, String value) {
 		LinearLayout row = row(10);
 		row.setGravity(Gravity.CENTER_VERTICAL);
+		row.setPadding(10, 0, 10, 0);
+		row.setFocusable(true);
+		row.setContentDescription("Select " + name + ": " + value);
+		GradientDrawable normal = round(Color.argb(126, 18, 24, 39), 8, STROKE);
+		GradientDrawable hover = round(Color.argb(176, 27, 33, 53), 8, STROKE_HOVER);
+		makeHover(row, normal, hover);
 		row.addView(label(name, 12, MUTED), new LinearLayout.LayoutParams(116, wrap()));
 		TextView valueLabel = label(value, 12, TEXT);
 		valueLabel.setSingleLine(true);
@@ -3851,6 +3860,13 @@ public final class TritonModernFragment extends Fragment {
 		select.setOnClickListener(view -> {
 			toggleDropdown(key, view, Math.max(260, view.getWidth()));
 		});
+		select.setOnKeyListener((view, keyCode, event) -> {
+			if (event.getAction() == KeyEvent.ACTION_DOWN && (keyCode == KeyEvent.KEY_ENTER || keyCode == KeyEvent.KEY_SPACE)) {
+				toggleDropdown(key, view, Math.max(260, view.getWidth()));
+				return true;
+			}
+			return false;
+		});
 		box.addView(select, new LinearLayout.LayoutParams(match(), 38));
 		return box;
 	}
@@ -3861,18 +3877,29 @@ public final class TritonModernFragment extends Fragment {
 		select.setOnClickListener(view -> {
 			toggleDropdown("accent", view, Math.max(260, view.getWidth()));
 		});
+		select.setOnKeyListener((view, keyCode, event) -> {
+			if (event.getAction() == KeyEvent.ACTION_DOWN && (keyCode == KeyEvent.KEY_ENTER || keyCode == KeyEvent.KEY_SPACE)) {
+				toggleDropdown("accent", view, Math.max(260, view.getWidth()));
+				return true;
+			}
+			return false;
+		});
 		box.addView(select, new LinearLayout.LayoutParams(match(), 38));
 		return box;
 	}
 
 	private View dropdownMenu(String selected, String[] options, Consumer<String> onSelected, boolean swatches) {
+		FrameLayout surface = new FrameLayout(requireContext());
+		surface.setPadding(6, 6, 6, 6);
+		surface.setBackground(dropdownSurface(10));
+		ScrollView scroll = new ScrollView(requireContext());
+		scroll.setFillViewport(false);
 		LinearLayout menu = column(4);
-		menu.setPadding(6, 6, 6, 6);
-		menu.setBackground(dropdownSurface(10));
 		for (String option : options) {
 			LinearLayout row = row(8);
 			row.setGravity(Gravity.CENTER_VERTICAL);
-			row.setPadding(10, 0, 10, 0);
+			row.setPadding(12, 0, 12, 0);
+			row.setFocusable(true);
 			boolean active = option.equals(selected);
 			makeHover(row, active ? round(Color.argb(132, red(PURPLE), green(PURPLE), blue(PURPLE)), 8, Color.argb(110, red(PURPLE), green(PURPLE), blue(PURPLE)))
 							: round(Color.TRANSPARENT, 8, 0),
@@ -3888,9 +3915,18 @@ public final class TritonModernFragment extends Fragment {
 				row.addView(icon("check-solid.png", TEXT), new LinearLayout.LayoutParams(13, 13));
 			}
 			row.setOnClickListener(view -> closeFloatingDropdown(() -> onSelected.accept(option)));
-			menu.addView(row, new LinearLayout.LayoutParams(match(), 28));
+			row.setOnKeyListener((view, keyCode, event) -> {
+				if (event.getAction() == KeyEvent.ACTION_DOWN && (keyCode == KeyEvent.KEY_ENTER || keyCode == KeyEvent.KEY_SPACE)) {
+					closeFloatingDropdown(() -> onSelected.accept(option));
+					return true;
+				}
+				return false;
+			});
+			menu.addView(row, new LinearLayout.LayoutParams(match(), 40));
 		}
-		return menu;
+		scroll.addView(menu, new ScrollView.LayoutParams(match(), wrap()));
+		surface.addView(scroll, new FrameLayout.LayoutParams(match(), match()));
+		return surface;
 	}
 
 	private boolean isDropdownOpen(String key) {
@@ -3898,7 +3934,7 @@ public final class TritonModernFragment extends Fragment {
 	}
 
 	private int dropdownOptionsHeight(int options) {
-		return 12 + options * 32;
+		return 12 + options * 44;
 	}
 
 	private View settingsSwitchRow(String name, boolean checked) {
@@ -8047,13 +8083,6 @@ public final class TritonModernFragment extends Fragment {
 			String line = lines[i];
 			String trimmed = line.trim();
 			int lineNumber = i + 1;
-			if (line.indexOf('\t') >= 0) {
-				issues.add("Line " + lineNumber + ": use spaces instead of tabs");
-			}
-			int leadingSpaces = line.length() - line.stripLeading().length();
-			if (!trimmed.isEmpty() && leadingSpaces % 4 != 0) {
-				issues.add("Line " + lineNumber + ": indentation should be a multiple of 4 spaces");
-			}
 			if (!trimmed.isEmpty() && !trimmed.startsWith("#")) {
 				String withoutComment = stripPythonComment(line);
 				if (!balancedQuotes(withoutComment)) {
@@ -8072,14 +8101,8 @@ public final class TritonModernFragment extends Fragment {
 						if (ch == '}') brace--;
 					}
 				}
-				if (looksLikePythonBlock(trimmed) && !trimmed.endsWith(":")) {
-					issues.add("Line " + lineNumber + ": block statement should end with ':'");
-				}
 				if (trimmed.startsWith("import ") && trimmed.endsWith(",")) {
 					issues.add("Line " + lineNumber + ": dangling comma in import");
-				}
-				if (trimmed.length() > 96) {
-					issues.add("Line " + lineNumber + ": line is longer than 96 characters");
 				}
 			}
 		}
@@ -8089,7 +8112,6 @@ public final class TritonModernFragment extends Fragment {
 		if (tripleDouble || tripleSingle) {
 			issues.add("File: unclosed triple-quoted string");
 		}
-		lintUndefinedNames(source, issues);
 		return issues;
 	}
 
@@ -8447,6 +8469,7 @@ public final class TritonModernFragment extends Fragment {
 			outer.addView(clickAway, new FrameLayout.LayoutParams(match(), match()));
 			animateFloatingSurface(dropdown, isModalSurface());
 			outer.addView(dropdown, floatingDropdownLayoutParams());
+			if (!isModalSurface()) dropdown.post(() -> positionFloatingDropdown(dropdown));
 		}
 		return outer;
 	}
@@ -8735,14 +8758,32 @@ public final class TritonModernFragment extends Fragment {
 		openDropdownKey = key;
 		dropdownAnchorWidth = Math.max(preferredWidth, anchor.getWidth());
 		int[] anchorLocation = new int[2];
-		int[] frameLocation = new int[2];
 		anchor.getLocationInWindow(anchorLocation);
-		if (currentPageFrame != null) {
-			currentPageFrame.getLocationInWindow(frameLocation);
-		}
-		dropdownAnchorX = anchorLocation[0] - frameLocation[0];
-		dropdownAnchorY = anchorLocation[1] - frameLocation[1] + anchor.getHeight();
+		dropdownAnchorLeftInWindow = anchorLocation[0];
+		dropdownAnchorTopInWindow = anchorLocation[1];
+		dropdownAnchorBottomInWindow = anchorLocation[1] + anchor.getHeight();
+		dropdownAnchorX = anchorLocation[0];
+		dropdownAnchorY = dropdownAnchorBottomInWindow;
 		renderShell();
+	}
+
+	private void positionFloatingDropdown(View dropdown) {
+		if (dropdown != currentFloatingDropdown || currentPageFrame == null || isModalSurface()) return;
+		ViewGroup.LayoutParams rawParams = dropdown.getLayoutParams();
+		if (!(rawParams instanceof FrameLayout.LayoutParams params)) return;
+		int[] frameLocation = new int[2];
+		currentPageFrame.getLocationInWindow(frameLocation);
+		int frameWidth = currentPageFrame.getWidth();
+		int frameHeight = currentPageFrame.getHeight();
+		if (frameWidth <= 0 || frameHeight <= 0) return;
+		int width = dropdown.getWidth() > 0 ? dropdown.getWidth() : params.width;
+		int height = dropdown.getHeight() > 0 ? dropdown.getHeight() : params.height;
+		int x = Math.max(8, Math.min(dropdownAnchorLeftInWindow - frameLocation[0], frameWidth - width - 8));
+		int below = dropdownAnchorBottomInWindow - frameLocation[1] + 6;
+		int above = dropdownAnchorTopInWindow - frameLocation[1] - height - 6;
+		int y = below + height <= frameHeight - 8 || above < 8 ? below : above;
+		params.setMargins(x, Math.max(8, Math.min(y, frameHeight - height - 8)), 0, 0);
+		dropdown.setLayoutParams(params);
 	}
 
 	private void openCommandPalette(View anchor) {
@@ -10583,6 +10624,8 @@ public final class TritonModernFragment extends Fragment {
 	private View nav(String text, String iconFile, boolean active) {
 		boolean compact = useCompactNavigation();
 		FrameLayout shell = new FrameLayout(requireContext());
+		shell.setFocusable(true);
+		shell.setContentDescription(text);
 		View hoverLayer = new View(requireContext());
 		GradientDrawable normal = active
 				? glass(accentAlpha(210), accentDarkAlpha(170), 12, PURPLE_SOFT)
@@ -10602,6 +10645,11 @@ public final class TritonModernFragment extends Fragment {
 		}
 		shell.addView(item, new FrameLayout.LayoutParams(match(), match()));
 		makeSlidingHover(shell, hoverLayer, normal, hover, active);
+		shell.setOnFocusChangeListener((view, focused) -> {
+			hoverLayer.setBackground(focused ? hover : normal);
+			hoverLayer.setAlpha(focused || active ? 1.0F : 0.0F);
+			hoverLayer.setScaleX(focused || active ? 1.0F : 0.0F);
+		});
 		addPressAnimation(shell);
 		if (text.equals("Dashboard")) {
 			shell.setOnClickListener(view -> openPage(Page.DASHBOARD));
