@@ -296,6 +296,7 @@ public final class TritonModernFragment extends Fragment {
 	private int dropdownAnchorTopInWindow;
 	private int dropdownAnchorBottomInWindow;
 	private int dropdownAnchorLeftInWindow;
+	private int dropdownAnchorRightInWindow;
 	private String consoleTab = "Console";
 	private String renamingDraft = "";
 	private boolean stylingEditorText;
@@ -3922,7 +3923,7 @@ public final class TritonModernFragment extends Fragment {
 				}
 				return false;
 			});
-			menu.addView(row, new LinearLayout.LayoutParams(match(), 40));
+			menu.addView(row, new LinearLayout.LayoutParams(match(), 48));
 		}
 		scroll.addView(menu, new ScrollView.LayoutParams(match(), wrap()));
 		surface.addView(scroll, new FrameLayout.LayoutParams(match(), match()));
@@ -3934,7 +3935,7 @@ public final class TritonModernFragment extends Fragment {
 	}
 
 	private int dropdownOptionsHeight(int options) {
-		return 12 + options * 44;
+		return 16 + options * 52;
 	}
 
 	private View settingsSwitchRow(String name, boolean checked) {
@@ -8760,6 +8761,7 @@ public final class TritonModernFragment extends Fragment {
 		int[] anchorLocation = new int[2];
 		anchor.getLocationInWindow(anchorLocation);
 		dropdownAnchorLeftInWindow = anchorLocation[0];
+		dropdownAnchorRightInWindow = anchorLocation[0] + anchor.getWidth();
 		dropdownAnchorTopInWindow = anchorLocation[1];
 		dropdownAnchorBottomInWindow = anchorLocation[1] + anchor.getHeight();
 		dropdownAnchorX = anchorLocation[0];
@@ -8778,7 +8780,8 @@ public final class TritonModernFragment extends Fragment {
 		if (frameWidth <= 0 || frameHeight <= 0) return;
 		int width = dropdown.getWidth() > 0 ? dropdown.getWidth() : params.width;
 		int height = dropdown.getHeight() > 0 ? dropdown.getHeight() : params.height;
-		int x = Math.max(8, Math.min(dropdownAnchorLeftInWindow - frameLocation[0], frameWidth - width - 8));
+		// Shared selects align their menu with the chevron/right edge, expanding inward from the trigger.
+		int x = Math.max(8, Math.min(dropdownAnchorRightInWindow - frameLocation[0] - width, frameWidth - width - 8));
 		int below = dropdownAnchorBottomInWindow - frameLocation[1] + 6;
 		int above = dropdownAnchorTopInWindow - frameLocation[1] - height - 6;
 		int y = below + height <= frameHeight - 8 || above < 8 ? below : above;
@@ -10639,16 +10642,44 @@ public final class TritonModernFragment extends Fragment {
 		LinearLayout item = row(compact ? 0 : 14);
 		item.setPadding(compact ? 0 : 16, 0, compact ? 0 : 16, 0);
 		item.setGravity(compact ? Gravity.CENTER : Gravity.CENTER_VERTICAL);
-		item.addView(icon(iconFile, TEXT), new LinearLayout.LayoutParams(20, 20));
+		ImageView navIcon = icon(iconFile, active ? TEXT : MUTED);
+		item.addView(navIcon, new LinearLayout.LayoutParams(20, 20));
 		if (!compact) {
 			item.addView(label(text, 15, TEXT));
 		}
 		shell.addView(item, new FrameLayout.LayoutParams(match(), match()));
-		makeSlidingHover(shell, hoverLayer, normal, hover, active);
+		shell.setClickable(true);
+		hoverLayer.setPivotX(0.0F);
+		hoverLayer.setPivotY(0.0F);
+		hoverLayer.setAlpha(active ? 1.0F : 0.0F);
+		hoverLayer.setScaleX(active ? 1.0F : 0.0F);
+		hoverLayer.setScaleY(1.0F);
+		final AnimatorSet[] hoverLayerAnimation = new AnimatorSet[1];
+		final AnimatorSet[] hoverIconAnimation = new AnimatorSet[1];
+		shell.setOnHoverListener((target, event) -> {
+			if (event.getAction() == MotionEvent.ACTION_HOVER_ENTER) {
+				hoverLayer.setBackground(hover);
+				navIcon.setImageTintList(ColorStateList.valueOf(TEXT));
+				startSlideAnimation(hoverLayerAnimation, hoverLayer, 1.0F, 1.0F, animationDuration(HOVER_IN_MS));
+				startScaleAnimation(hoverIconAnimation, navIcon, 1.08F, animationDuration(HOVER_IN_MS));
+				return true;
+			}
+			if (event.getAction() == MotionEvent.ACTION_HOVER_EXIT) {
+				hoverLayer.setBackground(normal);
+				navIcon.setImageTintList(ColorStateList.valueOf(active ? TEXT : MUTED));
+				startSlideAnimation(hoverLayerAnimation, hoverLayer, active ? 1.0F : 0.0F, active ? 1.0F : 0.0F, animationDuration(HOVER_OUT_MS));
+				startScaleAnimation(hoverIconAnimation, navIcon, 1.0F, animationDuration(HOVER_OUT_MS));
+				return true;
+			}
+			return false;
+		});
 		shell.setOnFocusChangeListener((view, focused) -> {
 			hoverLayer.setBackground(focused ? hover : normal);
 			hoverLayer.setAlpha(focused || active ? 1.0F : 0.0F);
 			hoverLayer.setScaleX(focused || active ? 1.0F : 0.0F);
+			navIcon.setImageTintList(ColorStateList.valueOf(focused || active ? TEXT : MUTED));
+			navIcon.setScaleX(focused ? 1.08F : 1.0F);
+			navIcon.setScaleY(focused ? 1.08F : 1.0F);
 		});
 		addPressAnimation(shell);
 		if (text.equals("Dashboard")) {
